@@ -10,7 +10,8 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
     "auto-save": "node auto-save.js",
-    "auto-save:start": "start /B node auto-save.js"
+    "auto-save:start": "start /B node auto-save.js",
+    "start": "start-dev.bat"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"
