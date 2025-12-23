@@ -9,7 +9,10 @@ export class ClientsController {
   @Get()
   async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<Client[]> {
     const effectiveCompanyId = companyId || req?.user?.companyId;
-    return this.clientsService.findAll(effectiveCompanyId);
+    console.log('ClientsController.findAll - companyId:', companyId, 'req?.user?.companyId:', req?.user?.companyId, 'effectiveCompanyId:', effectiveCompanyId);
+    const clients = await this.clientsService.findAll(effectiveCompanyId);
+    console.log('ClientsController.findAll - encontrados:', clients.length, 'clientes');
+    return clients;
   }
 
   @Get(':id')
@@ -18,7 +21,11 @@ export class ClientsController {
   }
 
   @Post()
-  async create(@Body() clientData: Partial<Client>): Promise<Client> {
+  async create(@Body() clientData: Partial<Client>, @Request() req?: any): Promise<Client> {
+    const companyId = req?.user?.companyId || clientData.companyId;
+    if (companyId && !clientData.companyId) {
+      clientData.companyId = companyId;
+    }
     return this.clientsService.create(clientData);
   }
 

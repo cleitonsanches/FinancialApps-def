@@ -7,9 +7,9 @@ export class ContactsController {
   constructor(private contactsService: ContactsService) {}
 
   @Get()
-  async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<Contact[]> {
+  async findAll(@Query('companyId') companyId?: string, @Query('clientId') clientId?: string, @Request() req?: any): Promise<Contact[]> {
     const effectiveCompanyId = companyId || req?.user?.companyId;
-    return this.contactsService.findAll(effectiveCompanyId);
+    return this.contactsService.findAll(effectiveCompanyId, clientId);
   }
 
   @Get(':id')

@@ -13,6 +13,8 @@
     "migrate:chart-status": "ts-node -r tsconfig-paths/register src/database/add-status-column.ts",
     "migrate:bank-fields": "ts-node -r tsconfig-paths/register src/database/add-bank-account-fields.ts",
     "migrate:pix-key": "ts-node -r tsconfig-paths/register src/database/add-pix-key-column.ts",
+    "migrate:client-fields": "ts-node -r tsconfig-paths/register src/database/add-client-fields.ts",
+    "migrate:fix-razao-social": "ts-node -r tsconfig-paths/register src/database/fix-razao-social-nullable.ts",
     "check:bank-accounts": "ts-node -r tsconfig-paths/register src/database/check-bank-accounts.ts",
     "seed:admin": "ts-node -r tsconfig-paths/register src/database/seed-admin.ts",
     "test:login": "ts-node -r tsconfig-paths/register src/database/test-login.ts"

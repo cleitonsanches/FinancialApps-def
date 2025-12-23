@@ -10,10 +10,13 @@ export class ContactsService {
     private contactRepository: Repository<Contact>,
   ) {}
 
-  async findAll(companyId?: string): Promise<Contact[]> {
+  async findAll(companyId?: string, clientId?: string): Promise<Contact[]> {
     const where: any = {};
     if (companyId) {
       where.companyId = companyId;
+    }
+    if (clientId) {
+      where.clientId = clientId;
     }
     return this.contactRepository.find({ 
       where, 

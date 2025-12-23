@@ -11,10 +11,15 @@ export class ClientsService {
   ) {}
 
   async findAll(companyId?: string): Promise<Client[]> {
+    console.log('ClientsService.findAll - companyId:', companyId);
     if (companyId) {
-      return this.clientRepository.find({ where: { companyId } });
+      const clients = await this.clientRepository.find({ where: { companyId } });
+      console.log('ClientsService.findAll - encontrados com companyId:', clients.length);
+      return clients;
     }
-    return this.clientRepository.find();
+    const allClients = await this.clientRepository.find();
+    console.log('ClientsService.findAll - encontrados todos:', allClients.length);
+    return allClients;
   }
 
   async findOne(id: string): Promise<Client> {
@@ -22,6 +27,12 @@ export class ClientsService {
   }
 
   async create(clientData: Partial<Client>): Promise<Client> {
+    // Garantir que razaoSocial sempre tenha um valor (mesmo que seja string vazia)
+    if (!clientData.razaoSocial && clientData.name) {
+      clientData.razaoSocial = clientData.name;
+    } else if (!clientData.razaoSocial) {
+      clientData.razaoSocial = '';
+    }
     const client = this.clientRepository.create(clientData);
     return this.clientRepository.save(client);
   }
