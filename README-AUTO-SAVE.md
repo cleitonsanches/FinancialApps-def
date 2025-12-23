@@ -77,3 +77,4 @@ Para iniciar o salvamento automático sempre que o Windows iniciar:
 2. Digite `shell:startup` e pressione Enter
 3. Crie um atalho para `start-auto-save.bat` nesta pasta
 
+

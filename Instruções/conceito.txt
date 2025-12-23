@@ -1,0 +1,94 @@
+ Conceito correto (visão de negócio)
+
+Proposta e Negociação não são coisas diferentes — são estados do mesmo processo comercial.
+
+O que muda é o status e o nível de comprometimento.
+
+⸻
+
+🧠 Modelo mental recomendado
+
+Uma única área:
+
+Propostas / Negociações
+
+Dentro dela, você separa por status:
+
+📌 Propostas (em andamento)
+	•	Rascunho
+	•	Enviada ao cliente
+	•	Em negociação
+	•	Ajustes solicitados
+
+📌 Negociações fechadas
+	•	Ganha
+	•	Perdida
+	•	Cancelada
+
+👉 Isso evita duplicação, confusão e retrabalho.
+
+⸻
+
+🗂️ Estrutura correta no banco (reforçando)
+
+Você já está no caminho certo com:
+status:
+- draft
+- proposta_enviada
+- em_negociacao
+- ganha
+- perdida
+
+proposal (opcional)
+
+Use apenas se:
+	•	Precisa versionar PDF
+	•	Precisa histórico de envio
+	•	Precisa múltiplas propostas para a mesma negociação
+
+Caso contrário:
+➡️ Pode existir só negotiation
+
+⸻
+
+🖥️ Como refletir isso na interface (boa prática de UX)
+
+Aba principal:
+
+Propostas & Negociações
+
+Filtros ou sub-abas:
+	•	📝 Propostas
+	•	status ≠ ganha/perdida
+	•	🤝 Fechadas
+	•	status = ganha
+	•	status = perdida
+
+Ou ainda melhor:
+	•	Kanban por status
+	•	Draft → Enviada → Negociação → Ganha/Perdida
+
+⸻
+
+⚙️ Impacto direto no seu fluxo automático
+
+Quando status ≠ ganha
+	•	❌ NÃO cria financeiro
+	•	❌ NÃO cria projeto
+	•	✔️ Pode editar livremente
+
+Quando status = ganha
+	•	🔒 Trava campos críticos
+	•	⚙️ Dispara:
+	•	Geração financeira
+	•	Criação do projeto
+	•	📌 Guarda snapshot do template
+
+⸻
+
+🚨 Anti-padrões que você está evitando (muito bem)
+
+❌ Tabela separada proposal e negotiation sem necessidade
+❌ Duplicar dados de cliente, valores, escopo
+❌ Lógicas diferentes para proposta e negociação
+❌ “Copiar proposta para negociação”

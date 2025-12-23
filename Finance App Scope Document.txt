@@ -1,0 +1,415 @@
+Guia Técnico Completo: Aplicativo de Gestão Financeira
+Instruções para Iniciar no Cursor
+Versão: 1.0
+Data: Dezembro 2025
+Objetivo: Criar um aplicativo responsivo de gestão financeira para iOS/Web com Cursor AI
+
+1. Visão Geral do Projeto
+Este documento fornece todas as instruções necessárias para criar um aplicativo de gestão financeira corporativa usando Cursor como assistente de desenvolvimento. O app será responsivo (mobile-first para iOS), baseado em uma arquitetura moderna com front-end React/Next.js e back-end Node.js.
+1.1 Requisitos Iniciais
+* Volume de dados: < 10 lançamentos/mês (carga mínima)
+* Responsividade: iOS + Web (mobile-first)
+* Infraestrutura: Azure SQL Database + Azure Blob Storage
+* Stack: React/Next.js + Node.js/NestJS + TypeScript
+1.2 Arquitetura Geral
+???????????????????????????????????????????????????????
+? Frontend (React/Next.js) ?
+? Responsivo para iOS/Mobile + Desktop ?
+???????????????????????????????????????????????????????
+? HTTPS/REST API
+???????????????????????????????????????????????????????
+? Backend (Node.js/NestJS + TypeScript) ?
+? Lógica de negócio, autenticação, processamento ?
+???????????????????????????????????????????????????????
+?
+???????????????????????
+? ? ?
+???????????? ?????????? ?????????????????
+? Azure SQL? ? Blob ? ? Banco Local ?
+? Database ? ?Storage ? ? (Sincroniz.) ?
+???????????? ?????????? ?????????????????
+
+2. Setup Inicial no Cursor
+2.1 Preparação do Ambiente
+Passo 1: Criar o Repositório Inicial
+1. Crie uma pasta para o projeto
+mkdir finance-app
+cd finance-app
+2. Inicialize um monorepo (recomendado com Turborepo)
+npm create turbo@latest
+Ou configure manualmente:
+mkdir apps packages
+mkdir apps/web apps/api
+mkdir packages/database packages/types packages/utils
+Passo 2: Configurar Git e Versionamento
+Inicializar repositório Git
+git init
+git remote add origin https://github.com/seu-usuario/finance-app.git
+Criar arquivo .gitignore
+echo "node_modules/
+dist/
+.env
+.env.local
+.next/
+build/
+coverage/
+.DS_Store
+*.log" > .gitignore
+git add .gitignore
+git commit -m "initial: setup gitignore"
+Passo 3: Criar Arquivo .env.local na Raiz
+Azure SQL Database
+DATABASE_URL=Server=seu-servidor.database.windows.net;Database=finance-db;User Id=seu-usuario;Password=sua-senha;Encrypt=true;TrustServerCertificate=false;Connection Timeout=30;
+Azure Blob Storage
+AZURE_STORAGE_ACCOUNT_NAME=seuarmazenamento
+AZURE_STORAGE_ACCOUNT_KEY=sua-chave-de-acesso
+AZURE_STORAGE_CONTAINER_NAME=finance-app
+Backend
+NODE_ENV=development
+PORT=3001
+JWT_SECRET=sua-chave-jwt-secreta-muito-longa
+Frontend
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_APP_NAME=Finance App
+Passo 4: Estrutura de Pastas Recomendada
+finance-app/
+??? apps/
+? ??? web/ # React/Next.js frontend
+? ? ??? src/
+? ? ? ??? app/ # Next.js app directory
+? ? ? ??? components/ # Componentes React reutilizáveis
+? ? ? ??? pages/ # Páginas (se usar pages router)
+? ? ? ??? hooks/ # Custom hooks (useAuth, useFinance)
+? ? ? ??? services/ # Chamadas HTTP para API
+? ? ? ??? styles/ # Estilos globais e Tailwind
+? ? ? ??? utils/ # Funções utilitárias
+? ? ? ??? types/ # Tipos TypeScript
+? ? ??? package.json
+? ? ??? next.config.js
+? ?
+? ??? api/ # Node.js/NestJS backend
+? ??? src/
+? ? ??? modules/ # Módulos de negócio
+? ? ? ??? auth/
+? ? ? ??? accounts-receivable/
+? ? ? ??? accounts-payable/
+? ? ? ??? reconciliation/
+? ? ? ??? reimbursement/
+? ? ? ??? attachments/
+? ? ??? common/ # Filtros, Guards, Pipes
+? ? ??? database/ # TypeORM entities e migrations
+? ? ??? config/ # Configurações
+? ? ??? main.ts # Entry point
+? ??? package.json
+? ??? tsconfig.json
+?
+??? packages/
+? ??? database/ # Schemas, migrations, seeds
+? ? ??? migrations/
+? ? ??? seeds/
+? ??? types/ # DTOs e tipos compartilhados
+? ??? utils/ # Utilitários compartilhados
+?
+??? .env.local
+??? .gitignore
+??? package.json (root)
+??? README.md
+2.2 Prompts para Usar no Cursor
+Prompt 1: Inicializar Frontend Next.js Responsivo
+Crie uma aplicação Next.js responsiva (mobile-first) para iOS com:
+1. Estrutura base com TypeScript
+2. Tailwind CSS para estilos responsivos
+3. Layout adaptativo para iPhone (viewport < 768px)
+4. Páginas principais:
+o /auth/login (tela de login)
+o /dashboard (dashboard financeiro)
+o /contas-receber (contas a receber)
+o /contas-pagar (contas a pagar)
+o /reembolsos (gestão de reembolsos)
+o /conciliacao (conciliação)
+5. Componentes reutilizáveis:
+o FormInput (input responsivo)
+o FormSelect (select com estilo mobile-first)
+o Card (container padrão)
+o Button (botão responsivo)
+o Header (navegação)
+o Navbar (menu inferior para mobile)
+6. Use Context API para estado global (autenticação, empresa)
+Gere a estrutura completa pronta para começar a desenvolver.
+Prompt 2: Inicializar Backend NestJS
+Crie um backend NestJS com TypeScript para a API financeira:
+1. Configuração base com TypeORM conectado ao Azure SQL Database
+2. Módulos iniciais:
+o AuthModule (login, JWT)
+o CompanyModule (empresa)
+o AccountsReceivableModule
+o AccountsPayableModule
+o ReimbursementModule
+o AttachmentsModule
+3. Para cada módulo, crie:
+o entities/ (modelos TypeORM)
+o dto/ (Data Transfer Objects)
+o services/ (lógica de negócio)
+o controllers/ (endpoints REST)
+4. Guards: JwtGuard, RolesGuard
+5. Interceptadores: logging, transformação de resposta
+6. Tratamento de erros global
+Pronto para integrar banco de dados Azure SQL.
+Prompt 3: Modelar Banco de Dados
+Crie as migrations TypeORM para Azure SQL Database com as seguintes tabelas:
+Tabelas principais:
+1. users (id, name, email, password_hash, company_id, created_at)
+2. companies (id, razao_social, cnpj, logo_url)
+3. clients (id, company_id, razao_social, cnpj_cpf, contact_email)
+4. suppliers (id, company_id, razao_social, cnpj_cpf)
+5. chart_of_accounts (id, company_id, code, name, type: 'RECEITA'|'DESPESA'|'REEMBOLSO', center_cost)
+6. invoices (id, company_id, invoice_number, series, emission_date, due_date, client_id, gross_value, calculation_base, status)
+7. invoice_taxes (id, invoice_id, tax_type, rate, provisioned_value, expected_payment_date)
+8. accounts_payable (id, company_id, supplier_id, description, chart_id, competency_date, due_date, total_value, is_installment, status)
+9. payable_installments (id, account_payable_id, installment_number, due_date, value, status)
+10. reimbursements (id, company_id, user_id, description, chart_id, expense_date, amount, status)
+11. financial_entries (id, company_id, type: 'RECEITA'|'DESPESA'|'IMPOSTO'|'REEMBOLSO', origin_entity, origin_id, entry_date, payment_date, amount, bank_account, notes)
+12. attachments (id, company_id, entity_type, entity_id, file_type: 'pdf'|'png'|'jpeg', original_filename, blob_path, upload_date, file_size)
+Crie índices nas colunas de busca frequente (company_id, status, due_date).
+Adicione foreign keys e cascata de delete onde apropriado.
+Prompt 4: Integrar Azure Blob Storage
+Crie um serviço no NestJS para gerenciar attachments com Azure Blob Storage:
+1. AttachmentsService com métodos:
+o uploadFile(file: Express.Multer.File, entityType: string, entityId: string): Promise<AttachmentDTO>
+o downloadFile(attachmentId: string): Promise<Buffer>
+o generateSasUrl(attachmentId: string, expiryMinutes: number): Promise<string>
+o deleteFile(attachmentId: string): Promise<void>
+2. AttachmentsController com endpoints:
+o POST /attachments (upload)
+o GET /attachments/:id/download (download)
+o GET /attachments/:id/preview (URL temporária)
+o DELETE /attachments/:id (deletar)
+3. Use @nestjs/common/HttpException para tratamento de erros
+4. Validar tipos de arquivo (pdf, png, jpeg) e tamanho máximo (10MB)
+5. Nomear arquivos no blob com GUID + metadados
+Pronto para integrar no frontend.
+
+3. Instruções de Desenvolvimento com Cursor
+3.1 Fluxo de Trabalho Recomendado
+Fase 1: Setup e Autenticação (1-2 dias)
+1. Criar estrutura inicial
+o Use os prompts 1 e 2 acima
+o Gere boilerplate completo
+2. Implementar Login
+o Tela de login responsiva
+o JWT no backend
+o Armazenar token no localStorage (web) / AsyncStorage (React Native)
+3. Testar autenticação
+o Fazer login e receber token
+o Chamar endpoint protegido
+Prompt para Cursor:
+Implemente sistema de autenticação completo:
+* Frontend: tela de login responsiva, armazenar JWT em localStorage
+* Backend: endpoint POST /auth/login validando email/senha
+* Retornar token + dados do usuário (id, empresa)
+* Implement JwtGuard para proteger rotas
+Fase 2: Módulo Contas a Receber (2-3 dias)
+1. Criar tela de NF
+o Formulário com cliente, número, datas, valor
+o Upload de PDF
+2. Backend endpoints
+o POST /invoices (criar NF)
+o GET /invoices (listar com filtros)
+o PUT /invoices/:id (editar)
+o DELETE /invoices/:id (deletar)
+3. Provisão de impostos
+o Ao salvar NF, calcular impostos automaticamente
+o Criar registros em invoice_taxes
+Prompt para Cursor:
+Implemente o módulo Contas a Receber:
+1. Tela responsiva com:
+o Seletor de cliente (dropdown)
+o Campos: número NF, série, data emissão, vencimento, valor bruto, base cálculo
+o Upload PDF
+o Botão salvar
+2. Backend:
+o POST /invoices/create com validação de dados
+o Ao salvar, chamar função de cálculo de impostos
+o Impostos: ISS (5%), IRPJ (15%), PIS (1.65%), COFINS (7.6%) - configurável por empresa
+o Gerar registros em financial_entries (tipo RECEITA e IMPOSTO)
+3. GET /invoices com filtros:
+o Por status (emitida, recebida, cancelada)
+o Por período (data_emissao)
+o Por cliente
+Deixe pronto para usar.
+Fase 3: Módulo Contas a Pagar (2-3 dias)
+1. Criar tela de CP
+o Formulário com fornecedor, valor, vencimento
+o Opção de parcelar
+2. Backend endpoints
+o POST /accounts-payable (criar CP)
+o POST /accounts-payable/:id/installments (gerar parcelas automaticamente)
+o POST /accounts-payable/:id/pay (registrar pagamento)
+3. Geração automática de parcelas
+Prompt para Cursor:
+Implemente o módulo Contas a Pagar:
+1. Tela responsiva com:
+o Seletor de fornecedor
+o Campos: descrição, valor, vencimento, tipo (única/parcelada)
+o Se parcelada: número parcelas, intervalo (mensal)
+o Upload boleto em PDF
+2. Backend:
+o POST /accounts-payable/create
+o Lógica: se parcelada=true, gerar N registros em payable_installments
+o Exemplo: 3000 BRL em 3x = 1000 BRL cada parcela com 30 dias de intervalo
+3. GET /accounts-payable com filtros por status/vencimento
+4. POST /accounts-payable/:id/pay registrando pagamento
+o Atualizar status em payable_installments
+o Criar entrada em financial_entries (tipo DESPESA)
+Integre com lista visual em card.
+Fase 4: Conciliação (1-2 dias)
+1. Dashboard de conciliação
+o Somar receitas, despesas, impostos
+o Calcular saldo
+2. Backend endpoint
+o GET /reconciliation/summary (período, empresa)
+Prompt para Cursor:
+Implemente Dashboard de Conciliação:
+1. Tela com:
+o Período selecionável (mês/ano)
+o Cards exibindo:
+* Total Receitas (sum invoices)
+* Total Impostos Provisionados (sum invoice_taxes)
+* Total Despesas (sum payable_installments pagos)
+* Total Reembolsos (sum reimbursements pagos)
+* Saldo = Receitas - Impostos - Despesas - Reembolsos
+2. Backend:
+o GET /reconciliation/summary?start_date=&end_date=&company_id=
+o Retornar agregados de todas as tabelas
+3. Cards responsivos em grid mobile (1 coluna) / desktop (2 colunas)
+Fase 5: Reembolsos (1-2 dias)
+1. Tela de reembolso
+o Descrição, valor, foto de comprovante (PNG/JPEG)
+o Status: solicitado ? aprovado ? pago
+2. Backend endpoints
+Prompt para Cursor:
+Implemente módulo Reembolsos:
+1. Tela com:
+o Descrição da despesa
+o Valor
+o Upload de recibo (PNG/JPEG)
+o Status (readonly): Solicitado / Aprovado / Pago
+2. Backend:
+o POST /reimbursements/create
+o GET /reimbursements (listar do usuário)
+o PUT /reimbursements/:id/approve (admin)
+o PUT /reimbursements/:id/pay (admin)
+3. Ao pagar, criar entrada em financial_entries (tipo REEMBOLSO)
+
+4. Checklist de Implementação
+Fase 1: Setup ?
+* [ ] Estrutura de pastas criada
+* [ ] .env.local configurado
+* [ ] Git inicializado
+* [ ] Next.js rodando em localhost:3000
+* [ ] NestJS rodando em localhost:3001
+* [ ] Conexão Azure SQL testada
+Fase 2: Autenticação ?
+* [ ] Tela de login responsiva
+* [ ] JWT gerado no backend
+* [ ] Token armazenado no frontend
+* [ ] JwtGuard protegendo rotas
+* [ ] Teste manual de login
+Fase 3: Contas a Receber ?
+* [ ] Criar NF com cálculo de impostos
+* [ ] Listar NFs com filtros
+* [ ] Upload de PDF
+* [ ] Tela responsiva iOS
+Fase 4: Contas a Pagar ?
+* [ ] Criar CP com parcelamento
+* [ ] Listar CP com filtros
+* [ ] Baixa de parcelas
+* [ ] Upload de boleto
+Fase 5: Conciliação ?
+* [ ] Dashboard de conciliação
+* [ ] Cálculo de saldo
+* [ ] Filtro por período
+Fase 6: Reembolsos ?
+* [ ] Criar reembolso
+* [ ] Upload de recibo
+* [ ] Aprovação/Pagamento
+Fase 7: Anexos ?
+* [ ] Azure Blob Storage integrado
+* [ ] Upload funcionando
+* [ ] Download/preview funcionando
+Fase 8: Testes e Deploy ?
+* [ ] Testes unitários backend
+* [ ] Testes de integração
+* [ ] Deploy em Azure App Service (frontend)
+* [ ] Deploy em Azure Container Instances (backend)
+
+5. Prompts Avançados para Cursor
+5.1 Implementar Sync Offline (Opcional)
+Implemente sincronização offline no React com:
+* IndexedDB para armazenar dados localmente
+* Service Worker para cache de requisições
+* Hook useOnlineSync() que sincroniza quando conexão retorna
+* Indicador visual de status "offline/online"
+Uso: app funcionaria mesmo sem internet, sincronizando quando voltar online.
+5.2 Relatórios em PDF
+Implemente geração de relatórios em PDF com:
+* React-pdf para renderizar PDF
+* Endpoint GET /reports/reconciliation-pdf?month=&year=
+* Backend gera PDF com table de movimentações
+* Frontend faz download automático
+5.3 Autenticação Multi-Empresa
+Implemente suporte a multi-empresa:
+* Usuário pode ter acesso a múltiplas empresas
+* Seletor de empresa no header
+* Todos os queries filtram por company_id
+* Permissões por empresa (owner, manager, viewer)
+
+6. Recursos de Referência
+Documentação Oficial
+* Next.js Docs
+* NestJS Docs
+* TypeORM with Azure SQL
+* Azure Blob Storage SDK
+* Tailwind CSS Responsive
+Templates no Cursor
+* Ao criar novo arquivo, use Ctrl+K ? "Generate file from template"
+* Exemplos úteis: React component, NestJS service, migration
+Debugging
+* Use console.log() liberalmente + Chrome DevTools
+* Backend: use npm run start:debug no NestJS
+* Frontend: use React DevTools extension
+
+7. Dicas Finais para Usar com Cursor Eficientemente
+1. Prompts específicos
+o Quanto mais detalhado o prompt, melhor o resultado
+o Inclua: "pronto para usar", "com tratamento de erro", "responsivo"
+2. Iteração rápida
+o Se gerado código não ficar perfeito, edite e peça para melhorar
+o Exemplo: "Este componente está muito grande. Refatore dividindo em 3 componentes menores."
+3. Aproveitar AI para testes
+o Peça: "Gere testes unitários para esta função"
+o Peça: "Gere dados mock para este endpoint"
+4. Documentação
+o Peça: "Gere JSDoc/comentários para este código"
+o Documentação facilita futuros ajustes
+5. Performance
+o No frontend: use React.memo, useMemo, useCallback para componentes pesados
+o No backend: use pagination, índices no BD, caching com Redis (se necessário)
+6. Segurança
+o Nunca commit .env local
+o Use secrets do Azure Key Vault para produção
+o Valide inputs no backend (nunca confie no frontend)
+7. Manutenção
+o Mantenha estrutura consistente de pastas
+o Use nomes descritivos (invoiceService, not invServ)
+o Commit frequente com mensagens claras
+
+Próximos Passos
+1. Hoje: Setup inicial + Prompt 1 e 2 no Cursor
+2. Dia 2-3: Implementar autenticação
+3. Dia 4-6: Contas a Receber
+4. Dia 7-9: Contas a Pagar
+5. Dia 10-12: Conciliação + Reembolsos
+6. Dia 13-14: Testes e ajustes finais
+Tempo total estimado: 2 semanas com Cursor acelerando o desenvolvimento
+Boa sorte! Use este documento como referência enquanto trabalha com Cursor. ??

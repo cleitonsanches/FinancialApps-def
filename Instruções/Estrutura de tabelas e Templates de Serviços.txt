@@ -1,0 +1,83 @@
+Estrutura de Tabelas – Negociações e Templates de Serviço
+1. Tabelas de Templates
+service_template
+- id (PK)
+- name
+- code
+- description
+- active
+- version
+- created_at
+- updated_at
+
+service_template_field
+- id (PK)
+- service_template_id (FK)
+- field_key
+- label
+- field_type
+- required
+- default_value
+- options (json)
+- order_index
+- created_at
+
+service_template_financial
+- id (PK)
+- service_template_id (FK)
+- financial_type
+- value_source
+- value
+- value_field_key
+- installments
+- center_cost
+- created_at
+
+service_template_project
+- id (PK)
+- service_template_id (FK)
+- project_type
+- default_name
+- start_rule
+- end_rule
+- created_at
+
+service_template_project_phase
+- id (PK)
+- service_template_project_id (FK)
+- name
+- order_index
+- created_at
+2. Tabelas de Negociação / Proposta
+negotiation
+- id (PK)
+- client_id (FK)
+- service_template_id (FK)
+- template_version
+- status
+- total_value
+- close_date
+- created_at
+- updated_at
+
+negotiation_field_value
+- id (PK)
+- negotiation_id (FK)
+- field_key
+- value
+- created_at
+
+proposal (opcional)
+- id (PK)
+- negotiation_id (FK)
+- proposal_number
+- valid_until
+- status
+- created_at
+3. Fluxo Geral
+1. Criar negociação
+2. Selecionar template de serviço
+3. Renderizar campos dinâmicos
+4. Preencher valores
+5. Salvar negociação
+6. Ao ganhar, gerar financeiro e projeto automaticamente

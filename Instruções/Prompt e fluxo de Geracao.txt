@@ -1,0 +1,61 @@
+Prompt Otimizado e Fluxo de Geração Automática
+1. PROMPT OTIMIZADO PARA CURSOR
+
+Você é um engenheiro de software sênior especializado em ERPs.
+
+Estou desenvolvendo um mini ERP para uma microempresa.
+O sistema possui os módulos:
+- Negociações / Propostas
+- Templates de Serviço
+- Financeiro
+- Projetos
+
+Arquitetura baseada em templates configuráveis.
+
+Regras principais:
+1. Cada negociação usa um Service Template
+2. O template define campos dinâmicos, financeiro e projeto
+3. Ao fechar negociação (status = ganha), gerar financeiro e projeto
+4. Negociações devem manter a versão do template
+5. Campos dinâmicos em EAV controlado
+
+Tabelas:
+service_template
+service_template_field
+service_template_financial
+service_template_project
+service_template_project_phase
+negotiation
+negotiation_field_value
+proposal
+
+Tarefas:
+- Gerar entidades
+- Criar migrations
+- Separar service layer, domain rules e repositórios
+- Evitar lógica hardcoded
+- Priorizar extensibilidade
+
+2. FLUXO DE GERAÇÃO AUTOMÁTICA
+
+Negociação criada
+Seleciona template
+Renderiza campos dinâmicos
+Usuário preenche
+Status muda para ganha
+Trigger de negócio
+Geração financeira
+Geração do projeto
+
+Financeiro:
+- Tipo único, parcelado ou recorrente
+- Valor fixo ou vindo de campo da negociação
+- Gera lançamentos provisionados
+
+Projeto:
+- Criar projeto baseado no template
+- Criar fases automaticamente
+- Vincular à negociação
+
+Boa prática:
+Criar tabela automation_log para auditoria.
