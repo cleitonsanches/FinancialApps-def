@@ -12,14 +12,27 @@ export class UsersService {
   ) {}
 
   async findAll(companyId?: string): Promise<User[]> {
+    const where: any = {};
     if (companyId) {
-      return this.userRepository.find({ where: { companyId } });
+      where.companyId = companyId;
     }
-    return this.userRepository.find();
+    try {
+      return await this.userRepository.find({ 
+        where, 
+        relations: ['company', 'contact'] 
+      });
+    } catch (error) {
+      console.error('Erro ao buscar usuários com relações:', error);
+      // Se houver erro com as relações, tentar sem elas
+      return await this.userRepository.find({ where });
+    }
   }
 
   async findOne(id: string): Promise<User> {
-    return this.userRepository.findOne({ where: { id } });
+    return this.userRepository.findOne({ 
+      where: { id }, 
+      relations: ['company', 'contact'] 
+    });
   }
 
   async findByEmail(email: string): Promise<User | null> {

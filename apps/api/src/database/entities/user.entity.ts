@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Company } from './company.entity';
+import { Contact } from './contact.entity';
 
 @Entity('users')
 export class User {
@@ -21,6 +22,19 @@ export class User {
   @ManyToOne(() => Company, { nullable: true })
   @JoinColumn({ name: 'company_id' })
   company?: Company;
+
+  @Column({ name: 'contact_id', nullable: true })
+  contactId?: string;
+
+  @ManyToOne(() => Contact, { nullable: true })
+  @JoinColumn({ name: 'contact_id' })
+  contact?: Contact;
+
+  @Column({ name: 'is_admin', type: 'boolean', default: false })
+  isAdmin: boolean;
+
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

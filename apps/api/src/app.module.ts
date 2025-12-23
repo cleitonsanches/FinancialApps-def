@@ -11,7 +11,9 @@ import { ProposalsModule } from './modules/proposals/proposals.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { ProjectTemplatesModule } from './modules/project-templates/project-templates.module';
+import { ProposalTemplatesModule } from './modules/proposal-templates/proposal-templates.module';
 import { UsersModule } from './modules/users/users.module';
+import { ContactsModule } from './modules/contacts/contacts.module';
 
 @Module({
   imports: [
@@ -32,7 +34,9 @@ import { UsersModule } from './modules/users/users.module';
     InvoicesModule,
     ProjectsModule,
     ProjectTemplatesModule,
+    ProposalTemplatesModule,
     UsersModule,
+    ContactsModule,
   ],
 })
 export class AppModule {}
