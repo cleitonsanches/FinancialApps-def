@@ -1,159 +1,202 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Proposal } from '../../database/entities/proposal.entity';
+import { Project, ProjectTask } from '../../database/entities/project.entity';
+import { ProjectTemplate } from '../../database/entities/project-template.entity';
+import { ProjectTemplateTask } from '../../database/entities/project-template-task.entity';
 
 @Injectable()
 export class ProposalsService {
   constructor(
     @InjectRepository(Proposal)
     private proposalRepository: Repository<Proposal>,
+    @InjectRepository(Project)
+    private projectRepository: Repository<Project>,
+    @InjectRepository(ProjectTask)
+    private projectTaskRepository: Repository<ProjectTask>,
+    @InjectRepository(ProjectTemplate)
+    private projectTemplateRepository: Repository<ProjectTemplate>,
+    @InjectRepository(ProjectTemplateTask)
+    private projectTemplateTaskRepository: Repository<ProjectTemplateTask>,
   ) {}
 
-  async generateProposalNumber(companyId: string): Promise<string> {
-    const currentYear = new Date().getFullYear();
-    
-    // Buscar todas as propostas do ano atual para esta empresa
-    const startOfYear = new Date(currentYear, 0, 1);
-    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
-    
-    const proposalsThisYear = await this.proposalRepository.find({
-      where: { 
-        companyId,
-      },
-      order: { dataProposta: 'DESC' },
+  async findAll(companyId?: string): Promise<Proposal[]> {
+    const where: any = {};
+    if (companyId) {
+      where.companyId = companyId;
+    }
+    return this.proposalRepository.find({ 
+      where,
+      relations: ['client', 'user'],
+      order: { createdAt: 'DESC' },
     });
+  }
 
-    // Filtrar propostas do ano atual e extrair o maior sequencial
-    let maxSequence = 0;
-    
-    for (const proposal of proposalsThisYear) {
-      if (proposal.numeroProposta) {
-        const parts = proposal.numeroProposta.split('/');
-        if (parts.length === 2) {
-          const proposalYear = parseInt(parts[1]);
-          const sequence = parseInt(parts[0]);
-          
-          if (proposalYear === currentYear && !isNaN(sequence)) {
-            if (sequence > maxSequence) {
-              maxSequence = sequence;
-            }
+  async findOne(id: string): Promise<Proposal> {
+    return this.proposalRepository.findOne({ 
+      where: { id },
+      relations: ['client', 'user'],
+    });
+  }
+
+  async create(proposalData: Partial<Proposal>): Promise<Proposal> {
+    const proposal = this.proposalRepository.create(proposalData);
+    return this.proposalRepository.save(proposal);
+  }
+
+  async update(id: string, proposalData: Partial<Proposal>): Promise<Proposal> {
+    const existingProposal = await this.findOne(id);
+    if (!existingProposal) {
+      throw new Error('Proposta não encontrada');
+    }
+
+    // Lógica para lidar com mudanças de status
+    if (proposalData.status && proposalData.status !== existingProposal.status) {
+      const linkedProjects = await this.projectRepository.find({
+        where: { proposalId: id },
+        relations: ['tasks'],
+      });
+
+      // Se status mudou de FECHADA para outro (RASCUNHO, ENVIADA, etc.), deletar projetos e tarefas
+      if (existingProposal.status === 'FECHADA' && 
+          ['RASCUNHO', 'ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(proposalData.status)) {
+        for (const project of linkedProjects) {
+          if (project.tasks) {
+            await this.projectTaskRepository.delete({ projectId: project.id });
+          }
+          await this.projectRepository.delete(project.id);
+        }
+      }
+
+      // Se status mudou para DECLINADA, deletar projetos e tarefas
+      if (proposalData.status === 'DECLINADA') {
+        for (const project of linkedProjects) {
+          if (project.tasks) {
+            await this.projectTaskRepository.delete({ projectId: project.id });
+          }
+          await this.projectRepository.delete(project.id);
+        }
+      }
+
+      // Se status mudou para CANCELADA, alterar status dos projetos e tarefas
+      if (proposalData.status === 'CANCELADA') {
+        for (const project of linkedProjects) {
+          await this.projectRepository.update(project.id, { status: 'NEGOCIACAO_CANCELADA' });
+          if (project.tasks) {
+            await this.projectTaskRepository.update(
+              { projectId: project.id },
+              { status: 'CANCELADA' }
+            );
           }
         }
       }
     }
 
-    const nextSequence = maxSequence + 1;
-    return `${nextSequence}/${currentYear}`;
+    await this.proposalRepository.update(id, proposalData);
+    return this.findOne(id);
   }
 
-  async create(createProposalDto: any, companyId: string, userId: string) {
-    // Gerar número da proposta automaticamente se não fornecido
-    let numeroProposta = createProposalDto.numeroProposta;
-    if (!numeroProposta) {
-      numeroProposta = await this.generateProposalNumber(companyId);
-    }
-
-    // Calcular data de validade: 10 dias após a criação (se não fornecida)
-    let dataValidade = createProposalDto.dataValidade;
-    if (!dataValidade) {
-      const hoje = new Date();
-      hoje.setDate(hoje.getDate() + 10);
-      dataValidade = hoje;
-    }
-
-    // Calcular data condicionada ao aceite: mesma da validade (se não fornecida)
-    let dataCondicionadaAceite = createProposalDto.dataCondicionadaAceite;
-    if (!dataCondicionadaAceite) {
-      dataCondicionadaAceite = dataValidade;
-    }
-
-    const proposal = this.proposalRepository.create({
-      ...createProposalDto,
-      numeroProposta,
-      companyId,
-      userId,
-      dataValidade,
-      dataCondicionadaAceite,
-    });
-    return await this.proposalRepository.save(proposal);
+  async delete(id: string): Promise<void> {
+    await this.proposalRepository.delete(id);
   }
 
-  async findAll(companyId: string) {
-    return await this.proposalRepository.find({
-      where: { companyId },
-      relations: ['client', 'user'],
-      order: { dataProposta: 'DESC' },
-    });
-  }
-
-  async findOne(id: string, companyId: string) {
-    const proposal = await this.proposalRepository.findOne({
-      where: { id, companyId },
-      relations: ['client', 'user', 'templateProposta'],
-    });
-
+  async createProjectFromTemplate(proposalId: string, templateId: string, startDate: Date): Promise<any> {
+    const proposal = await this.findOne(proposalId);
     if (!proposal) {
-      throw new NotFoundException('Proposta não encontrada');
+      throw new Error('Proposta não encontrada');
     }
 
-    return proposal;
-  }
-
-  async update(id: string, updateProposalDto: any, companyId: string) {
-    // Buscar a proposta atual para verificar o status
-    const currentProposal = await this.proposalRepository.findOne({
-      where: { id, companyId },
+    const template = await this.projectTemplateRepository.findOne({
+      where: { id: templateId },
+      relations: ['tasks'],
     });
 
-    if (!currentProposal) {
-      throw new NotFoundException('Proposta não encontrada');
+    if (!template) {
+      throw new Error('Template não encontrado');
     }
 
-    // Se o status está sendo alterado para ENVIADA ou RE_ENVIADA, atualizar data de validade
-    if ((updateProposalDto.status === 'ENVIADA' || updateProposalDto.status === 'RE_ENVIADA') && 
-        currentProposal.status !== 'ENVIADA' && currentProposal.status !== 'RE_ENVIADA') {
-      // Calcular nova data de validade: 10 dias após a alteração do status
-      const hoje = new Date();
-      hoje.setDate(hoje.getDate() + 10);
-      updateProposalDto.dataValidade = hoje;
-      
-      // Se data condicionada não foi fornecida, usar a mesma da validade
-      if (!updateProposalDto.dataCondicionadaAceite) {
-        updateProposalDto.dataCondicionadaAceite = hoje;
+    // Criar projeto
+    const project = this.projectRepository.create({
+      companyId: proposal.companyId,
+      clientId: proposal.clientId,
+      proposalId: proposal.id,
+      templateId: template.id,
+      name: template.name,
+      description: template.description,
+      serviceType: template.serviceType,
+      dataInicio: startDate,
+      status: 'PENDENTE',
+    });
+
+    const savedProject = await this.projectRepository.save(project);
+
+    // Calcular e criar tarefas
+    const tasks: ProjectTask[] = [];
+    const taskMap = new Map<string, ProjectTask>();
+
+    // Ordenar tarefas do template por ordem
+    const sortedTemplateTasks = (template.tasks || []).sort((a, b) => a.ordem - b.ordem);
+
+    for (const templateTask of sortedTemplateTasks) {
+      let taskStartDate: Date;
+
+      if (templateTask.diasAposInicioProjeto !== null && templateTask.diasAposInicioProjeto !== undefined) {
+        // Tarefa baseada na data de início do projeto
+        taskStartDate = new Date(startDate);
+        taskStartDate.setDate(taskStartDate.getDate() + templateTask.diasAposInicioProjeto);
+      } else if (templateTask.tarefaAnteriorId) {
+        // Tarefa baseada na tarefa anterior
+        const previousTask = taskMap.get(templateTask.tarefaAnteriorId);
+        if (previousTask && previousTask.dataInicio) {
+          taskStartDate = new Date(previousTask.dataInicio);
+          taskStartDate.setDate(taskStartDate.getDate() + templateTask.duracaoPrevistaDias);
+        } else {
+          taskStartDate = new Date(startDate);
+        }
+      } else {
+        taskStartDate = new Date(startDate);
+      }
+
+      const taskEndDate = new Date(taskStartDate);
+      taskEndDate.setDate(taskEndDate.getDate() + templateTask.duracaoPrevistaDias);
+
+      const task = this.projectTaskRepository.create({
+        projectId: savedProject.id,
+        name: templateTask.name,
+        description: templateTask.description,
+        dataInicio: taskStartDate,
+        dataConclusao: taskEndDate,
+        status: 'PENDENTE',
+        ordem: templateTask.ordem,
+      });
+
+      const savedTask = await this.projectTaskRepository.save(task);
+      tasks.push(savedTask);
+      taskMap.set(templateTask.id, savedTask);
+    }
+
+    // Calcular data fim do projeto baseada na última tarefa
+    if (tasks.length > 0) {
+      const lastTask = tasks[tasks.length - 1];
+      if (lastTask.dataConclusao) {
+        savedProject.dataFim = lastTask.dataConclusao;
+        await this.projectRepository.save(savedProject);
       }
     }
 
-    // Se o status atual é ENVIADA e não está sendo alterado explicitamente,
-    // alterar automaticamente para REVISADA
-    // Isso acontece quando a proposta é editada (campos alterados) mas o status não é explicitamente mudado
-    if (currentProposal.status === 'ENVIADA' && updateProposalDto.status === undefined) {
-      updateProposalDto.status = 'REVISADA';
-    }
-
-    // Remover campos que não existem na entidade
-    const allowedFields = [
-      'clientId', 'titulo', 'valorProposto', 'valorTotal', 'status',
-      'templatePropostaId', 'descricaoProjeto', 'tipoContratacao',
-      'tipoFaturamento', 'horasEstimadas', 'dataInicio', 'dataConclusao',
-      'inicioFaturamento', 'fimFaturamento', 'dataVencimento',
-      'condicaoPagamento', 'sistemaOrigem', 'sistemaDestino',
-      'produto', 'manutencoes', 'dataValidade', 'dataCondicionadaAceite'
-    ];
-
-    const filteredDto: any = {};
-    Object.keys(updateProposalDto).forEach(key => {
-      if (allowedFields.includes(key)) {
-        filteredDto[key] = updateProposalDto[key];
-      }
-    });
-
-    await this.proposalRepository.update({ id, companyId }, filteredDto);
-    return await this.findOne(id, companyId);
-  }
-
-  async remove(id: string, companyId: string) {
-    await this.proposalRepository.delete({ id, companyId });
+    return {
+      project: {
+        ...savedProject,
+        dataInicio: savedProject.dataInicio ? savedProject.dataInicio.toISOString().split('T')[0] : null,
+        dataFim: savedProject.dataFim ? savedProject.dataFim.toISOString().split('T')[0] : null,
+      },
+      tasks: tasks.map(task => ({
+        ...task,
+        dataInicio: task.dataInicio ? task.dataInicio.toISOString().split('T')[0] : null,
+        dataConclusao: task.dataConclusao ? task.dataConclusao.toISOString().split('T')[0] : null,
+      })),
+    };
   }
 }
 

@@ -27,11 +27,11 @@ export default function NavigationLinks() {
   }, [showFinanceMenu])
 
   return (
-    <div className="flex gap-2 items-center flex-nowrap overflow-x-auto">
+    <div className="flex gap-2 flex-wrap">
       {/* Agenda */}
       <Link
         href="/agenda"
-        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 whitespace-nowrap"
+        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
       >
         Agenda
       </Link>
@@ -39,7 +39,7 @@ export default function NavigationLinks() {
       {/* Projetos */}
       <Link
         href="/projetos"
-        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 whitespace-nowrap"
+        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
       >
         Projetos
       </Link>
@@ -47,7 +47,7 @@ export default function NavigationLinks() {
       {/* Negociações */}
       <Link
         href="/negociacoes"
-        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 whitespace-nowrap"
+        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
       >
         Negociações
       </Link>
@@ -56,7 +56,7 @@ export default function NavigationLinks() {
       <div className="relative" ref={financeMenuRef}>
         <button
           onClick={() => setShowFinanceMenu(!showFinanceMenu)}
-          className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1 whitespace-nowrap"
+          className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
         >
           Financeiro
           <span className="text-xs">▼</span>
@@ -103,20 +103,20 @@ export default function NavigationLinks() {
         )}
       </div>
       
+      {/* Templates */}
+      <Link
+        href="/templates"
+        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+      >
+        Templates
+      </Link>
+      
       {/* Cadastros */}
       <Link
         href="/cadastros"
-        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 whitespace-nowrap"
+        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
       >
         Cadastros
-      </Link>
-      
-      {/* Administração */}
-      <Link
-        href="/templates"
-        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 whitespace-nowrap"
-      >
-        Administração
       </Link>
       
       {/* Botão de Logout */}
@@ -127,7 +127,7 @@ export default function NavigationLinks() {
           // Redirecionar para a página de login
           router.push('/auth/login')
         }}
-        className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors whitespace-nowrap"
+        className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
         title="Sair do sistema"
       >
         Sair

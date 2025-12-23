@@ -1,39 +1,35 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request } from '@nestjs/common';
 import { ClientsService } from './clients.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Client } from '../../database/entities/client.entity';
 
 @Controller('clients')
-@UseGuards(JwtAuthGuard)
 export class ClientsController {
-  constructor(private readonly clientsService: ClientsService) {}
-
-  @Post()
-  create(@Body() createClientDto: any, @Request() req: any) {
-    const companyId = req.user?.companyId;
-    if (!companyId) {
-      throw new BadRequestException('Usuário não possui empresa vinculada. Por favor, cadastre uma empresa primeiro.');
-    }
-    return this.clientsService.create(createClientDto, companyId);
-  }
+  constructor(private clientsService: ClientsService) {}
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.clientsService.findAll(req.user?.companyId);
+  async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<Client[]> {
+    const effectiveCompanyId = companyId || req?.user?.companyId;
+    return this.clientsService.findAll(effectiveCompanyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Request() req: any) {
-    return this.clientsService.findOne(id, req.user?.companyId);
+  async findOne(@Param('id') id: string): Promise<Client> {
+    return this.clientsService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateClientDto: any, @Request() req: any) {
-    return this.clientsService.update(id, updateClientDto, req.user?.companyId);
+  @Post()
+  async create(@Body() clientData: Partial<Client>): Promise<Client> {
+    return this.clientsService.create(clientData);
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() clientData: Partial<Client>): Promise<Client> {
+    return this.clientsService.update(id, clientData);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.clientsService.remove(id, req.user?.companyId);
+  async delete(@Param('id') id: string): Promise<void> {
+    return this.clientsService.delete(id);
   }
 }
 

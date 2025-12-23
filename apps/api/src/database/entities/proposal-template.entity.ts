@@ -13,19 +13,11 @@ export class ProposalTemplate {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @Column({ name: 'nome', type: 'varchar', length: 200 })
-  nome: string;
+  @Column({ name: 'name', type: 'varchar', length: 255 })
+  name: string;
 
-  @Column({ name: 'tipo_servico', type: 'varchar', length: 50 })
-  tipoServico: string; // AUTOMACOES, CONSULTORIA, TREINAMENTO, etc.
-
-  @Column({ name: 'descricao', type: 'text', nullable: true })
-  descricao?: string;
-
-  // Configuração JSON dos campos visíveis/obrigatórios
-  // Formato: { "campo": { "visivel": true, "obrigatorio": false, "valorPadrao": null } }
-  @Column({ name: 'configuracao_campos', type: 'text', nullable: true })
-  configuracaoCampos?: string; // JSON string
+  @Column({ name: 'content', type: 'text', nullable: true })
+  content?: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

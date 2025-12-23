@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { Company } from './company.entity';
 
 @Entity('chart_of_accounts')
-export class ChartOfAccount {
+@Index('IX_chart_of_accounts_company_id', ['companyId'])
+export class ChartOfAccounts {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -16,19 +17,19 @@ export class ChartOfAccount {
   @Column({ name: 'code', type: 'varchar', length: 50 })
   code: string;
 
-  @Column({ name: 'name', type: 'varchar', length: 200 })
+  @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
   @Column({ name: 'type', type: 'varchar', length: 20 })
-  type: 'RECEITA' | 'DESPESA' | 'REEMBOLSO';
+  type: string; // RECEITA, DESPESA, REEMBOLSO
 
   @Column({ name: 'center_cost', type: 'varchar', length: 100, nullable: true })
   centerCost?: string;
 
-  @CreateDateColumn({ name: 'created_at', select: false })
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', select: false })
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
 

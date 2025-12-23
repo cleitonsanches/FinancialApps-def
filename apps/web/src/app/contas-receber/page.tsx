@@ -26,15 +26,9 @@ export default function ContasReceberPage() {
       setLoading(true)
       const response = await api.get('/invoices')
       setInvoices(response.data || [])
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao carregar contas a receber:', error)
-      // Se o endpoint não existir, apenas mostrar lista vazia
-      if (error.response?.status === 404) {
-        console.log('Endpoint /invoices não encontrado. Página funcionará com lista vazia.')
-      } else {
-        console.error('Detalhes do erro:', error.response?.data)
-      }
-      setInvoices([])
+      alert('Erro ao carregar contas a receber')
     } finally {
       setLoading(false)
     }

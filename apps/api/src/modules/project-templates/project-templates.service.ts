@@ -1,62 +1,49 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProjectTemplate } from '../../database/entities/project-template.entity';
+import { ProjectTemplateTask } from '../../database/entities/project-template-task.entity';
 
 @Injectable()
 export class ProjectTemplatesService {
   constructor(
     @InjectRepository(ProjectTemplate)
     private templateRepository: Repository<ProjectTemplate>,
+    @InjectRepository(ProjectTemplateTask)
+    private taskRepository: Repository<ProjectTemplateTask>,
   ) {}
 
-  async create(createTemplateDto: any, companyId: string) {
-    const template = this.templateRepository.create({
-      ...createTemplateDto,
-      companyId,
-    });
-    return await this.templateRepository.save(template);
-  }
-
-  async findAll(companyId: string, serviceType?: string) {
-    const where: any = { companyId };
-    if (serviceType) {
-      where.serviceType = serviceType;
+  async findAll(companyId?: string): Promise<ProjectTemplate[]> {
+    const where: any = {};
+    if (companyId) {
+      where.companyId = companyId;
     }
-    
-    const templates = await this.templateRepository.find({
+    return this.templateRepository.find({ 
       where,
       relations: ['tasks'],
-      order: { name: 'ASC' },
+      order: { createdAt: 'DESC' },
     });
-    
-    // Adicionar contagem de tarefas para cada template
-    return templates.map(template => ({
-      ...template,
-      tasksCount: template.tasks?.length || 0,
-    }));
   }
 
-  async findOne(id: string, companyId: string) {
-    const template = await this.templateRepository.findOne({
-      where: { id, companyId },
+  async findOne(id: string): Promise<ProjectTemplate> {
+    return this.templateRepository.findOne({ 
+      where: { id },
       relations: ['tasks'],
     });
-
-    if (!template) {
-      throw new NotFoundException('Template não encontrado');
-    }
-
-    return template;
   }
 
-  async update(id: string, updateTemplateDto: any, companyId: string) {
-    await this.templateRepository.update({ id, companyId }, updateTemplateDto);
-    return await this.findOne(id, companyId);
+  async create(templateData: Partial<ProjectTemplate>): Promise<ProjectTemplate> {
+    const template = this.templateRepository.create(templateData);
+    return this.templateRepository.save(template);
   }
 
-  async remove(id: string, companyId: string) {
-    await this.templateRepository.delete({ id, companyId });
+  async update(id: string, templateData: Partial<ProjectTemplate>): Promise<ProjectTemplate> {
+    await this.templateRepository.update(id, templateData);
+    return this.findOne(id);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.templateRepository.delete(id);
   }
 }
 

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Company } from './company.entity';
 import { ProjectTemplateTask } from './project-template-task.entity';
 
@@ -14,16 +14,16 @@ export class ProjectTemplate {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @Column({ name: 'name', type: 'varchar', length: 200 })
+  @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
-
-  @Column({ name: 'service_type', type: 'varchar', length: 50 })
-  serviceType: string; // AUTOMACOES, CONSULTORIA, TREINAMENTO, etc.
 
   @Column({ name: 'description', type: 'text', nullable: true })
   description?: string;
 
-  @OneToMany(() => ProjectTemplateTask, task => task.template)
+  @Column({ name: 'service_type', type: 'varchar', length: 100, nullable: true })
+  serviceType?: string;
+
+  @OneToMany(() => ProjectTemplateTask, task => task.template, { cascade: true })
   tasks?: ProjectTemplateTask[];
 
   @CreateDateColumn({ name: 'created_at' })

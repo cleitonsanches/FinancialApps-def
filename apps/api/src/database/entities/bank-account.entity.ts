@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { Company } from './company.entity';
 
 @Entity('bank_accounts')
+@Index('IX_bank_accounts_company_id', ['companyId'])
 export class BankAccount {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -13,25 +14,22 @@ export class BankAccount {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @Column({ name: 'bank_name', type: 'varchar', length: 200 })
+  @Column({ name: 'bank_name', type: 'varchar', length: 255 })
   bankName: string;
-
-  @Column({ name: 'agency', type: 'varchar', length: 20, nullable: true })
-  agency?: string;
 
   @Column({ name: 'account_number', type: 'varchar', length: 50 })
   accountNumber: string;
 
+  @Column({ name: 'agency', type: 'varchar', length: 20, nullable: true })
+  agency?: string;
+
   @Column({ name: 'account_type', type: 'varchar', length: 20, nullable: true })
-  accountType?: string;
+  accountType?: string; // CORRENTE, POUPANCA, etc.
 
-  @Column({ name: 'balance', type: 'decimal', precision: 15, scale: 2, default: 0 })
-  balance: number;
-
-  @CreateDateColumn({ name: 'created_at', select: false })
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', select: false })
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
 

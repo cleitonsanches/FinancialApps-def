@@ -24,7 +24,7 @@ export default function NegociacoesPage() {
   const loadNegotiations = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/proposals')
+      const response = await api.get('/negotiations')
       setNegotiations(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar negociações:', error)
@@ -42,23 +42,19 @@ export default function NegociacoesPage() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      RASCUNHO: 'bg-gray-100 text-gray-800',
-      ENVIADA: 'bg-blue-100 text-blue-800',
-      REVISADA: 'bg-purple-100 text-purple-800',
-      RE_ENVIADA: 'bg-cyan-100 text-cyan-800',
+      EM_NEGOCIACAO: 'bg-blue-100 text-blue-800',
       FECHADA: 'bg-green-100 text-green-800',
-      DECLINADA: 'bg-red-100 text-red-800',
+      CANCELADA: 'bg-red-100 text-red-800',
+      DECLINADA: 'bg-orange-100 text-orange-800',
     }
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      RASCUNHO: 'Rascunho',
-      ENVIADA: 'Enviada',
-      REVISADA: 'Revisada',
-      RE_ENVIADA: 'Re-enviada',
+      EM_NEGOCIACAO: 'Em Negociação',
       FECHADA: 'Fechada',
+      CANCELADA: 'Cancelada',
       DECLINADA: 'Declinada',
     }
     return labels[status] || status
@@ -83,10 +79,8 @@ export default function NegociacoesPage() {
     if (!filter) return true
     const searchTerm = filter.toLowerCase()
     return (
-      negotiation.numeroProposta?.toLowerCase().includes(searchTerm) ||
       negotiation.titulo?.toLowerCase().includes(searchTerm) ||
-      negotiation.client?.razaoSocial?.toLowerCase().includes(searchTerm) ||
-      negotiation.client?.nomeCompleto?.toLowerCase().includes(searchTerm)
+      negotiation.client?.razaoSocial?.toLowerCase().includes(searchTerm)
     )
   })
 
@@ -128,7 +122,7 @@ export default function NegociacoesPage() {
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <input
             type="text"
-            placeholder="Buscar por número, título ou cliente..."
+            placeholder="Buscar por título ou cliente..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
@@ -155,9 +149,9 @@ export default function NegociacoesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Título</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo de Serviço</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -166,18 +160,21 @@ export default function NegociacoesPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredNegotiations.map((negotiation) => (
                   <tr key={negotiation.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {negotiation.numeroProposta || '-'}
-                    </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">{negotiation.titulo || '-'}</div>
+                      {negotiation.description && (
+                        <div className="text-sm text-gray-500">{negotiation.description}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {negotiation.client?.razaoSocial || negotiation.client?.nomeCompleto || '-'}
+                      {negotiation.client?.razaoSocial || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {getServiceTypeLabel(negotiation.serviceType)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {negotiation.valorTotal
-                        ? `R$ ${parseFloat(negotiation.valorTotal.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      {negotiation.valor
+                        ? `R$ ${parseFloat(negotiation.valor.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                         : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

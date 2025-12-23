@@ -16,16 +16,11 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    console.log('Tentando fazer login com:', { email, password: password ? '***' : 'VAZIA' })
-
     try {
-      const loginData = {
-        email: email.trim(),
-        password: password,
-      }
-      console.log('Dados enviados:', { email: loginData.email, password: loginData.password ? '***' : 'VAZIA' })
-      
-      const response = await api.post('/auth/login', loginData)
+      const response = await api.post('/auth/login', {
+        email,
+        password,
+      })
 
       if (response.data.token) {
         localStorage.setItem('token', response.data.token)
@@ -52,7 +47,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-md p-8 w-full max-w-md">
         <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          FinancialApp
+          Projeto Financial
         </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (

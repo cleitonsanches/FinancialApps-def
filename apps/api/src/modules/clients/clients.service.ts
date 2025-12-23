@@ -10,36 +10,29 @@ export class ClientsService {
     private clientRepository: Repository<Client>,
   ) {}
 
-  async create(createClientDto: any, companyId: string) {
-    const client = this.clientRepository.create({
-      ...createClientDto,
-      companyId,
-    });
-    return await this.clientRepository.save(client);
+  async findAll(companyId?: string): Promise<Client[]> {
+    if (companyId) {
+      return this.clientRepository.find({ where: { companyId } });
+    }
+    return this.clientRepository.find();
   }
 
-  async findAll(companyId: string) {
-    return await this.clientRepository.find({
-      where: { companyId },
-      relations: ['contacts'],
-      order: { dataCadastro: 'DESC' },
-    });
+  async findOne(id: string): Promise<Client> {
+    return this.clientRepository.findOne({ where: { id } });
   }
 
-  async findOne(id: string, companyId: string) {
-    return await this.clientRepository.findOne({
-      where: { id, companyId },
-      relations: ['contacts'],
-    });
+  async create(clientData: Partial<Client>): Promise<Client> {
+    const client = this.clientRepository.create(clientData);
+    return this.clientRepository.save(client);
   }
 
-  async update(id: string, updateClientDto: any, companyId: string) {
-    await this.clientRepository.update({ id, companyId }, updateClientDto);
-    return await this.findOne(id, companyId);
+  async update(id: string, clientData: Partial<Client>): Promise<Client> {
+    await this.clientRepository.update(id, clientData);
+    return this.findOne(id);
   }
 
-  async remove(id: string, companyId: string) {
-    await this.clientRepository.delete({ id, companyId });
+  async delete(id: string): Promise<void> {
+    await this.clientRepository.delete(id);
   }
 }
 

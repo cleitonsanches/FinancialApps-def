@@ -1,56 +1,48 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request } from '@nestjs/common';
 import { ProposalsService } from './proposals.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Proposal } from '../../database/entities/proposal.entity';
 
 @Controller(['proposals', 'negotiations'])
-@UseGuards(JwtAuthGuard)
 export class ProposalsController {
-  constructor(private readonly proposalsService: ProposalsService) {}
-
-  @Get('next-number')
-  async getNextNumber(@Request() req: any) {
-    const companyId = req.user?.companyId;
-    if (!companyId) {
-      throw new BadRequestException('Usuário não possui empresa vinculada. Por favor, cadastre uma empresa primeiro.');
-    }
-    const nextNumber = await this.proposalsService.generateProposalNumber(companyId);
-    return { numeroProposta: nextNumber };
-  }
-
-  @Post()
-  create(@Body() createProposalDto: any, @Request() req: any) {
-    const companyId = req.user?.companyId;
-    const userId = req.user?.id;
-
-    if (!companyId) {
-      throw new BadRequestException('Usuário não possui empresa vinculada. Por favor, cadastre uma empresa primeiro.');
-    }
-
-    if (!userId) {
-      throw new BadRequestException('Usuário não identificado.');
-    }
-
-    return this.proposalsService.create(createProposalDto, companyId, userId);
-  }
+  constructor(private proposalsService: ProposalsService) {}
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.proposalsService.findAll(req.user?.companyId);
+  async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<Proposal[]> {
+    const effectiveCompanyId = companyId || req?.user?.companyId;
+    return this.proposalsService.findAll(effectiveCompanyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Request() req: any) {
-    return this.proposalsService.findOne(id, req.user?.companyId);
+  async findOne(@Param('id') id: string): Promise<Proposal> {
+    return this.proposalsService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProposalDto: any, @Request() req: any) {
-    return this.proposalsService.update(id, updateProposalDto, req.user?.companyId);
+  @Post()
+  async create(@Body() proposalData: Partial<Proposal>, @Request() req?: any): Promise<Proposal> {
+    const companyId = req?.user?.companyId;
+    if (companyId && !proposalData.companyId) {
+      proposalData.companyId = companyId;
+    }
+    return this.proposalsService.create(proposalData);
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() proposalData: Partial<Proposal>): Promise<Proposal> {
+    return this.proposalsService.update(id, proposalData);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.proposalsService.remove(id, req.user?.companyId);
+  async delete(@Param('id') id: string): Promise<void> {
+    return this.proposalsService.delete(id);
+  }
+
+  @Post(':id/create-project-from-template')
+  async createProjectFromTemplate(
+    @Param('id') proposalId: string,
+    @Body() body: { templateId: string; startDate: string },
+  ): Promise<any> {
+    const startDate = new Date(body.startDate);
+    return this.proposalsService.createProjectFromTemplate(proposalId, body.templateId, startDate);
   }
 }
 

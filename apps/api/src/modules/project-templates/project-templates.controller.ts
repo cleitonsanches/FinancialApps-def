@@ -1,39 +1,39 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request } from '@nestjs/common';
 import { ProjectTemplatesService } from './project-templates.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ProjectTemplate } from '../../database/entities/project-template.entity';
 
 @Controller('project-templates')
-@UseGuards(JwtAuthGuard)
 export class ProjectTemplatesController {
-  constructor(private readonly templatesService: ProjectTemplatesService) {}
-
-  @Post()
-  create(@Body() createTemplateDto: any, @Request() req: any) {
-    const companyId = req.user?.companyId;
-    if (!companyId) {
-      throw new BadRequestException('Usuário não possui empresa vinculada. Por favor, cadastre uma empresa primeiro.');
-    }
-    return this.templatesService.create(createTemplateDto, companyId);
-  }
+  constructor(private projectTemplatesService: ProjectTemplatesService) {}
 
   @Get()
-  findAll(@Request() req: any, @Query('serviceType') serviceType?: string) {
-    return this.templatesService.findAll(req.user?.companyId, serviceType);
+  async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<ProjectTemplate[]> {
+    const effectiveCompanyId = companyId || req?.user?.companyId;
+    return this.projectTemplatesService.findAll(effectiveCompanyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Request() req: any) {
-    return this.templatesService.findOne(id, req.user?.companyId);
+  async findOne(@Param('id') id: string): Promise<ProjectTemplate> {
+    return this.projectTemplatesService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateTemplateDto: any, @Request() req: any) {
-    return this.templatesService.update(id, updateTemplateDto, req.user?.companyId);
+  @Post()
+  async create(@Body() templateData: Partial<ProjectTemplate>, @Request() req?: any): Promise<ProjectTemplate> {
+    const companyId = req?.user?.companyId;
+    if (companyId && !templateData.companyId) {
+      templateData.companyId = companyId;
+    }
+    return this.projectTemplatesService.create(templateData);
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() templateData: Partial<ProjectTemplate>): Promise<ProjectTemplate> {
+    return this.projectTemplatesService.update(id, templateData);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.templatesService.remove(id, req.user?.companyId);
+  async delete(@Param('id') id: string): Promise<void> {
+    return this.projectTemplatesService.delete(id);
   }
 }
 

@@ -1,0 +1,107 @@
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import { Company } from './company.entity';
+import { Client } from './client.entity';
+import { Proposal } from './proposal.entity';
+import { ProjectTemplate } from './project-template.entity';
+
+@Entity('projects')
+@Index('IX_projects_company_id', ['companyId'])
+@Index('IX_projects_proposal_id', ['proposalId'])
+export class Project {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ name: 'company_id' })
+  companyId: string;
+
+  @ManyToOne(() => Company)
+  @JoinColumn({ name: 'company_id' })
+  company: Company;
+
+  @Column({ name: 'client_id' })
+  clientId: string;
+
+  @ManyToOne(() => Client)
+  @JoinColumn({ name: 'client_id' })
+  client: Client;
+
+  @Column({ name: 'proposal_id', nullable: true })
+  proposalId?: string;
+
+  @ManyToOne(() => Proposal, { nullable: true })
+  @JoinColumn({ name: 'proposal_id' })
+  proposal?: Proposal;
+
+  @Column({ name: 'template_id', nullable: true })
+  templateId?: string;
+
+  @ManyToOne(() => ProjectTemplate, { nullable: true })
+  @JoinColumn({ name: 'template_id' })
+  template?: ProjectTemplate;
+
+  @Column({ name: 'name', type: 'varchar', length: 255 })
+  name: string;
+
+  @Column({ name: 'description', type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ name: 'service_type', type: 'varchar', length: 100, nullable: true })
+  serviceType?: string;
+
+  @Column({ name: 'data_inicio', type: 'date', nullable: true })
+  dataInicio?: Date;
+
+  @Column({ name: 'data_fim', type: 'date', nullable: true })
+  dataFim?: Date;
+
+  @Column({ name: 'status', type: 'varchar', length: 50, default: 'PENDENTE' })
+  status: string; // PENDENTE, EM_ANDAMENTO, CONCLUIDO, CANCELADA, NEGOCIACAO_CANCELADA
+
+  @OneToMany(() => ProjectTask, task => task.project, { cascade: true })
+  tasks?: ProjectTask[];
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
+
+@Entity('project_tasks')
+@Index('IX_project_tasks_project_id', ['projectId'])
+export class ProjectTask {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ name: 'project_id' })
+  projectId: string;
+
+  @ManyToOne(() => Project, project => project.tasks, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'project_id' })
+  project: Project;
+
+  @Column({ name: 'name', type: 'varchar', length: 255 })
+  name: string;
+
+  @Column({ name: 'description', type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ name: 'data_inicio', type: 'date', nullable: true })
+  dataInicio?: Date;
+
+  @Column({ name: 'data_conclusao', type: 'date', nullable: true })
+  dataConclusao?: Date;
+
+  @Column({ name: 'status', type: 'varchar', length: 50, default: 'PENDENTE' })
+  status: string; // PENDENTE, EM_ANDAMENTO, CONCLUIDA, CANCELADA
+
+  @Column({ name: 'ordem', type: 'integer', default: 0 })
+  ordem: number;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
+

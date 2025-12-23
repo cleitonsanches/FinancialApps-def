@@ -14,11 +14,20 @@ export default function NegotiationDetailsPage() {
   const [negotiation, setNegotiation] = useState<any>(null)
   const [projects, setProjects] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
+  const [projectTemplates, setProjectTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [editingStatus, setEditingStatus] = useState(false)
-  const [savingStatus, setSavingStatus] = useState(false)
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+
+  // Estados dos modais
+  const [showCloseNegotiationModal, setShowCloseNegotiationModal] = useState(false)
+  const [showParcelsModal, setShowParcelsModal] = useState(false)
+  const [showProjectTemplateModal, setShowProjectTemplateModal] = useState(false)
+  const [showTasksReviewModal, setShowTasksReviewModal] = useState(false)
+  
+  // Dados temporários
+  const [calculatedParcels, setCalculatedParcels] = useState<any[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [calculatedTasks, setCalculatedTasks] = useState<any[]>([])
+  const [tasksToCreate, setTasksToCreate] = useState<any[]>([])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -29,13 +38,13 @@ export default function NegotiationDetailsPage() {
     loadNegotiation()
     loadProjects()
     loadTasks()
+    loadProjectTemplates()
   }, [negotiationId, router])
 
   const loadNegotiation = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/proposals/${negotiationId}`)
-      console.log('Dados da negociação recebidos:', response.data) // Debug
+      const response = await api.get(`/negotiations/${negotiationId}`)
       setNegotiation(response.data)
     } catch (error: any) {
       console.error('Erro ao carregar negociação:', error)
@@ -53,8 +62,7 @@ export default function NegotiationDetailsPage() {
   const loadProjects = async () => {
     try {
       const response = await api.get('/projects')
-      // Filtrar projetos vinculados a esta negociação
-      const linkedProjects = response.data.filter((p: any) => p.negotiationId === negotiationId)
+      const linkedProjects = response.data.filter((p: any) => p.proposalId === negotiationId)
       setProjects(linkedProjects)
     } catch (error) {
       console.error('Erro ao carregar projetos:', error)
@@ -70,96 +78,44 @@ export default function NegotiationDetailsPage() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Tem certeza que deseja excluir esta negociação? Esta ação não pode ser desfeita.')) {
-      return
-    }
-
+  const loadProjectTemplates = async () => {
     try {
-      await api.delete(`/proposals/${negotiationId}`)
-      alert('Negociação excluída com sucesso!')
-      router.push('/negociacoes')
-    } catch (error: any) {
-      console.error('Erro ao excluir negociação:', error)
-      alert(error.response?.data?.message || 'Erro ao excluir negociação')
+      const response = await api.get('/project-templates')
+      setProjectTemplates(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error)
     }
-  }
-
-  const handleStatusChange = async (newStatus: string) => {
-    // Se for mudar para ENVIADA ou RE_ENVIADA, mostrar modal de confirmação
-    if (newStatus === 'ENVIADA' || newStatus === 'RE_ENVIADA') {
-      setPendingStatus(newStatus)
-      setShowConfirmModal(true)
-      return
-    }
-
-    // Para outros status, atualizar diretamente
-    await updateStatus(newStatus)
-  }
-
-  const updateStatus = async (newStatus: string) => {
-    try {
-      setSavingStatus(true)
-      await api.patch(`/proposals/${negotiationId}`, { status: newStatus })
-      setNegotiation({ ...negotiation, status: newStatus })
-      setEditingStatus(false)
-      setShowConfirmModal(false)
-      setPendingStatus(null)
-      alert('Status atualizado com sucesso!')
-    } catch (error: any) {
-      console.error('Erro ao atualizar status:', error)
-      alert(error.response?.data?.message || 'Erro ao atualizar status')
-    } finally {
-      setSavingStatus(false)
-    }
-  }
-
-  const handleConfirmStatusChange = () => {
-    if (pendingStatus) {
-      updateStatus(pendingStatus)
-    }
-  }
-
-  const handleCancelStatusChange = () => {
-    setShowConfirmModal(false)
-    setPendingStatus(null)
-    setEditingStatus(false)
   }
 
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '-'
     
-    // Se for string no formato YYYY-MM-DD, tratar como data local
     if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
       const [year, month, day] = dateString.split('T')[0].split('-').map(Number)
       const date = new Date(year, month - 1, day)
       return date.toLocaleDateString('pt-BR')
     }
     
-    // Se for Date ou outra string, usar normalmente
     const date = new Date(dateString)
     return date.toLocaleDateString('pt-BR')
   }
 
-  const formatCurrency = (value: number | string | null | undefined) => {
-    if (!value) return 'R$ 0,00'
-    const numValue = typeof value === 'string' ? parseFloat(value) : value
-    return numValue.toLocaleString('pt-BR', {
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
+      currency: 'BRL'
+    }).format(value)
   }
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       RASCUNHO: 'bg-gray-100 text-gray-800',
       ENVIADA: 'bg-blue-100 text-blue-800',
-      REVISADA: 'bg-purple-100 text-purple-800',
-      RE_ENVIADA: 'bg-cyan-100 text-cyan-800',
+      RE_ENVIADA: 'bg-blue-100 text-blue-800',
+      REVISADA: 'bg-yellow-100 text-yellow-800',
       FECHADA: 'bg-green-100 text-green-800',
-      DECLINADA: 'bg-red-100 text-red-800',
+      CANCELADA: 'bg-red-100 text-red-800',
+      DECLINADA: 'bg-orange-100 text-orange-800',
     }
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
@@ -168,9 +124,10 @@ export default function NegotiationDetailsPage() {
     const labels: Record<string, string> = {
       RASCUNHO: 'Rascunho',
       ENVIADA: 'Enviada',
-      REVISADA: 'Revisada',
       RE_ENVIADA: 'Re-enviada',
+      REVISADA: 'Revisada',
       FECHADA: 'Fechada',
+      CANCELADA: 'Cancelada',
       DECLINADA: 'Declinada',
     }
     return labels[status] || status
@@ -190,60 +147,170 @@ export default function NegotiationDetailsPage() {
     return labels[serviceType] || serviceType
   }
 
-  const getTipoContratacaoLabel = (tipo: string) => {
-    const labels: Record<string, string> = {
-      RECORRENTE_MENSAL: 'Recorrente (Mensal)',
-      PACOTE_HORAS: 'Pacote de Horas',
-      PROJETO: 'Projeto',
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === 'FECHADA' && negotiation.status !== 'FECHADA') {
+      setShowCloseNegotiationModal(true)
+      return
     }
-    return labels[tipo] || tipo
+
+    try {
+      await api.put(`/negotiations/${negotiationId}`, { status: newStatus })
+      await loadNegotiation()
+      await loadProjects()
+      await loadTasks()
+      alert('Status atualizado com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao atualizar status:', error)
+      alert(error.response?.data?.message || 'Erro ao atualizar status')
+    }
   }
 
-  const getTipoFaturamentoLabel = (tipo: string) => {
-    const labels: Record<string, string> = {
-      FIXO: 'Fixo',
-      POR_HORAS_TRABALHADAS: 'Por Horas Trabalhadas',
+  const handleConfirmCloseNegotiation = () => {
+    setShowCloseNegotiationModal(false)
+    
+    // Calcular parcelas baseado na proposta
+    const parcels: any[] = []
+    const valorTotal = negotiation.valorTotal || negotiation.valor || 0
+    
+    // Verificar se tem parcelas definidas na negociação
+    if (negotiation.parcelas && Array.isArray(negotiation.parcelas) && negotiation.parcelas.length > 0) {
+      negotiation.parcelas.forEach((parcela: any, index: number) => {
+        parcels.push({
+          numero: parcela.numero || index + 1,
+          valor: parcela.valor || (valorTotal / negotiation.parcelas.length),
+          dataVencimento: parcela.dataVencimento || parcela.dataVencimento,
+          clientId: negotiation.clientId,
+        })
+      })
+    } else if (negotiation.tipoFaturamento === 'PARCELADO' && negotiation.quantidadeParcelas) {
+      // Se é parcelado mas não tem parcelas definidas, criar baseado na quantidade
+      const valorParcela = valorTotal / negotiation.quantidadeParcelas
+      const dataInicio = negotiation.dataInicio ? new Date(negotiation.dataInicio) : new Date()
+      
+      for (let i = 0; i < negotiation.quantidadeParcelas; i++) {
+        const dataVencimento = new Date(dataInicio)
+        dataVencimento.setMonth(dataVencimento.getMonth() + i)
+        
+        parcels.push({
+          numero: i + 1,
+          valor: valorParcela,
+          dataVencimento: dataVencimento.toISOString().split('T')[0],
+          clientId: negotiation.clientId,
+        })
+      }
+    } else {
+      // Se não tem parcelas, criar uma única
+      parcels.push({
+        numero: 1,
+        valor: valorTotal,
+        dataVencimento: negotiation.dataInicio || new Date().toISOString().split('T')[0],
+        clientId: negotiation.clientId,
+      })
     }
-    return labels[tipo] || tipo
+    
+    setCalculatedParcels(parcels)
+    setShowParcelsModal(true)
   }
 
-  const getTipoPagamentoLabel = (tipo: string) => {
-    const labels: Record<string, string> = {
-      ONESHOT: 'Oneshot (Pagamento único)',
-      PARCELADO: 'Parcelado',
-      MENSAL: 'Mensal (Recorrente)',
+  const handleConfirmParcels = async () => {
+    try {
+      await api.post(`/invoices/from-proposal-parcels/${negotiationId}`, {
+        parcels: calculatedParcels,
+      })
+      
+      setShowParcelsModal(false)
+      
+      // Perguntar se quer associar template de projeto
+      if (projectTemplates.length > 0) {
+        setShowProjectTemplateModal(true)
+      } else {
+        // Se não tem templates, apenas atualizar status
+        await api.put(`/negotiations/${negotiationId}`, { status: 'FECHADA' })
+        await loadNegotiation()
+        alert('Negociação fechada e parcelas criadas com sucesso!')
+      }
+    } catch (error: any) {
+      console.error('Erro ao criar parcelas:', error)
+      alert(error.response?.data?.message || 'Erro ao criar parcelas')
     }
-    return labels[tipo] || tipo
   }
 
-  const getProdutoLabel = (produto: string) => {
-    const labels: Record<string, string> = {
-      BI_EXPLORER: 'BI Explorer',
-      OUTROS: 'Outros',
+  const handleSelectProjectTemplate = async () => {
+    if (!selectedTemplateId) {
+      alert('Selecione um template')
+      return
     }
-    return labels[produto] || produto
+
+    try {
+      const startDate = negotiation.dataInicio 
+        ? new Date(negotiation.dataInicio).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0]
+
+      const response = await api.post(`/negotiations/${negotiationId}/create-project-from-template`, {
+        templateId: selectedTemplateId,
+        startDate,
+      })
+
+      setCalculatedTasks(response.data.tasks || [])
+      setTasksToCreate(response.data.tasks || [])
+      setShowProjectTemplateModal(false)
+      setShowTasksReviewModal(true)
+    } catch (error: any) {
+      console.error('Erro ao criar projeto:', error)
+      alert(error.response?.data?.message || 'Erro ao criar projeto')
+    }
   }
 
+  const handleSkipProjectTemplate = async () => {
+    setShowProjectTemplateModal(false)
+    try {
+      await api.put(`/proposals/${negotiationId}`, { status: 'FECHADA' })
+      await loadNegotiation()
+      await loadProjects()
+      alert('Negociação fechada com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao fechar negociação:', error)
+      alert('Erro ao fechar negociação')
+    }
+  }
 
-  // Calcular dados do projeto baseado nas tarefas
+  const handleUpdateTask = (taskId: string, field: string, value: any) => {
+    setTasksToCreate(tasksToCreate.map(task => 
+      task.id === taskId ? { ...task, [field]: value } : task
+    ))
+  }
+
+  const handleConfirmCreateProject = async () => {
+    try {
+      // O projeto já foi criado, apenas atualizar as tarefas se necessário
+      await api.put(`/proposals/${negotiationId}`, { status: 'FECHADA' })
+      await loadNegotiation()
+      await loadProjects()
+      await loadTasks()
+      setShowTasksReviewModal(false)
+      alert('Projeto e tarefas criados com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao confirmar projeto:', error)
+      alert(error.response?.data?.message || 'Erro ao confirmar projeto')
+    }
+  }
+
   const getProjectData = (project: any) => {
     const projectTasks = tasks.filter(t => t.projectId === project.id)
     
-    // Calcular status
-    let calculatedStatus = project.status || 'PLANEJAMENTO'
+    let calculatedStatus = project.status || 'PENDENTE'
     if (projectTasks.length > 0) {
       const allCompleted = projectTasks.every(t => t.status === 'CONCLUIDA')
       if (allCompleted) {
         calculatedStatus = 'CONCLUIDO'
       } else {
-        const hasInProgressOrCompleted = projectTasks.some(t => t.status === 'EM_PROGRESSO' || t.status === 'CONCLUIDA')
+        const hasInProgressOrCompleted = projectTasks.some(t => t.status === 'EM_ANDAMENTO' || t.status === 'CONCLUIDA')
         if (hasInProgressOrCompleted) {
           calculatedStatus = 'EM_ANDAMENTO'
         }
       }
     }
 
-    // Calcular data de início (primeira tarefa)
     let startDate = project.dataInicio || null
     if (projectTasks.length > 0) {
       const tasksWithStartDate = projectTasks.filter(t => t.dataInicio)
@@ -258,16 +325,15 @@ export default function NegotiationDetailsPage() {
       }
     }
 
-    // Calcular data de conclusão (última tarefa)
     let endDate = project.dataFim || null
     if (projectTasks.length > 0) {
-      const tasksWithEndDate = projectTasks.filter(t => t.dataFimPrevista)
+      const tasksWithEndDate = projectTasks.filter(t => t.dataConclusao)
       if (tasksWithEndDate.length > 0) {
         const dates = tasksWithEndDate.map(t => {
-          if (typeof t.dataFimPrevista === 'string') {
-            return new Date(t.dataFimPrevista.split('T')[0])
+          if (typeof t.dataConclusao === 'string') {
+            return new Date(t.dataConclusao.split('T')[0])
           }
-          return new Date(t.dataFimPrevista)
+          return new Date(t.dataConclusao)
         })
         endDate = new Date(Math.max(...dates.map(d => d.getTime())))
       }
@@ -284,9 +350,9 @@ export default function NegotiationDetailsPage() {
     const colors: Record<string, string> = {
       CONCLUIDO: 'bg-green-100 text-green-800',
       EM_ANDAMENTO: 'bg-yellow-100 text-yellow-800',
-      PLANEJAMENTO: 'bg-blue-100 text-blue-800',
-      CANCELADO: 'bg-red-100 text-red-800',
-      PAUSADO: 'bg-gray-100 text-gray-800',
+      PENDENTE: 'bg-blue-100 text-blue-800',
+      CANCELADA: 'bg-red-100 text-red-800',
+      NEGOCIACAO_CANCELADA: 'bg-red-100 text-red-800',
     }
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
@@ -295,9 +361,9 @@ export default function NegotiationDetailsPage() {
     const labels: Record<string, string> = {
       CONCLUIDO: 'Concluído',
       EM_ANDAMENTO: 'Em Andamento',
-      PLANEJAMENTO: 'Planejamento',
-      CANCELADO: 'Cancelado',
-      PAUSADO: 'Pausado',
+      PENDENTE: 'Pendente',
+      CANCELADA: 'Cancelada',
+      NEGOCIACAO_CANCELADA: 'Negociação Cancelada',
     }
     return labels[status] || status
   }
@@ -328,6 +394,8 @@ export default function NegotiationDetailsPage() {
     )
   }
 
+  const shouldShowLinkedItems = ['FECHADA', 'DECLINADA', 'CANCELADA'].includes(negotiation.status)
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -346,7 +414,7 @@ export default function NegotiationDetailsPage() {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  {negotiation.titulo || 'Negociação sem título'}
+                  {negotiation.title || negotiation.titulo || 'Negociação sem título'}
                 </h1>
                 {negotiation.description && (
                   <p className="text-gray-600">{negotiation.description}</p>
@@ -359,14 +427,6 @@ export default function NegotiationDetailsPage() {
                 >
                   Editar
                 </Link>
-                {negotiation.status === 'RASCUNHO' && (
-                  <button
-                    onClick={handleDelete}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                  >
-                    Excluir
-                  </button>
-                )}
               </div>
             </div>
 
@@ -375,60 +435,54 @@ export default function NegotiationDetailsPage() {
               <div>
                 <span className="text-sm text-gray-500">Cliente:</span>
                 <p className="font-medium">
-                  {negotiation.client?.name || negotiation.client?.razaoSocial || negotiation.client?.nome || '-'}
+                  {negotiation.client?.razaoSocial || negotiation.client?.name || '-'}
                 </p>
-                {negotiation.client?.cnpj && (
-                  <p className="text-xs text-gray-400">CNPJ: {negotiation.client.cnpj}</p>
+                {negotiation.client?.cnpjCpf && (
+                  <p className="text-xs text-gray-400">CNPJ/CPF: {negotiation.client.cnpjCpf}</p>
                 )}
               </div>
               <div>
                 <span className="text-sm text-gray-500">Status:</span>
-                {editingStatus ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <select
-                      value={negotiation.status}
-                      onChange={(e) => handleStatusChange(e.target.value)}
-                      disabled={savingStatus}
-                      className="px-3 py-1 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-sm"
-                    >
-                      <option value="RASCUNHO">Rascunho</option>
-                      <option value="ENVIADA">Enviada</option>
-                      <option value="REVISADA">Revisada</option>
-                      <option value="RE_ENVIADA">Re-enviada</option>
-                      <option value="FECHADA">Fechada</option>
-                      <option value="DECLINADA">Declinada</option>
-                    </select>
-                    <button
-                      onClick={() => setEditingStatus(false)}
-                      className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(negotiation.status)}`}>
-                      {getStatusLabel(negotiation.status)}
-                    </span>
-                    <button
-                      onClick={() => setEditingStatus(true)}
-                      className="text-xs text-primary-600 hover:text-primary-700 underline"
-                    >
-                      Alterar
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={negotiation.status || 'RASCUNHO'}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    className="px-2 py-1 text-xs font-semibold rounded border"
+                  >
+                    <option value="RASCUNHO">Rascunho</option>
+                    <option value="ENVIADA">Enviada</option>
+                    <option value="RE_ENVIADA">Re-enviada</option>
+                    <option value="REVISADA">Revisada</option>
+                    <option value="FECHADA">Fechada</option>
+                    <option value="DECLINADA">Declinada</option>
+                    <option value="CANCELADA">Cancelada</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <span className="text-sm text-gray-500">Tipo de Serviço:</span>
-                <p className="font-medium">{getServiceTypeLabel(negotiation.serviceType)}</p>
-              </div>
-              {negotiation.valor && (
+              {negotiation.valorTotal && (
                 <div>
-                  <span className="text-sm text-gray-500">Valor:</span>
+                  <span className="text-sm text-gray-500">Valor Total:</span>
                   <p className="font-medium text-lg text-green-600">
-                    R$ {parseFloat(negotiation.valor.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {formatCurrency(negotiation.valorTotal)}
                   </p>
+                </div>
+              )}
+              {negotiation.tipoContratacao && (
+                <div>
+                  <span className="text-sm text-gray-500">Tipo de Contratação:</span>
+                  <p className="font-medium">{negotiation.tipoContratacao}</p>
+                </div>
+              )}
+              {negotiation.tipoFaturamento && (
+                <div>
+                  <span className="text-sm text-gray-500">Tipo de Faturamento:</span>
+                  <p className="font-medium">{negotiation.tipoFaturamento}</p>
+                </div>
+              )}
+              {negotiation.dataInicio && (
+                <div>
+                  <span className="text-sm text-gray-500">Data de Início:</span>
+                  <p className="font-medium text-sm">{formatDate(negotiation.dataInicio)}</p>
                 </div>
               )}
               {negotiation.createdAt && (
@@ -438,464 +492,252 @@ export default function NegotiationDetailsPage() {
                 </div>
               )}
             </div>
-
-            {/* Descrição Completa */}
-            {negotiation.description && (
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <span className="text-sm font-semibold text-gray-700 mb-2 block">Descrição:</span>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{negotiation.description}</p>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Detalhes Completos da Proposta */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Detalhes da Proposta</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Número da Proposta */}
-            {negotiation.numeroProposta && (
-              <div>
-                <span className="text-sm text-gray-500">Número da Proposta:</span>
-                <p className="font-medium text-gray-900">{negotiation.numeroProposta}</p>
-              </div>
-            )}
-
-            {/* Título */}
-            {negotiation.titulo && (
-              <div>
-                <span className="text-sm text-gray-500">Título:</span>
-                <p className="font-medium text-gray-900">{negotiation.titulo}</p>
-              </div>
-            )}
-
-            {/* Valor Proposto */}
-            {negotiation.valorProposto && (
-              <div>
-                <span className="text-sm text-gray-500">Valor Proposto:</span>
-                <p className="font-medium text-lg text-green-600">{formatCurrency(negotiation.valorProposto)}</p>
-              </div>
-            )}
-
-            {/* Valor Total */}
-            {negotiation.valorTotal && (
-              <div>
-                <span className="text-sm text-gray-500">Valor Total:</span>
-                <p className="font-medium text-lg text-green-600">{formatCurrency(negotiation.valorTotal)}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Informações de Validade - Abaixo dos Valores */}
-          {(negotiation.valorProposto || negotiation.valorTotal) && (
-            <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Informações de Validade</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {negotiation.dataValidade && (
-                  <div>
-                    <span className="text-sm text-gray-500">Proposta válida até dia:</span>
-                    <p className="font-medium text-gray-900">{formatDate(negotiation.dataValidade)}</p>
-                  </div>
-                )}
-                {negotiation.dataCondicionadaAceite && (
-                  <div>
-                    <span className="text-sm text-gray-500">Datas de início e conclusão condicionadas ao aceite até dia:</span>
-                    <p className="font-medium text-gray-900">{formatDate(negotiation.dataCondicionadaAceite)}</p>
-                  </div>
-                )}
-              </div>
+        {/* Projetos Vinculados - Só mostrar se status for FECHADA, DECLINADA ou CANCELADA */}
+        {shouldShowLinkedItems && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Projetos Vinculados</h2>
             </div>
-          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Tipo de Contratação */}
-            {negotiation.tipoContratacao && (
-              <div>
-                <span className="text-sm text-gray-500">Tipo de Contratação:</span>
-                <p className="font-medium text-gray-900">{getTipoContratacaoLabel(negotiation.tipoContratacao)}</p>
-              </div>
-            )}
-
-            {/* Tipo de Faturamento */}
-            {negotiation.tipoFaturamento && (
-              <div>
-                <span className="text-sm text-gray-500">Tipo de Faturamento:</span>
-                <p className="font-medium text-gray-900">{getTipoFaturamentoLabel(negotiation.tipoFaturamento)}</p>
-              </div>
-            )}
-
-            {/* Horas Estimadas */}
-            {negotiation.horasEstimadas && (
-              <div>
-                <span className="text-sm text-gray-500">Horas Estimadas:</span>
-                <p className="font-medium text-gray-900">{negotiation.horasEstimadas}</p>
-              </div>
-            )}
-
-            {/* Data de Início */}
-            {negotiation.dataInicio && (
-              <div>
-                <span className="text-sm text-gray-500">Data de Início:</span>
-                <p className="font-medium text-gray-900">{formatDate(negotiation.dataInicio)}</p>
-              </div>
-            )}
-
-            {/* Data de Conclusão */}
-            {negotiation.dataConclusao && (
-              <div>
-                <span className="text-sm text-gray-500">Data de Conclusão:</span>
-                <p className="font-medium text-gray-900">{formatDate(negotiation.dataConclusao)}</p>
-              </div>
-            )}
-
-            {/* Início do Faturamento */}
-            {negotiation.inicioFaturamento && (
-              <div>
-                <span className="text-sm text-gray-500">Início do Faturamento:</span>
-                <p className="font-medium text-gray-900">{formatDate(negotiation.inicioFaturamento)}</p>
-              </div>
-            )}
-
-            {/* Fim do Faturamento */}
-            {negotiation.fimFaturamento && (
-              <div>
-                <span className="text-sm text-gray-500">Fim do Faturamento:</span>
-                <p className="font-medium text-gray-900">{formatDate(negotiation.fimFaturamento)}</p>
-              </div>
-            )}
-
-            {/* Data de Vencimento */}
-            {negotiation.dataVencimento && (
-              <div>
-                <span className="text-sm text-gray-500">Data de Vencimento (Primeiro vencimento):</span>
-                <p className="font-medium text-gray-900">{formatDate(negotiation.dataVencimento)}</p>
-              </div>
-            )}
-
-            {/* Data de Validade */}
-            {negotiation.dataValidade && (
-              <div>
-                <span className="text-sm text-gray-500">Data de Validade:</span>
-                <p className="font-medium text-gray-900">{formatDate(negotiation.dataValidade)}</p>
-              </div>
-            )}
-
-            {/* Tipo de Pagamento */}
-            {negotiation.tipoPagamento && (
-              <div>
-                <span className="text-sm text-gray-500">Tipo de Pagamento:</span>
-                <p className="font-medium text-gray-900">{getTipoPagamentoLabel(negotiation.tipoPagamento)}</p>
-              </div>
-            )}
-
-            {/* Condição de Pagamento */}
-            {negotiation.condicaoPagamento && (
-              <div>
-                <span className="text-sm text-gray-500">Condição de Pagamento:</span>
-                <p className="font-medium text-gray-900">
-                  {negotiation.condicaoPagamento === 'ONESHOT' ? 'Oneshot' : 
-                   negotiation.condicaoPagamento === 'PARCELADO' ? 'Parcelado' :
-                   negotiation.condicaoPagamento === 'MENSAL' ? 'Mensal' : negotiation.condicaoPagamento}
-                </p>
-              </div>
-            )}
-
-            {/* Sistema de Origem */}
-            {negotiation.sistemaOrigem && (
-              <div>
-                <span className="text-sm text-gray-500">Sistema de Origem:</span>
-                <p className="font-medium text-gray-900">{negotiation.sistemaOrigem}</p>
-              </div>
-            )}
-
-            {/* Sistema de Destino */}
-            {negotiation.sistemaDestino && (
-              <div>
-                <span className="text-sm text-gray-500">Sistema de Destino:</span>
-                <p className="font-medium text-gray-900">{negotiation.sistemaDestino}</p>
-              </div>
-            )}
-
-            {/* Produto */}
-            {negotiation.produto && (
-              <div>
-                <span className="text-sm text-gray-500">Produto:</span>
-                <p className="font-medium text-gray-900">{getProdutoLabel(negotiation.produto)}</p>
-              </div>
-            )}
-
-            {/* Manutenções */}
-            {negotiation.manutencoes && (
-              <div>
-                <span className="text-sm text-gray-500">Manutenções:</span>
-                <p className="font-medium text-gray-900">{negotiation.manutencoes}</p>
-              </div>
-            )}
-
-            {/* Template de Proposta */}
-            {negotiation.templateProposta && (
-              <div>
-                <span className="text-sm text-gray-500">Template de Proposta:</span>
-                <p className="font-medium text-gray-900">{negotiation.templateProposta.nome}</p>
-              </div>
-            )}
-
-            {/* Data de Criação */}
-            {negotiation.dataProposta && (
-              <div>
-                <span className="text-sm text-gray-500">Data da Proposta:</span>
-                <p className="font-medium text-gray-900">{formatDate(negotiation.dataProposta)}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Descrição do Projeto */}
-          {negotiation.descricaoProjeto && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <span className="text-sm font-semibold text-gray-700 mb-2 block">Descrição do Projeto:</span>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{negotiation.descricaoProjeto}</p>
-            </div>
-          )}
-
-          {/* Parcelas (se houver) */}
-          {negotiation.parcelas && Array.isArray(negotiation.parcelas) && negotiation.parcelas.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Parcelas</h3>
-              <div className="space-y-3">
-                {negotiation.parcelas.map((parcela: any, index: number) => (
-                  <div key={index} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium text-gray-900">
-                          Parcela {parcela.numero}/{parcela.total || negotiation.parcelas.length}
-                        </span>
-                        {parcela.dataVencimento && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            Vencimento: {formatDate(parcela.dataVencimento)}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-lg text-green-600">
-                          {formatCurrency(parcela.valor)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div className="p-3 bg-gray-100 rounded-lg border border-gray-300 mt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-gray-900">Total das Parcelas:</span>
-                    <span className="font-bold text-lg text-green-600">
-                      {formatCurrency(negotiation.parcelas.reduce((sum: number, p: any) => sum + (parseFloat(p.valor) || 0), 0))}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Projetos Vinculados */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Projetos Vinculados</h2>
-            {negotiation.status === 'FECHADA' && (
-              <Link
-                href={`/projetos/novo?negotiationId=${negotiation.id}`}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
-              >
-                + Criar Projeto
-              </Link>
-            )}
-          </div>
-
-          {projects.length === 0 ? (
-            <p className="text-gray-600 text-center py-8">
-              Nenhum projeto vinculado a esta negociação
-            </p>
-          ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projeto</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data de Início</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data de Conclusão</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {projects.map((project) => {
-                  const projectData = getProjectData(project)
-                  return (
-                    <tr key={project.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                        {project.description && (
-                          <div className="text-sm text-gray-500">{project.description}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getProjectStatusColor(projectData.calculatedStatus)}`}>
-                          {getProjectStatusLabel(projectData.calculatedStatus)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(projectData.startDate)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(projectData.endDate)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Link
-                          href={`/projetos/${project.id}`}
-                          className="text-primary-600 hover:text-primary-900"
-                        >
-                          Ver Detalhes
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* Modal de Confirmação para Status Enviada */}
-      {showConfirmModal && negotiation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                {pendingStatus === 'RE_ENVIADA' ? 'Confirmar Re-envio da Proposta' : 'Confirmar Envio da Proposta'}
-              </h2>
-              
-              <p className="text-gray-700 mb-6">
-                Você está prestes a alterar o status desta proposta para <strong>{pendingStatus === 'RE_ENVIADA' ? 'Re-enviada' : 'Enviada'}</strong>. 
-                Por favor, confirme as informações abaixo antes de continuar:
+            {projects.length === 0 ? (
+              <p className="text-gray-600 text-center py-8">
+                Nenhum projeto vinculado a esta negociação
               </p>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projeto</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data de Início</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data de Conclusão</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {projects.map((project) => {
+                    const projectData = getProjectData(project)
+                    return (
+                      <tr key={project.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">{project.name}</div>
+                          {project.description && (
+                            <div className="text-sm text-gray-500">{project.description}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getProjectStatusColor(projectData.calculatedStatus)}`}>
+                            {getProjectStatusLabel(projectData.calculatedStatus)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(projectData.startDate)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(projectData.endDate)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <Link
+                            href={`/projetos/${project.id}`}
+                            className="text-primary-600 hover:text-primary-900"
+                          >
+                            Ver Detalhes
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
 
-              <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-4">
-                {/* Informações Principais */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {negotiation.numeroProposta && (
-                    <div>
-                      <span className="text-sm text-gray-500">Número da Proposta:</span>
-                      <p className="font-medium text-gray-900">{negotiation.numeroProposta}</p>
-                    </div>
-                  )}
-                  
-                  {negotiation.titulo && (
-                    <div>
-                      <span className="text-sm text-gray-500">Título:</span>
-                      <p className="font-medium text-gray-900">{negotiation.titulo}</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <span className="text-sm text-gray-500">Cliente:</span>
-                    <p className="font-medium text-gray-900">
-                      {negotiation.client?.razaoSocial || negotiation.client?.nomeCompleto || negotiation.client?.name || '-'}
-                    </p>
-                  </div>
-
-                  {negotiation.valorProposto && (
-                    <div>
-                      <span className="text-sm text-gray-500">Valor Proposto:</span>
-                      <p className="font-medium text-lg text-green-600">
-                        {formatCurrency(negotiation.valorProposto)}
-                      </p>
-                    </div>
-                  )}
-
-                  {negotiation.tipoContratacao && (
-                    <div>
-                      <span className="text-sm text-gray-500">Tipo de Contratação:</span>
-                      <p className="font-medium text-gray-900">
-                        {getTipoContratacaoLabel(negotiation.tipoContratacao)}
-                      </p>
-                    </div>
-                  )}
-
-                  {negotiation.dataVencimento && (
-                    <div>
-                      <span className="text-sm text-gray-500">Data de Vencimento:</span>
-                      <p className="font-medium text-gray-900">
-                        {formatDate(negotiation.dataVencimento)}
-                      </p>
-                    </div>
-                  )}
-
-                  {negotiation.dataValidade && (
-                    <div>
-                      <span className="text-sm text-gray-500">Data de Validade:</span>
-                      <p className="font-medium text-gray-900">
-                        {formatDate(negotiation.dataValidade)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Descrição do Projeto */}
-                {negotiation.descricaoProjeto && (
-                  <div className="mt-4 pt-4 border-t border-gray-300">
-                    <span className="text-sm font-semibold text-gray-700 mb-2 block">
-                      Descrição do Projeto:
-                    </span>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {negotiation.descricaoProjeto}
-                    </p>
-                  </div>
+        {/* Modal de Confirmação de Fechamento */}
+        {showCloseNegotiationModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+              <h2 className="text-2xl font-bold mb-4">Confirmar Fechamento da Negociação</h2>
+              <div className="space-y-2 mb-6">
+                <p><strong>Cliente:</strong> {negotiation.client?.razaoSocial || '-'}</p>
+                <p><strong>Valor Total:</strong> {formatCurrency(negotiation.valorTotal || 0)}</p>
+                {negotiation.tipoContratacao && (
+                  <p><strong>Tipo de Contratação:</strong> {negotiation.tipoContratacao}</p>
                 )}
-
-                {/* Parcelas (se houver) */}
-                {negotiation.parcelas && Array.isArray(negotiation.parcelas) && negotiation.parcelas.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-gray-300">
-                    <span className="text-sm font-semibold text-gray-700 mb-2 block">
-                      Parcelas:
-                    </span>
-                    <div className="space-y-2">
-                      {negotiation.parcelas.map((parcela: any, index: number) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span className="text-gray-700">
-                            Parcela {parcela.numero}/{parcela.total || negotiation.parcelas.length}
-                            {parcela.dataVencimento && ` - Vencimento: ${formatDate(parcela.dataVencimento)}`}
-                          </span>
-                          <span className="font-medium text-green-600">
-                            {formatCurrency(parcela.valor)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                {negotiation.tipoFaturamento && (
+                  <p><strong>Tipo de Faturamento:</strong> {negotiation.tipoFaturamento}</p>
+                )}
+                {negotiation.dataInicio && (
+                  <p><strong>Data de Início:</strong> {formatDate(negotiation.dataInicio)}</p>
                 )}
               </div>
-
-              <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
+              <div className="flex gap-2 justify-end">
                 <button
-                  onClick={handleCancelStatusChange}
-                  disabled={savingStatus}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 disabled:opacity-50"
+                  onClick={() => setShowCloseNegotiationModal(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
                   Cancelar
                 </button>
                 <button
-                  onClick={handleConfirmStatusChange}
-                  disabled={savingStatus}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                  onClick={handleConfirmCloseNegotiation}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
-                  {savingStatus ? 'Confirmando...' : pendingStatus === 'RE_ENVIADA' ? 'Confirmar e Re-enviar' : 'Confirmar e Enviar'}
+                  OK
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Modal de Parcelas */}
+        {showParcelsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4">Parcelas a serem Criadas</h2>
+              <div className="mb-4">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nº</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {calculatedParcels.map((parcela, index) => (
+                      <tr key={index}>
+                        <td className="px-4 py-2">{parcela.numero}</td>
+                        <td className="px-4 py-2">{formatCurrency(parcela.valor)}</td>
+                        <td className="px-4 py-2">{formatDate(parcela.dataVencimento)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-4 text-sm text-gray-600">
+                  Total: {formatCurrency(calculatedParcels.reduce((sum, p) => sum + (p.valor || 0), 0))}
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setShowParcelsModal(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmParcels}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Confirmar e Criar Parcelas
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Seleção de Template */}
+        {showProjectTemplateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+              <h2 className="text-2xl font-bold mb-4">Associar Template de Projeto</h2>
+              <p className="mb-4 text-gray-600">
+                Deseja associar um template de projeto a esta negociação?
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Selecione o Template:
+                </label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Selecione um template...</option>
+                  {projectTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={handleSkipProjectTemplate}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Pular
+                </button>
+                <button
+                  onClick={handleSelectProjectTemplate}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Revisão de Tarefas */}
+        {showTasksReviewModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4">Revisar Tarefas do Projeto</h2>
+              <div className="mb-4">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Conclusão</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {tasksToCreate.map((task, index) => (
+                      <tr key={task.id || index}>
+                        <td className="px-4 py-2">{task.name}</td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="date"
+                            value={task.dataInicio ? task.dataInicio.split('T')[0] : ''}
+                            onChange={(e) => handleUpdateTask(task.id, 'dataInicio', e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="date"
+                            value={task.dataConclusao ? task.dataConclusao.split('T')[0] : ''}
+                            onChange={(e) => handleUpdateTask(task.id, 'dataConclusao', e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setShowTasksReviewModal(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmCreateProject}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Confirmar e Criar Projeto
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
-

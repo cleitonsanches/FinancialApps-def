@@ -76,8 +76,8 @@ export default function DashboardPage() {
             className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
           >
             <div className="text-4xl mb-4">📄</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Administração</h2>
-            <p className="text-gray-600">Gerencie administração</p>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Templates</h2>
+            <p className="text-gray-600">Gerencie templates</p>
           </Link>
         </div>
       </div>

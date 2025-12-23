@@ -1,39 +1,35 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request } from '@nestjs/common';
 import { ChartOfAccountsService } from './chart-of-accounts.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ChartOfAccounts } from '../../database/entities/chart-of-accounts.entity';
 
 @Controller('chart-of-accounts')
-@UseGuards(JwtAuthGuard)
 export class ChartOfAccountsController {
-  constructor(private readonly chartOfAccountsService: ChartOfAccountsService) {}
-
-  @Post()
-  create(@Body() createChartOfAccountDto: any, @Request() req: any) {
-    const companyId = req.user?.companyId;
-    if (!companyId) {
-      throw new BadRequestException('Usuário não possui empresa vinculada');
-    }
-    return this.chartOfAccountsService.create(createChartOfAccountDto, companyId);
-  }
+  constructor(private chartOfAccountsService: ChartOfAccountsService) {}
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.chartOfAccountsService.findAll(req.user?.companyId);
+  async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<ChartOfAccounts[]> {
+    const effectiveCompanyId = companyId || req?.user?.companyId;
+    return this.chartOfAccountsService.findAll(effectiveCompanyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Request() req: any) {
-    return this.chartOfAccountsService.findOne(id, req.user?.companyId);
+  async findOne(@Param('id') id: string): Promise<ChartOfAccounts> {
+    return this.chartOfAccountsService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateChartOfAccountDto: any, @Request() req: any) {
-    return this.chartOfAccountsService.update(id, updateChartOfAccountDto, req.user?.companyId);
+  @Post()
+  async create(@Body() chartData: Partial<ChartOfAccounts>): Promise<ChartOfAccounts> {
+    return this.chartOfAccountsService.create(chartData);
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() chartData: Partial<ChartOfAccounts>): Promise<ChartOfAccounts> {
+    return this.chartOfAccountsService.update(id, chartData);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.chartOfAccountsService.remove(id, req.user?.companyId);
+  async delete(@Param('id') id: string): Promise<void> {
+    return this.chartOfAccountsService.delete(id);
   }
 }
 

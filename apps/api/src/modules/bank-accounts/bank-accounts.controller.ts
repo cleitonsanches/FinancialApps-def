@@ -1,39 +1,35 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request } from '@nestjs/common';
 import { BankAccountsService } from './bank-accounts.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BankAccount } from '../../database/entities/bank-account.entity';
 
 @Controller('bank-accounts')
-@UseGuards(JwtAuthGuard)
 export class BankAccountsController {
-  constructor(private readonly bankAccountsService: BankAccountsService) {}
-
-  @Post()
-  create(@Body() createBankAccountDto: any, @Request() req: any) {
-    const companyId = req.user?.companyId;
-    if (!companyId) {
-      throw new BadRequestException('Usuário não possui empresa vinculada');
-    }
-    return this.bankAccountsService.create(createBankAccountDto, companyId);
-  }
+  constructor(private bankAccountsService: BankAccountsService) {}
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.bankAccountsService.findAll(req.user?.companyId);
+  async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<BankAccount[]> {
+    const effectiveCompanyId = companyId || req?.user?.companyId;
+    return this.bankAccountsService.findAll(effectiveCompanyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Request() req: any) {
-    return this.bankAccountsService.findOne(id, req.user?.companyId);
+  async findOne(@Param('id') id: string): Promise<BankAccount> {
+    return this.bankAccountsService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBankAccountDto: any, @Request() req: any) {
-    return this.bankAccountsService.update(id, updateBankAccountDto, req.user?.companyId);
+  @Post()
+  async create(@Body() bankAccountData: Partial<BankAccount>): Promise<BankAccount> {
+    return this.bankAccountsService.create(bankAccountData);
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() bankAccountData: Partial<BankAccount>): Promise<BankAccount> {
+    return this.bankAccountsService.update(id, bankAccountData);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.bankAccountsService.remove(id, req.user?.companyId);
+  async delete(@Param('id') id: string): Promise<void> {
+    return this.bankAccountsService.delete(id);
   }
 }
 

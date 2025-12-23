@@ -354,15 +354,9 @@ export default function AgendaPage() {
         }
       }
       setTasksWithHours(hoursMap)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao carregar tarefas:', error)
-      // Se o endpoint não existir, apenas mostrar lista vazia
-      if (error.response?.status === 404) {
-        console.log('Endpoint /projects/tasks/all não encontrado. Página funcionará com lista vazia.')
-      } else {
-        console.error('Detalhes do erro:', error.response?.data)
-      }
-      setTasks([])
+      alert('Erro ao carregar tarefas da agenda')
     } finally {
       setLoading(false)
     }
