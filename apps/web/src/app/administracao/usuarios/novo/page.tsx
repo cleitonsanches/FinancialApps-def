@@ -102,12 +102,12 @@ export default function NovoUsuarioPage() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <Link 
-              href="/administracao"
-              className="text-primary-600 hover:text-primary-700 inline-block"
+            <button
+              onClick={() => router.back()}
+              className="text-primary-600 hover:text-primary-700 inline-block cursor-pointer"
             >
-              ← Voltar para Administração
-            </Link>
+              ← Voltar
+            </button>
             <NavigationLinks />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Novo Usuário</h1>

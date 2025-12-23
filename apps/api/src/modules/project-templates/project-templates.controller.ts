@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request, BadRequestException } from '@nestjs/common';
 import { ProjectTemplatesService } from './project-templates.service';
 import { ProjectTemplate } from '../../database/entities/project-template.entity';
 
@@ -19,10 +19,13 @@ export class ProjectTemplatesController {
 
   @Post()
   async create(@Body() templateData: Partial<ProjectTemplate>, @Request() req?: any): Promise<ProjectTemplate> {
-    const companyId = req?.user?.companyId;
-    if (companyId && !templateData.companyId) {
-      templateData.companyId = companyId;
+    const companyId = req?.user?.companyId || templateData.companyId;
+    
+    if (!companyId) {
+      throw new BadRequestException('companyId is required. Please provide companyId in the request body or ensure you are authenticated.');
     }
+    
+    templateData.companyId = companyId;
     return this.projectTemplatesService.create(templateData);
   }
 
@@ -34,6 +37,22 @@ export class ProjectTemplatesController {
   @Delete(':id')
   async delete(@Param('id') id: string): Promise<void> {
     return this.projectTemplatesService.delete(id);
+  }
+
+  @Post(':id/tasks')
+  async createTask(@Param('id') templateId: string, @Body() taskData: any): Promise<any> {
+    taskData.templateId = templateId;
+    return this.projectTemplatesService.createTask(taskData);
+  }
+
+  @Put('tasks/:taskId')
+  async updateTask(@Param('taskId') taskId: string, @Body() taskData: any): Promise<any> {
+    return this.projectTemplatesService.updateTask(taskId, taskData);
+  }
+
+  @Delete('tasks/:taskId')
+  async deleteTask(@Param('taskId') taskId: string): Promise<void> {
+    return this.projectTemplatesService.deleteTask(taskId);
   }
 }
 

@@ -41,60 +41,54 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Link
-            href="/agenda"
-            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="text-4xl mb-4">📅</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Agenda</h2>
-            <p className="text-gray-600">Visualize suas tarefas e compromissos</p>
-          </Link>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Ações Rápidas</h2>
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/agenda"
+              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow flex-1 min-w-[200px]"
+            >
+              <div className="text-4xl mb-4">📅</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Agenda</h2>
+              <p className="text-gray-600">Visualize suas tarefas e compromissos</p>
+            </Link>
 
-          <Link
-            href="/projetos"
-            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="text-4xl mb-4">🚀</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Projetos</h2>
-            <p className="text-gray-600">Gerencie seus projetos</p>
-          </Link>
+            <Link
+              href="/projetos"
+              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow flex-1 min-w-[200px]"
+            >
+              <div className="text-4xl mb-4">🚀</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Projetos</h2>
+              <p className="text-gray-600">Gerencie seus projetos</p>
+            </Link>
 
-          <Link
-            href="/negociacoes"
-            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="text-4xl mb-4">🤝</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Negociações</h2>
-            <p className="text-gray-600">Acompanhe suas negociações</p>
-          </Link>
+            <Link
+              href="/negociacoes"
+              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow flex-1 min-w-[200px]"
+            >
+              <div className="text-4xl mb-4">🤝</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Negociações</h2>
+              <p className="text-gray-600">Acompanhe suas negociações</p>
+            </Link>
 
-          <Link
-            href="/contas-receber"
-            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="text-4xl mb-4">💰</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Contas a Receber</h2>
-            <p className="text-gray-600">Gerencie recebimentos</p>
-          </Link>
+            <Link
+              href="/contas-receber"
+              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow flex-1 min-w-[200px]"
+            >
+              <div className="text-4xl mb-4">💰</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Contas a Receber</h2>
+              <p className="text-gray-600">Gerencie recebimentos</p>
+            </Link>
 
-          <Link
-            href="/contas-pagar"
-            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="text-4xl mb-4">💳</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Contas a Pagar</h2>
-            <p className="text-gray-600">Gerencie pagamentos</p>
-          </Link>
-
-          <Link
-            href="/administracao"
-            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="text-4xl mb-4">⚙️</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Administração</h2>
-            <p className="text-gray-600">Gerencie configurações e templates</p>
-          </Link>
+            <Link
+              href="/contas-pagar"
+              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow flex-1 min-w-[200px]"
+            >
+              <div className="text-4xl mb-4">💳</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Contas a Pagar</h2>
+              <p className="text-gray-600">Gerencie pagamentos</p>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

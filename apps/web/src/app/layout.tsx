@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Projeto Financial',
+  title: 'FinancialApps',
   description: 'Sistema de Gestão Financeira',
 }
 

@@ -363,12 +363,12 @@ export default function ProjectDetailsPage() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <Link 
-              href="/projetos"
-              className="text-primary-600 hover:text-primary-700 inline-block"
+            <button
+              onClick={() => router.back()}
+              className="text-primary-600 hover:text-primary-700 inline-block cursor-pointer"
             >
-              ← Voltar para Projetos
-            </Link>
+              ← Voltar
+            </button>
             <NavigationLinks />
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">

@@ -21,6 +21,14 @@ export default function AdministracaoPage() {
     name: '',
     serviceType: '',
   })
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
+  const [showTemplateDetails, setShowTemplateDetails] = useState(false)
+  const [selectedProjectTemplate, setSelectedProjectTemplate] = useState<any>(null)
+  const [showProjectTemplateDetails, setShowProjectTemplateDetails] = useState(false)
+  const [selectedChartAccount, setSelectedChartAccount] = useState<any>(null)
+  const [showChartAccountDetails, setShowChartAccountDetails] = useState(false)
+  const [selectedBankAccount, setSelectedBankAccount] = useState<any>(null)
+  const [showBankAccountDetails, setShowBankAccountDetails] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -28,8 +36,28 @@ export default function AdministracaoPage() {
       router.push('/auth/login')
       return
     }
+    
+    // Verificar se há tab na URL na primeira renderização
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const tabParam = urlParams.get('tab') as TabType | null
+      if (tabParam && ['projeto-template', 'negociacao-template', 'plano-contas', 'conta-corrente', 'usuarios'].includes(tabParam)) {
+        if (activeTab !== tabParam) {
+          setActiveTab(tabParam)
+          // Não retornar aqui, deixar carregar os dados após mudar a tab
+        }
+      }
+    }
+  }, [router])
+
+  // Carregar dados quando activeTab mudar
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      return
+    }
     loadData()
-  }, [router, activeTab])
+  }, [activeTab])
 
   const loadData = async () => {
     try {
@@ -159,12 +187,12 @@ export default function AdministracaoPage() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <Link 
-              href="/dashboard"
-              className="text-primary-600 hover:text-primary-700 inline-block"
+            <button
+              onClick={() => router.back()}
+              className="text-primary-600 hover:text-primary-700 inline-block cursor-pointer"
             >
-              ← Voltar ao início
-            </Link>
+              ← Voltar
+            </button>
             <NavigationLinks />
           </div>
           <div className="flex justify-between items-center">
@@ -197,7 +225,10 @@ export default function AdministracaoPage() {
                 Templates de Negociações
               </button>
               <button
-                onClick={() => setActiveTab('plano-contas')}
+                onClick={() => {
+                  setActiveTab('plano-contas')
+                  router.push('/administracao?tab=plano-contas', { scroll: false })
+                }}
                 className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                   activeTab === 'plano-contas'
                     ? 'border-b-2 border-primary-600 text-primary-600'
@@ -207,7 +238,10 @@ export default function AdministracaoPage() {
                 Plano de Contas
               </button>
               <button
-                onClick={() => setActiveTab('conta-corrente')}
+                onClick={() => {
+                  setActiveTab('conta-corrente')
+                  router.push('/administracao?tab=conta-corrente', { scroll: false })
+                }}
                 className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                   activeTab === 'conta-corrente'
                     ? 'border-b-2 border-primary-600 text-primary-600'
@@ -217,7 +251,10 @@ export default function AdministracaoPage() {
                 Contas Correntes
               </button>
               <button
-                onClick={() => setActiveTab('usuarios')}
+                onClick={() => {
+                  setActiveTab('usuarios')
+                  router.push('/administracao?tab=usuarios', { scroll: false })
+                }}
                 className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                   activeTab === 'usuarios'
                     ? 'border-b-2 border-primary-600 text-primary-600'
@@ -323,7 +360,14 @@ export default function AdministracaoPage() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredTemplates.map((template) => (
-                      <tr key={template.id} className="hover:bg-gray-50">
+                      <tr 
+                        key={template.id} 
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => {
+                          setSelectedProjectTemplate(template)
+                          setShowProjectTemplateDetails(true)
+                        }}
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">{template.name}</div>
                           {template.description && (
@@ -340,6 +384,7 @@ export default function AdministracaoPage() {
                           <Link
                             href={`/templates/projeto-template/${template.id}`}
                             className="text-primary-600 hover:text-primary-900 mr-4"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             Editar
                           </Link>
@@ -389,28 +434,265 @@ export default function AdministracaoPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {proposalTemplates.map((template) => (
-                      <tr key={template.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{template.name}</div>
-                          {template.content && (
-                            <div className="text-sm text-gray-500 truncate max-w-md">{template.content}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <Link
-                            href={`/templates/proposta-template/${template.id}`}
-                            className="text-primary-600 hover:text-primary-900"
-                          >
-                            Editar
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
+                    {proposalTemplates.map((template) => {
+                      let templateInfo = null
+                      try {
+                        if (template.content) {
+                          const parsed = JSON.parse(template.content)
+                          templateInfo = {
+                            serviceType: parsed.serviceType || 'Não especificado',
+                            fieldsCount: parsed.fields?.length || 0,
+                            fields: parsed.fields || [],
+                          }
+                        }
+                      } catch (e) {
+                        // Se não for JSON válido, ignora
+                      }
+
+                      return (
+                        <tr 
+                          key={template.id} 
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => {
+                            setSelectedTemplate({ ...template, parsedInfo: templateInfo })
+                            setShowTemplateDetails(true)
+                          }}
+                        >
+                          <td className="px-6 py-4">
+                            <div className="text-sm font-medium text-gray-900">{template.name}</div>
+                            {templateInfo && (
+                              <div className="text-sm text-gray-500 mt-1">
+                                <span className="inline-block mr-3">
+                                  Tipo: <span className="font-medium">{templateInfo.serviceType}</span>
+                                </span>
+                                <span className="inline-block">
+                                  Campos: <span className="font-medium">{templateInfo.fieldsCount}</span>
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <Link
+                              href={`/templates/proposta-template/${template.id}`}
+                              className="text-primary-600 hover:text-primary-900"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Editar
+                            </Link>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Modal de Detalhes do Template */}
+        {showTemplateDetails && selectedTemplate && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Detalhes do Template</h2>
+                  <button
+                    onClick={() => {
+                      setShowTemplateDetails(false)
+                      setSelectedTemplate(null)
+                    }}
+                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-6">
+                  {/* Informações Básicas */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Informações Básicas</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Nome:</span>
+                        <span className="ml-2 text-gray-900">{selectedTemplate.name}</span>
+                      </div>
+                      {selectedTemplate.parsedInfo && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Tipo de Serviço:</span>
+                          <span className="ml-2 text-gray-900">{selectedTemplate.parsedInfo.serviceType}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Campos do Template */}
+                  {selectedTemplate.parsedInfo && selectedTemplate.parsedInfo.fields && selectedTemplate.parsedInfo.fields.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                        Campos Configurados ({selectedTemplate.parsedInfo.fields.length})
+                      </h3>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="space-y-2">
+                          {selectedTemplate.parsedInfo.fields.map((field: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                              <div>
+                                <span className="font-medium text-gray-900">{index + 1}. {field.label}</span>
+                                <span className="ml-2 text-sm text-gray-500">({field.type})</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(!selectedTemplate.parsedInfo || !selectedTemplate.parsedInfo.fields || selectedTemplate.parsedInfo.fields.length === 0) && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <p className="text-yellow-800">Este template ainda não possui campos configurados.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+                <button
+                  onClick={() => {
+                    setShowTemplateDetails(false)
+                    setSelectedTemplate(null)
+                  }}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Fechar
+                </button>
+                <Link
+                  href={`/templates/proposta-template/${selectedTemplate.id}`}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Editar Template
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Detalhes do Template de Projeto */}
+        {showProjectTemplateDetails && selectedProjectTemplate && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Detalhes do Template</h2>
+                  <button
+                    onClick={() => {
+                      setShowProjectTemplateDetails(false)
+                      setSelectedProjectTemplate(null)
+                    }}
+                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-6">
+                  {/* Informações Básicas */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Informações Básicas</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Nome:</span>
+                        <span className="ml-2 text-gray-900">{selectedProjectTemplate.name}</span>
+                      </div>
+                      {selectedProjectTemplate.serviceType && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Tipo de Serviço:</span>
+                          <span className="ml-2 text-gray-900">{getServiceTypeLabel(selectedProjectTemplate.serviceType)}</span>
+                        </div>
+                      )}
+                      {selectedProjectTemplate.description && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Descrição:</span>
+                          <span className="ml-2 text-gray-900">{selectedProjectTemplate.description}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tarefas do Template */}
+                  {selectedProjectTemplate.tasks && selectedProjectTemplate.tasks.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                        Tarefas ({selectedProjectTemplate.tasks.length})
+                      </h3>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="space-y-2">
+                          {selectedProjectTemplate.tasks
+                            .sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0))
+                            .map((task: any, index: number) => {
+                              let taskInfo: any = {}
+                              try {
+                                if (task.description) {
+                                  taskInfo = JSON.parse(task.description)
+                                }
+                              } catch (e) {
+                                // Ignorar erro de parse
+                              }
+
+                              return (
+                                <div key={task.id} className="flex items-start justify-between p-3 bg-white rounded border border-gray-200">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-gray-900">
+                                      {index + 1}. {task.name}
+                                    </div>
+                                    <div className="text-sm text-gray-500 mt-1">
+                                      Duração: {task.duracaoPrevistaDias} dia(s)
+                                      {taskInfo.horasEstimadas && ` | Horas: ${taskInfo.horasEstimadas}h`}
+                                      {task.diasAposInicioProjeto !== null && task.diasAposInicioProjeto !== undefined && (
+                                        <span> | Início: {task.diasAposInicioProjeto} dia(s) após fechamento</span>
+                                      )}
+                                      {task.tarefaAnteriorId && (
+                                        <span> | Depende de outra tarefa</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(!selectedProjectTemplate.tasks || selectedProjectTemplate.tasks.length === 0) && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <p className="text-yellow-800">Este template ainda não possui tarefas configuradas.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+                <button
+                  onClick={() => {
+                    setShowProjectTemplateDetails(false)
+                    setSelectedProjectTemplate(null)
+                  }}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Fechar
+                </button>
+                <Link
+                  href={`/templates/projeto-template/${selectedProjectTemplate.id}`}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Editar Template
+                </Link>
+              </div>
+            </div>
           </div>
         )}
 
@@ -449,12 +731,20 @@ export default function AdministracaoPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Centro de Custo</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {chartAccounts.map((account) => (
-                      <tr key={account.id} className="hover:bg-gray-50">
+                      <tr 
+                        key={account.id} 
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => {
+                          setSelectedChartAccount(account)
+                          setShowChartAccountDetails(true)
+                        }}
+                      >
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {account.code}
                         </td>
@@ -470,9 +760,19 @@ export default function AdministracaoPage() {
                           {account.centerCost || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            account.status === 'ATIVA' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {account.status === 'ATIVA' ? 'Ativa' : 'Inativa'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <Link
                             href={`/cadastros/plano-contas/${account.id}`}
                             className="text-primary-600 hover:text-primary-900"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             Editar
                           </Link>
@@ -483,6 +783,125 @@ export default function AdministracaoPage() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Modal de Detalhes do Plano de Contas */}
+        {showChartAccountDetails && selectedChartAccount && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Detalhes da Conta</h2>
+                  <button
+                    onClick={() => {
+                      setShowChartAccountDetails(false)
+                      setSelectedChartAccount(null)
+                    }}
+                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-6">
+                  {/* Informações Básicas */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Informações da Conta</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Nome:</span>
+                        <span className="ml-2 text-gray-900">{selectedChartAccount.name}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Código:</span>
+                        <span className="ml-2 text-gray-900">{selectedChartAccount.code}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Tipo:</span>
+                        <span className="ml-2">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(selectedChartAccount.type)}`}>
+                            {getTypeLabel(selectedChartAccount.type)}
+                          </span>
+                        </span>
+                      </div>
+                      {selectedChartAccount.centerCost && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Centro de Custo:</span>
+                          <span className="ml-2 text-gray-900">{selectedChartAccount.centerCost}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Status</h3>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Status Atual:</span>
+                          <span className={`ml-2 px-3 py-1 text-sm font-semibold rounded-full ${
+                            selectedChartAccount.status === 'ATIVA' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {selectedChartAccount.status === 'ATIVA' ? 'Ativa' : 'Inativa'}
+                          </span>
+                        </div>
+                        <select
+                          value={selectedChartAccount.status}
+                          onChange={async (e) => {
+                            try {
+                              const newStatus = e.target.value
+                              await api.put(`/chart-of-accounts/${selectedChartAccount.id}`, {
+                                ...selectedChartAccount,
+                                status: newStatus,
+                              })
+                              setSelectedChartAccount({ ...selectedChartAccount, status: newStatus })
+                              // Atualizar na lista também
+                              setChartAccounts(chartAccounts.map(acc => 
+                                acc.id === selectedChartAccount.id 
+                                  ? { ...acc, status: newStatus }
+                                  : acc
+                              ))
+                              alert('Status atualizado com sucesso!')
+                            } catch (error: any) {
+                              console.error('Erro ao atualizar status:', error)
+                              alert(error.response?.data?.message || 'Erro ao atualizar status')
+                            }
+                          }}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                        >
+                          <option value="ATIVA">Ativa</option>
+                          <option value="INATIVA">Inativa</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+                <button
+                  onClick={() => {
+                    setShowChartAccountDetails(false)
+                    setSelectedChartAccount(null)
+                  }}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Fechar
+                </button>
+                <Link
+                  href={`/cadastros/plano-contas/${selectedChartAccount.id}`}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Editar Conta
+                </Link>
+              </div>
+            </div>
           </div>
         )}
 
@@ -521,6 +940,7 @@ export default function AdministracaoPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agência</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conta</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                     </tr>
                   </thead>
@@ -553,6 +973,127 @@ export default function AdministracaoPage() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Modal de Detalhes da Conta Corrente */}
+        {showBankAccountDetails && selectedBankAccount && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Detalhes da Conta Corrente</h2>
+                  <button
+                    onClick={() => {
+                      setShowBankAccountDetails(false)
+                      setSelectedBankAccount(null)
+                    }}
+                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-6">
+                  {/* Informações Básicas */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Informações da Conta</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Banco:</span>
+                        <span className="ml-2 text-gray-900">{selectedBankAccount.bankName}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Agência:</span>
+                        <span className="ml-2 text-gray-900">{selectedBankAccount.agency || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Conta:</span>
+                        <span className="ml-2 text-gray-900">{selectedBankAccount.accountNumber}</span>
+                      </div>
+                      {selectedBankAccount.accountType && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Tipo:</span>
+                          <span className="ml-2 text-gray-900">{selectedBankAccount.accountType}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Saldo Inicial:</span>
+                        <span className="ml-2 text-gray-900">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedBankAccount.saldoInicial || 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Status</h3>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Status Atual:</span>
+                          <span className={`ml-2 px-3 py-1 text-sm font-semibold rounded-full ${
+                            selectedBankAccount.status === 'ATIVA' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {selectedBankAccount.status === 'ATIVA' ? 'Ativa' : 'Inativa'}
+                          </span>
+                        </div>
+                        <select
+                          value={selectedBankAccount.status}
+                          onChange={async (e) => {
+                            try {
+                              const newStatus = e.target.value
+                              await api.put(`/bank-accounts/${selectedBankAccount.id}`, {
+                                ...selectedBankAccount,
+                                status: newStatus,
+                              })
+                              setSelectedBankAccount({ ...selectedBankAccount, status: newStatus })
+                              // Atualizar na lista também
+                              setBankAccounts(bankAccounts.map(acc => 
+                                acc.id === selectedBankAccount.id 
+                                  ? { ...acc, status: newStatus }
+                                  : acc
+                              ))
+                              alert('Status atualizado com sucesso!')
+                            } catch (error: any) {
+                              console.error('Erro ao atualizar status:', error)
+                              alert(error.response?.data?.message || 'Erro ao atualizar status')
+                            }
+                          }}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                        >
+                          <option value="ATIVA">Ativa</option>
+                          <option value="INATIVA">Inativa</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+                <button
+                  onClick={() => {
+                    setShowBankAccountDetails(false)
+                    setSelectedBankAccount(null)
+                  }}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Fechar
+                </button>
+                <Link
+                  href={`/cadastros/conta-corrente/${selectedBankAccount.id}`}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Editar Conta
+                </Link>
+              </div>
+            </div>
           </div>
         )}
 

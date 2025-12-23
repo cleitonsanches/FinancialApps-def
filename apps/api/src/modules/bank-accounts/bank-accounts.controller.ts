@@ -9,7 +9,12 @@ export class BankAccountsController {
   @Get()
   async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<BankAccount[]> {
     const effectiveCompanyId = companyId || req?.user?.companyId;
-    return this.bankAccountsService.findAll(effectiveCompanyId);
+    console.log('BankAccountsController.findAll - companyId:', companyId);
+    console.log('BankAccountsController.findAll - req.user:', req?.user);
+    console.log('BankAccountsController.findAll - effectiveCompanyId:', effectiveCompanyId);
+    const accounts = await this.bankAccountsService.findAll(effectiveCompanyId);
+    console.log('BankAccountsController.findAll - contas encontradas:', accounts.length);
+    return accounts;
   }
 
   @Get(':id')
@@ -18,7 +23,11 @@ export class BankAccountsController {
   }
 
   @Post()
-  async create(@Body() bankAccountData: Partial<BankAccount>): Promise<BankAccount> {
+  async create(@Body() bankAccountData: Partial<BankAccount>, @Request() req?: any): Promise<BankAccount> {
+    const companyId = req?.user?.companyId || bankAccountData.companyId;
+    if (companyId && !bankAccountData.companyId) {
+      bankAccountData.companyId = companyId;
+    }
     return this.bankAccountsService.create(bankAccountData);
   }
 

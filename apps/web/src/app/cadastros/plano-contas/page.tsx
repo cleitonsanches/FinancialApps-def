@@ -76,12 +76,12 @@ export default function PlanoContasPage() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <Link 
-              href="/cadastros"
-              className="text-primary-600 hover:text-primary-700 inline-block"
+            <button
+              onClick={() => router.back()}
+              className="text-primary-600 hover:text-primary-700 inline-block cursor-pointer"
             >
-              ← Voltar para Cadastros
-            </Link>
+              ← Voltar
+            </button>
             <NavigationLinks />
           </div>
           <div className="flex justify-between items-center">

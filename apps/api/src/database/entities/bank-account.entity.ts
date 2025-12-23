@@ -26,6 +26,17 @@ export class BankAccount {
   @Column({ name: 'account_type', type: 'varchar', length: 20, nullable: true })
   accountType?: string; // CORRENTE, POUPANCA, etc.
 
+  // Temporariamente comentado até a migração ser executada
+  // Execute: npm run migrate:pix-key na pasta apps/api
+  // @Column({ name: 'pix_key', type: 'varchar', length: 255, nullable: true })
+  // pixKey?: string;
+
+  @Column({ name: 'saldo_inicial', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  saldoInicial: number;
+
+  @Column({ name: 'status', type: 'varchar', length: 20, default: 'ATIVA' })
+  status: string; // ATIVA, INATIVA
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

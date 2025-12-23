@@ -18,7 +18,11 @@ export class ChartOfAccountsController {
   }
 
   @Post()
-  async create(@Body() chartData: Partial<ChartOfAccounts>): Promise<ChartOfAccounts> {
+  async create(@Body() chartData: Partial<ChartOfAccounts>, @Request() req?: any): Promise<ChartOfAccounts> {
+    const companyId = req?.user?.companyId || chartData.companyId;
+    if (companyId && !chartData.companyId) {
+      chartData.companyId = companyId;
+    }
     return this.chartOfAccountsService.create(chartData);
   }
 

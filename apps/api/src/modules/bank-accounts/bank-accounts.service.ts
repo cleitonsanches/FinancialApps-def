@@ -22,12 +22,16 @@ export class BankAccountsService {
   }
 
   async create(bankAccountData: Partial<BankAccount>): Promise<BankAccount> {
-    const bankAccount = this.bankAccountRepository.create(bankAccountData);
+    // Remover pixKey temporariamente até a migração ser executada
+    const { pixKey, ...dataWithoutPixKey } = bankAccountData as any;
+    const bankAccount = this.bankAccountRepository.create(dataWithoutPixKey as Partial<BankAccount>);
     return this.bankAccountRepository.save(bankAccount);
   }
 
   async update(id: string, bankAccountData: Partial<BankAccount>): Promise<BankAccount> {
-    await this.bankAccountRepository.update(id, bankAccountData);
+    // Remover pixKey temporariamente até a migração ser executada
+    const { pixKey, ...dataWithoutPixKey } = bankAccountData as any;
+    await this.bankAccountRepository.update(id, dataWithoutPixKey);
     return this.findOne(id);
   }
 

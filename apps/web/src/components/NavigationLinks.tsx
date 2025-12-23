@@ -28,6 +28,15 @@ export default function NavigationLinks() {
 
   return (
     <div className="flex gap-2 flex-wrap">
+      {/* Dashboard */}
+      <Link
+        href="/dashboard"
+        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+        title="Dashboard"
+      >
+        <span className="text-base">🏠</span>
+      </Link>
+      
       {/* Agenda */}
       <Link
         href="/agenda"

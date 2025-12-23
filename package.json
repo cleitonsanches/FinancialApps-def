@@ -9,6 +9,11 @@
     "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
+    "setup": "node setup.js",
+    "init:db": "npm run init:db --workspace=apps/api",
+    "migrate:chart-status": "npm run migrate:chart-status --workspace=apps/api",
+    "migrate:bank-fields": "npm run migrate:bank-fields --workspace=apps/api",
+    "seed:admin": "npm run seed:admin --workspace=apps/api",
     "auto-save": "node auto-save.js",
     "auto-save:start": "start /B node auto-save.js",
     "start": "start-dev.bat"

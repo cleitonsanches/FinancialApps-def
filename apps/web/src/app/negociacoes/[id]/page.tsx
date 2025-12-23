@@ -383,12 +383,12 @@ export default function NegotiationDetailsPage() {
       <div className="min-h-screen bg-gray-100 p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           <p className="text-center text-gray-600">Negociação não encontrada</p>
-          <Link
-            href="/negociacoes"
-            className="mt-4 inline-block text-primary-600 hover:text-primary-700"
+          <button
+            onClick={() => router.back()}
+            className="mt-4 inline-block text-primary-600 hover:text-primary-700 cursor-pointer"
           >
-            ← Voltar para Negociações
-          </Link>
+            ← Voltar
+          </button>
         </div>
       </div>
     )
@@ -402,12 +402,12 @@ export default function NegotiationDetailsPage() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <Link 
-              href="/negociacoes"
-              className="text-primary-600 hover:text-primary-700 inline-block"
+            <button
+              onClick={() => router.back()}
+              className="text-primary-600 hover:text-primary-700 inline-block cursor-pointer"
             >
-              ← Voltar para Negociações
-            </Link>
+              ← Voltar
+            </button>
             <NavigationLinks />
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">

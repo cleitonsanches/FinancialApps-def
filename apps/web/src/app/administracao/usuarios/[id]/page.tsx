@@ -53,12 +53,12 @@ export default function UsuarioDetalhesPage() {
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error || 'Usuário não encontrado'}
           </div>
-          <Link
-            href="/administracao"
-            className="text-primary-600 hover:text-primary-700"
+          <button
+            onClick={() => router.back()}
+            className="text-primary-600 hover:text-primary-700 cursor-pointer"
           >
-            ← Voltar para Administração
-          </Link>
+            ← Voltar
+          </button>
         </div>
       </div>
     )
@@ -69,12 +69,12 @@ export default function UsuarioDetalhesPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <Link 
-              href="/administracao"
-              className="text-primary-600 hover:text-primary-700 inline-block"
+            <button
+              onClick={() => router.back()}
+              className="text-primary-600 hover:text-primary-700 inline-block cursor-pointer"
             >
-              ← Voltar para Administração
-            </Link>
+              ← Voltar
+            </button>
             <NavigationLinks />
           </div>
           <div className="flex justify-between items-center">

@@ -10,6 +10,10 @@
     "fix:users": "ts-node -r tsconfig-paths/register src/database/fix-users-company.ts",
     "init:db": "ts-node -r tsconfig-paths/register src/database/init-database.ts",
     "migrate:user-fields": "ts-node -r tsconfig-paths/register src/database/add-user-fields.ts",
+    "migrate:chart-status": "ts-node -r tsconfig-paths/register src/database/add-status-column.ts",
+    "migrate:bank-fields": "ts-node -r tsconfig-paths/register src/database/add-bank-account-fields.ts",
+    "migrate:pix-key": "ts-node -r tsconfig-paths/register src/database/add-pix-key-column.ts",
+    "check:bank-accounts": "ts-node -r tsconfig-paths/register src/database/check-bank-accounts.ts",
     "seed:admin": "ts-node -r tsconfig-paths/register src/database/seed-admin.ts",
     "test:login": "ts-node -r tsconfig-paths/register src/database/test-login.ts"
   },

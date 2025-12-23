@@ -14,8 +14,8 @@ export class ChartOfAccounts {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @Column({ name: 'code', type: 'varchar', length: 50 })
-  code: string;
+  @Column({ name: 'code', type: 'varchar', length: 50, nullable: true })
+  code?: string;
 
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
@@ -25,6 +25,9 @@ export class ChartOfAccounts {
 
   @Column({ name: 'center_cost', type: 'varchar', length: 100, nullable: true })
   centerCost?: string;
+
+  @Column({ name: 'status', type: 'varchar', length: 20, default: 'ATIVA' })
+  status: string; // ATIVA, INATIVA
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request, BadRequestException } from '@nestjs/common';
 import { ProposalTemplatesService } from './proposal-templates.service';
 import { ProposalTemplate } from '../../database/entities/proposal-template.entity';
 
@@ -19,10 +19,13 @@ export class ProposalTemplatesController {
 
   @Post()
   async create(@Body() templateData: Partial<ProposalTemplate>, @Request() req?: any): Promise<ProposalTemplate> {
-    const companyId = req?.user?.companyId;
-    if (companyId && !templateData.companyId) {
-      templateData.companyId = companyId;
+    const companyId = req?.user?.companyId || templateData.companyId;
+    
+    if (!companyId) {
+      throw new BadRequestException('companyId is required. Please provide companyId in the request body or ensure you are authenticated.');
     }
+    
+    templateData.companyId = companyId;
     return this.proposalTemplatesService.create(templateData);
   }
 

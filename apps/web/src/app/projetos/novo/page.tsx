@@ -98,12 +98,12 @@ export default function NovoProjetoPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <Link 
-              href="/projetos"
-              className="text-primary-600 hover:text-primary-700 inline-block"
+            <button
+              onClick={() => router.back()}
+              className="text-primary-600 hover:text-primary-700 inline-block cursor-pointer"
             >
-              ← Voltar para Projetos
-            </Link>
+              ← Voltar
+            </button>
             <NavigationLinks />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Novo Projeto</h1>

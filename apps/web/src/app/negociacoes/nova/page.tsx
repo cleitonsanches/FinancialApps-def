@@ -223,12 +223,12 @@ export default function NovaNegociacaoPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <Link 
-              href="/negociacoes"
-              className="text-primary-600 hover:text-primary-700 inline-block"
+            <button
+              onClick={() => router.back()}
+              className="text-primary-600 hover:text-primary-700 inline-block cursor-pointer"
             >
-              ← Voltar para Negociações
-            </Link>
+              ← Voltar
+            </button>
             <NavigationLinks />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Nova Negociação</h1>

@@ -34,7 +34,13 @@ export class ProjectTemplatesService {
 
   async create(templateData: Partial<ProjectTemplate>): Promise<ProjectTemplate> {
     const template = this.templateRepository.create(templateData);
-    return this.templateRepository.save(template);
+    const savedTemplate = await this.templateRepository.save(template);
+    return this.findOne(savedTemplate.id);
+  }
+
+  async createTask(taskData: Partial<ProjectTemplateTask>): Promise<ProjectTemplateTask> {
+    const task = this.taskRepository.create(taskData);
+    return this.taskRepository.save(task);
   }
 
   async update(id: string, templateData: Partial<ProjectTemplate>): Promise<ProjectTemplate> {
@@ -44,6 +50,15 @@ export class ProjectTemplatesService {
 
   async delete(id: string): Promise<void> {
     await this.templateRepository.delete(id);
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    await this.taskRepository.delete(taskId);
+  }
+
+  async updateTask(taskId: string, taskData: Partial<ProjectTemplateTask>): Promise<ProjectTemplateTask> {
+    await this.taskRepository.update(taskId, taskData);
+    return this.taskRepository.findOne({ where: { id: taskId } }) as Promise<ProjectTemplateTask>;
   }
 }
 
