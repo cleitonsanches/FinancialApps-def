@@ -17,20 +17,50 @@ export default function LoginPage() {
     setError('')
 
     try {
+      console.log('Tentando fazer login com:', { email, password: '***' })
       const response = await api.post('/auth/login', {
         email,
         password,
       })
 
-      if (response.data.token) {
+      console.log('Resposta do login:', response.data)
+
+      if (response.data.access_token) {
+        localStorage.setItem('token', response.data.access_token)
+        console.log('Token salvo no localStorage:', response.data.access_token.substring(0, 20) + '...')
+        
+        // Verificar se foi salvo
+        const savedToken = localStorage.getItem('token')
+        console.log('Token verificado no localStorage:', savedToken ? savedToken.substring(0, 20) + '...' : 'NÃO ENCONTRADO')
+        
+        // Pequeno delay para garantir que o token foi salvo
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        console.log('Redirecionando para /dashboard')
+        // Usar window.location para garantir redirecionamento
+        window.location.href = '/dashboard'
+      } else if (response.data.token) {
+        // Fallback para compatibilidade
         localStorage.setItem('token', response.data.token)
-        router.push('/dashboard')
+        console.log('Token (fallback) salvo no localStorage')
+        await new Promise(resolve => setTimeout(resolve, 100))
+        window.location.href = '/dashboard'
+      } else {
+        console.error('Resposta não contém token:', response.data)
+        setError('Resposta do servidor inválida. Tente novamente.')
       }
     } catch (err: any) {
       console.error('Erro no login:', err)
+      console.error('Detalhes do erro:', {
+        response: err.response?.data,
+        status: err.response?.status,
+        message: err.message,
+      })
       if (err.response) {
         // Erro com resposta do servidor
-        setError(err.response.data?.message || err.response.data?.error || 'Erro ao fazer login')
+        const errorMessage = err.response.data?.message || err.response.data?.error || 'Erro ao fazer login'
+        setError(errorMessage)
+        console.error('Mensagem de erro:', errorMessage)
       } else if (err.request) {
         // Erro de conexão
         setError('Não foi possível conectar ao servidor. Verifique se a API está rodando.')

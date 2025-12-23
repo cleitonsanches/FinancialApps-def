@@ -103,20 +103,20 @@ export default function NavigationLinks() {
         )}
       </div>
       
-      {/* Templates */}
-      <Link
-        href="/templates"
-        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-      >
-        Templates
-      </Link>
-      
       {/* Cadastros */}
       <Link
         href="/cadastros"
         className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
       >
         Cadastros
+      </Link>
+      
+      {/* Administração */}
+      <Link
+        href="/administracao"
+        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+      >
+        Administração
       </Link>
       
       {/* Botão de Logout */}

@@ -1,19 +1,35 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NavigationLinks from '@/components/NavigationLinks'
 
 export default function DashboardPage() {
   const router = useRouter()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log('Dashboard: Verificando autenticação...')
     const token = localStorage.getItem('token')
+    console.log('Dashboard: Token encontrado:', token ? token.substring(0, 20) + '...' : 'NÃO ENCONTRADO')
+    
     if (!token) {
+      console.log('Dashboard: Sem token, redirecionando para login')
       router.push('/auth/login')
+    } else {
+      console.log('Dashboard: Token válido, exibindo dashboard')
+      setLoading(false)
     }
   }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <p className="text-gray-600">Carregando...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
@@ -72,12 +88,12 @@ export default function DashboardPage() {
           </Link>
 
           <Link
-            href="/templates"
+            href="/administracao"
             className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
           >
-            <div className="text-4xl mb-4">📄</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Templates</h2>
-            <p className="text-gray-600">Gerencie templates</p>
+            <div className="text-4xl mb-4">⚙️</div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Administração</h2>
+            <p className="text-gray-600">Gerencie configurações e templates</p>
           </Link>
         </div>
       </div>
