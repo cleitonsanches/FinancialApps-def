@@ -160,6 +160,12 @@ export class ProposalsService {
     if (proposalData.dataDeclinio !== undefined) updateData.dataDeclinio = proposalData.dataDeclinio
     if (proposalData.dataCancelamento !== undefined) updateData.dataCancelamento = proposalData.dataCancelamento
     
+    // Campos de motivo
+    if (proposalData.motivoCancelamento !== undefined) updateData.motivoCancelamento = proposalData.motivoCancelamento
+    if (proposalData.motivoDeclinio !== undefined) updateData.motivoDeclinio = proposalData.motivoDeclinio
+    if (proposalData.dataDeclinio !== undefined) updateData.dataDeclinio = proposalData.dataDeclinio
+    if (proposalData.dataCancelamento !== undefined) updateData.dataCancelamento = proposalData.dataCancelamento
+    
     // Converter parcelas para JSON string se existir
     if ((proposalData as any).parcelas && Array.isArray((proposalData as any).parcelas)) {
       console.log('ProposalsService.update - Parcelas recebidas:', (proposalData as any).parcelas);

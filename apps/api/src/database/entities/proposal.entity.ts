@@ -118,7 +118,13 @@ export class Proposal {
   dataCancelamento?: Date;
 
   @Column({ name: 'parcelas', type: 'text', nullable: true })
-  parcelas?: string; // JSON string com array de parcelas
+  parcelas?: string;
+
+  @Column({ name: 'motivo_cancelamento', type: 'text', nullable: true })
+  motivoCancelamento?: string;
+
+  @Column({ name: 'motivo_declinio', type: 'text', nullable: true })
+  motivoDeclinio?: string; // JSON string com array de parcelas
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

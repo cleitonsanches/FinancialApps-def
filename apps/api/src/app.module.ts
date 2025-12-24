@@ -7,6 +7,7 @@ import { DatabaseConfig } from './config/database.config';
 import { ensureProposalNumeroColumn } from './database/ensure-proposal-numero';
 import { ensureProposalStatusDatesColumns } from './database/ensure-proposal-status-dates';
 import { ensureInvoiceFields } from './database/ensure-invoice-fields';
+import { ensureProposalMotivoFields } from './database/ensure-proposal-motivo-fields';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -59,6 +60,8 @@ export class AppModule implements OnModuleInit {
     await ensureProposalStatusDatesColumns(this.dataSource);
     // Garantir que as colunas data_recebimento e numero_nf existem na tabela invoices
     await ensureInvoiceFields(this.dataSource);
+    // Garantir que as colunas motivo_cancelamento e motivo_declinio existem na tabela proposals
+    await ensureProposalMotivoFields(this.dataSource);
   }
 }
 

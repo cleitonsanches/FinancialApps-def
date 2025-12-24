@@ -3,6 +3,7 @@ import { Company } from './company.entity';
 import { Client } from './client.entity';
 import { Proposal } from './proposal.entity';
 import { ProjectTemplate } from './project-template.entity';
+import { User } from './user.entity';
 
 @Entity('projects')
 @Index('IX_projects_company_id', ['companyId'])
@@ -97,6 +98,23 @@ export class ProjectTask {
 
   @Column({ name: 'ordem', type: 'integer', default: 0 })
   ordem: number;
+
+  @Column({ name: 'usuario_responsavel_id', nullable: true })
+  usuarioResponsavelId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'usuario_responsavel_id' })
+  usuarioResponsavel?: User;
+
+  @Column({ name: 'usuario_executor_id', nullable: true })
+  usuarioExecutorId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'usuario_executor_id' })
+  usuarioExecutor?: User;
+
+  @Column({ name: 'horas_estimadas', type: 'varchar', length: 20, nullable: true })
+  horasEstimadas?: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

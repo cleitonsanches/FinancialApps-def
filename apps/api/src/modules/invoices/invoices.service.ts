@@ -86,5 +86,23 @@ export class InvoicesService {
     const savedInvoices = await this.invoiceRepository.save(invoicesToCreate);
     return Array.isArray(savedInvoices) ? savedInvoices : [savedInvoices];
   }
+
+  async findByProposalId(proposalId: string): Promise<Invoice[]> {
+    return this.invoiceRepository.find({
+      where: { proposalId },
+      relations: ['client', 'proposal'],
+      order: { emissionDate: 'ASC' },
+    });
+  }
+
+  async updateStatus(id: string, status: string): Promise<Invoice> {
+    await this.invoiceRepository.update(id, { status });
+    return this.findOne(id);
+  }
+
+  async updateMultipleStatus(ids: string[], status: string): Promise<void> {
+    if (ids.length === 0) return;
+    await this.invoiceRepository.update(ids, { status });
+  }
 }
 

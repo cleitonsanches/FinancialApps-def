@@ -40,5 +40,15 @@ export class ProjectsController {
   async findAllTasks(@Query('projectId') projectId?: string): Promise<any[]> {
     return this.projectsService.findAllTasks(projectId);
   }
+
+  @Get(':id/tasks')
+  async findProjectTasks(@Param('id') projectId: string): Promise<any[]> {
+    return this.projectsService.findAllTasks(projectId);
+  }
+
+  @Post(':id/tasks')
+  async createTask(@Param('id') projectId: string, @Body() taskData: any): Promise<any> {
+    return this.projectsService.createTask(projectId, taskData);
+  }
 }
 

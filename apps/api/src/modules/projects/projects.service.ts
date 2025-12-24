@@ -56,5 +56,14 @@ export class ProjectsService {
       order: { ordem: 'ASC' },
     });
   }
+
+  async createTask(projectId: string, taskData: Partial<ProjectTask>): Promise<ProjectTask> {
+    const task = this.projectTaskRepository.create({
+      ...taskData,
+      projectId,
+      status: taskData.status || 'PENDENTE',
+    });
+    return this.projectTaskRepository.save(task);
+  }
 }
 

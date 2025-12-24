@@ -50,6 +50,21 @@ export class InvoicesController {
     return this.invoicesService.update(id, invoiceData);
   }
 
+  @Get('by-proposal/:proposalId')
+  async findByProposalId(@Param('proposalId') proposalId: string): Promise<Invoice[]> {
+    return this.invoicesService.findByProposalId(proposalId);
+  }
+
+  @Put('update-status/:id')
+  async updateStatus(@Param('id') id: string, @Body() body: { status: string }): Promise<Invoice> {
+    return this.invoicesService.updateStatus(id, body.status);
+  }
+
+  @Put('update-multiple-status')
+  async updateMultipleStatus(@Body() body: { ids: string[], status: string }): Promise<void> {
+    return this.invoicesService.updateMultipleStatus(body.ids, body.status);
+  }
+
   @Delete(':id')
   async delete(@Param('id') id: string): Promise<void> {
     return this.invoicesService.delete(id);
