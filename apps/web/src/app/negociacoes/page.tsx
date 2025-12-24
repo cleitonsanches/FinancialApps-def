@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
@@ -11,6 +11,7 @@ export default function NegociacoesPage() {
   const [negotiations, setNegotiations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
+  const loadingRef = useRef(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -19,18 +20,44 @@ export default function NegociacoesPage() {
       return
     }
     loadNegotiations()
-  }, [router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const getCompanyIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.companyId || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
+    }
+  }
 
   const loadNegotiations = async () => {
+    // Evitar requisições duplicadas
+    if (loadingRef.current) {
+      return
+    }
+    
     try {
+      loadingRef.current = true
       setLoading(true)
-      const response = await api.get('/negotiations')
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/negotiations?companyId=${companyId}` : '/negotiations'
+      const response = await api.get(url)
       setNegotiations(response.data || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar negociações:', error)
-      alert('Erro ao carregar negociações')
+      // Não mostrar alert se for erro 404 ou se a requisição foi cancelada
+      if (error.code !== 'ERR_CANCELED' && error.response?.status !== 404) {
+        alert('Erro ao carregar negociações')
+      }
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }
 
@@ -42,6 +69,7 @@ export default function NegociacoesPage() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
+      RASCUNHO: 'bg-gray-100 text-gray-800',
       EM_NEGOCIACAO: 'bg-blue-100 text-blue-800',
       FECHADA: 'bg-green-100 text-green-800',
       CANCELADA: 'bg-red-100 text-red-800',
@@ -52,12 +80,28 @@ export default function NegociacoesPage() {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
+      RASCUNHO: 'Rascunho',
       EM_NEGOCIACAO: 'Em Negociação',
       FECHADA: 'Fechada',
       CANCELADA: 'Cancelada',
       DECLINADA: 'Declinada',
     }
     return labels[status] || status
+  }
+
+  const handleDelete = async (negotiationId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta negociação?')) {
+      return
+    }
+
+    try {
+      await api.delete(`/negotiations/${negotiationId}`)
+      alert('Negociação excluída com sucesso!')
+      loadNegotiations()
+    } catch (error: any) {
+      console.error('Erro ao excluir negociação:', error)
+      alert(error.response?.data?.message || 'Erro ao excluir negociação')
+    }
   }
 
   const getServiceTypeLabel = (serviceType: string) => {
@@ -79,8 +123,11 @@ export default function NegociacoesPage() {
     if (!filter) return true
     const searchTerm = filter.toLowerCase()
     return (
+      negotiation.numero?.toLowerCase().includes(searchTerm) ||
+      negotiation.title?.toLowerCase().includes(searchTerm) ||
       negotiation.titulo?.toLowerCase().includes(searchTerm) ||
-      negotiation.client?.razaoSocial?.toLowerCase().includes(searchTerm)
+      negotiation.client?.razaoSocial?.toLowerCase().includes(searchTerm) ||
+      negotiation.client?.name?.toLowerCase().includes(searchTerm)
     )
   })
 
@@ -122,7 +169,7 @@ export default function NegociacoesPage() {
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <input
             type="text"
-            placeholder="Buscar por título ou cliente..."
+            placeholder="Buscar por número, título ou cliente..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
@@ -149,6 +196,7 @@ export default function NegociacoesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Título</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo de Serviço</th>
@@ -159,42 +207,66 @@ export default function NegociacoesPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredNegotiations.map((negotiation) => (
-                  <tr key={negotiation.id} className="hover:bg-gray-50">
+                  <tr 
+                    key={negotiation.id} 
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => router.push(`/negociacoes/${negotiation.id}`)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {negotiation.numero || '-'}
+                    </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{negotiation.titulo || '-'}</div>
-                      {negotiation.description && (
-                        <div className="text-sm text-gray-500">{negotiation.description}</div>
-                      )}
+                      <div className="text-sm font-medium text-gray-900">{negotiation.title || negotiation.titulo || '-'}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {negotiation.client?.razaoSocial || '-'}
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {negotiation.client?.razaoSocial || negotiation.client?.name || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {getServiceTypeLabel(negotiation.serviceType)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {negotiation.valor
-                        ? `R$ ${parseFloat(negotiation.valor.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {negotiation.valorTotal || negotiation.valor
+                        ? `R$ ${parseFloat((negotiation.valorTotal || negotiation.valor).toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                         : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(negotiation.status)}`}>
                         {getStatusLabel(negotiation.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Link
-                        href={`/negociacoes/${negotiation.id}`}
-                        className="text-primary-600 hover:text-primary-900 mr-4"
-                      >
-                        Ver
-                      </Link>
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap text-sm font-medium"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Link
                         href={`/negociacoes/editar/${negotiation.id}`}
-                        className="text-primary-600 hover:text-primary-900"
+                        className="text-primary-600 hover:text-primary-900 mr-4"
                       >
                         Editar
                       </Link>
+                      {negotiation.status === 'RASCUNHO' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(negotiation.id)
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Excluir
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

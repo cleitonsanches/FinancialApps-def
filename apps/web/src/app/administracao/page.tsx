@@ -6,7 +6,7 @@ import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
 
-type TabType = 'projeto-template' | 'negociacao-template' | 'plano-contas' | 'conta-corrente' | 'usuarios'
+type TabType = 'projeto-template' | 'negociacao-template' | 'plano-contas' | 'conta-corrente' | 'usuarios' | 'tipos-servico'
 
 export default function AdministracaoPage() {
   const router = useRouter()
@@ -16,6 +16,7 @@ export default function AdministracaoPage() {
   const [chartAccounts, setChartAccounts] = useState<any[]>([])
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
+  const [serviceTypes, setServiceTypes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [templateFilters, setTemplateFilters] = useState({
     name: '',
@@ -41,7 +42,7 @@ export default function AdministracaoPage() {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
       const tabParam = urlParams.get('tab') as TabType | null
-      if (tabParam && ['projeto-template', 'negociacao-template', 'plano-contas', 'conta-corrente', 'usuarios'].includes(tabParam)) {
+      if (tabParam && ['projeto-template', 'negociacao-template', 'plano-contas', 'conta-corrente', 'usuarios', 'tipos-servico'].includes(tabParam)) {
         if (activeTab !== tabParam) {
           setActiveTab(tabParam)
           // Não retornar aqui, deixar carregar os dados após mudar a tab
@@ -77,6 +78,9 @@ export default function AdministracaoPage() {
           break
         case 'usuarios':
           await loadUsers()
+          break
+        case 'tipos-servico':
+          await loadServiceTypes()
           break
       }
     } catch (error) {
@@ -133,6 +137,31 @@ export default function AdministracaoPage() {
       console.error('Erro ao carregar usuários:', error)
       console.error('Detalhes do erro:', error.response?.data)
       setUsers([]) // Garantir que a lista fique vazia em caso de erro
+    }
+  }
+
+  const loadServiceTypes = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/service-types?companyId=${companyId}&includeInactive=true` : '/service-types?includeInactive=true'
+      const response = await api.get(url)
+      setServiceTypes(response.data || [])
+    } catch (error: any) {
+      console.error('Erro ao carregar tipos de serviços:', error)
+      setServiceTypes([])
+    }
+  }
+
+  const getCompanyIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.companyId || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
     }
   }
 
@@ -249,6 +278,19 @@ export default function AdministracaoPage() {
                 }`}
               >
                 Contas Correntes
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('tipos-servico')
+                  router.push('/administracao?tab=tipos-servico', { scroll: false })
+                }}
+                className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                  activeTab === 'tipos-servico'
+                    ? 'border-b-2 border-primary-600 text-primary-600'
+                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Tipos de Serviços
               </button>
               <button
                 onClick={() => {
@@ -1094,6 +1136,84 @@ export default function AdministracaoPage() {
                 </Link>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'tipos-servico' && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Tipos de Serviços</h2>
+              <Link
+                href="/administracao/tipos-servico/novo"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              >
+                + Novo Tipo de Serviço
+              </Link>
+            </div>
+
+            {loading ? (
+              <div className="bg-white rounded-lg shadow-md p-8 text-center">
+                <p className="text-gray-600">Carregando tipos de serviços...</p>
+              </div>
+            ) : serviceTypes.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-md p-8 text-center">
+                <p className="text-gray-600 mb-4">Nenhum tipo de serviço cadastrado</p>
+                <Link
+                  href="/administracao/tipos-servico/novo"
+                  className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Criar Primeiro Tipo de Serviço
+                </Link>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {serviceTypes.map((serviceType) => (
+                      <tr 
+                        key={serviceType.id} 
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => router.push(`/administracao/tipos-servico/${serviceType.id}`)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {serviceType.code}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {serviceType.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {serviceType.active !== false ? (
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                              Ativo
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                              Inativo
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
+                          <Link
+                            href={`/administracao/tipos-servico/${serviceType.id}`}
+                            className="text-primary-600 hover:text-primary-900"
+                          >
+                            Editar
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

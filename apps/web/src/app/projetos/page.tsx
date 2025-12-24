@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
@@ -14,6 +14,7 @@ export default function ProjetosPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('')
+  const loadingRef = useRef(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -23,10 +24,17 @@ export default function ProjetosPage() {
     }
     loadProjects()
     loadTasks()
-  }, [router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const loadProjects = async () => {
+    // Evitar requisições duplicadas
+    if (loadingRef.current) {
+      return
+    }
+    
     try {
+      loadingRef.current = true
       setLoading(true)
       const response = await api.get('/projects')
       const projectsList = response.data || []
@@ -36,11 +44,15 @@ export default function ProjetosPage() {
       if (projectsList.length > 0) {
         loadTimeEntries(projectsList)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar projetos:', error)
-      alert('Erro ao carregar projetos')
+      // Não mostrar alert se for erro 404 ou se a requisição foi cancelada
+      if (error.code !== 'ERR_CANCELED' && error.response?.status !== 404) {
+        alert('Erro ao carregar projetos')
+      }
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }
 
@@ -48,8 +60,12 @@ export default function ProjetosPage() {
     try {
       const response = await api.get('/projects/tasks/all')
       setTasks(response.data || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar tarefas:', error)
+      // Não mostrar alert se for erro 404 ou se a requisição foi cancelada
+      if (error.code !== 'ERR_CANCELED' && error.response?.status !== 404) {
+        // Silenciosamente falhar - tarefas não são críticas para a página
+      }
     }
   }
 

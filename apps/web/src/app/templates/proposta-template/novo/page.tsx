@@ -1,11 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
-
-type ServiceType = 'Análise de dados' | 'Assinaturas' | 'Automações' | 'Consultoria' | 'Manutenções' | 'Migração de dados' | 'Outros' | 'Treinamento'
 
 type FieldType = 
   | 'valor_proposta'
@@ -42,28 +40,27 @@ const AVAILABLE_FIELDS: Omit<TemplateField, 'order' | 'selected'>[] = [
   { key: 'data_entrega_producao', label: 'Data para entrega da produção', type: 'date' },
 ]
 
-const SERVICE_TYPES: ServiceType[] = [
-  'Análise de dados',
-  'Assinaturas',
-  'Automações',
-  'Consultoria',
-  'Manutenções',
-  'Migração de dados',
-  'Outros',
-  'Treinamento',
-]
-
 export default function NovoPropostaTemplatePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [showFieldsModal, setShowFieldsModal] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [templateId, setTemplateId] = useState<string | null>(null)
+  const [serviceTypes, setServiceTypes] = useState<any[]>([])
   
   const [formData, setFormData] = useState({
     name: '',
-    serviceType: '' as ServiceType | '',
+    serviceType: '',
   })
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/auth/login')
+      return
+    }
+    loadServiceTypes()
+  }, [router])
 
   const [selectedFields, setSelectedFields] = useState<TemplateField[]>(() => {
     // Inicializar campos disponíveis
@@ -85,6 +82,18 @@ export default function NovoPropostaTemplatePage() {
     } catch (error) {
       console.error('Erro ao decodificar token:', error)
       return null
+    }
+  }
+
+  const loadServiceTypes = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/service-types?companyId=${companyId}` : '/service-types'
+      const response = await api.get(url)
+      setServiceTypes(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar tipos de serviços:', error)
+      setServiceTypes([])
     }
   }
 
@@ -267,14 +276,14 @@ export default function NovoPropostaTemplatePage() {
             </label>
             <select
               value={formData.serviceType}
-              onChange={(e) => setFormData({ ...formData, serviceType: e.target.value as ServiceType })}
+              onChange={(e) => setFormData({ ...formData, serviceType: e.target.value })}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
             >
-              <option value="">Selecione o serviço</option>
-              {SERVICE_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
+              <option value="">Selecione o tipo de serviço</option>
+              {serviceTypes.map((serviceType) => (
+                <option key={serviceType.id} value={serviceType.code}>
+                  {serviceType.name}
                 </option>
               ))}
             </select>

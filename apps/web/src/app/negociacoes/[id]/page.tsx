@@ -22,12 +22,27 @@ export default function NegotiationDetailsPage() {
   const [showParcelsModal, setShowParcelsModal] = useState(false)
   const [showProjectTemplateModal, setShowProjectTemplateModal] = useState(false)
   const [showTasksReviewModal, setShowTasksReviewModal] = useState(false)
+  const [showProjectChoiceModal, setShowProjectChoiceModal] = useState(false)
+  const [showCancelDeclineModal, setShowCancelDeclineModal] = useState(false)
+  const [cancelDeclineData, setCancelDeclineData] = useState({ tipo: '', motivo: '' })
+  const [relatedInvoices, setRelatedInvoices] = useState<any[]>([])
+  const [showInvoiceConfirmModal, setShowInvoiceConfirmModal] = useState(false)
+  const [invoiceConfirmData, setInvoiceConfirmData] = useState<any>(null)
+  const [showFaturadaOptionsModal, setShowFaturadaOptionsModal] = useState(false)
+  const [faturadaInvoices, setFaturadaInvoices] = useState<any[]>([])
+  const [recebidaInvoices, setRecebidaInvoices] = useState<any[]>([])
+  const [adjustedInvoices, setAdjustedInvoices] = useState<any[]>([])
+  const [invoicesByParcela, setInvoicesByParcela] = useState<Record<number, any>>({})
   
   // Dados temporários
   const [calculatedParcels, setCalculatedParcels] = useState<any[]>([])
+  const [parcelInputValues, setParcelInputValues] = useState<Record<number, string>>({})
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [calculatedTasks, setCalculatedTasks] = useState<any[]>([])
   const [tasksToCreate, setTasksToCreate] = useState<any[]>([])
+  const [projectCreationMode, setProjectCreationMode] = useState<'template' | 'manual' | null>(null)
+  const [users, setUsers] = useState<any[]>([])
+  const [currentUser, setCurrentUser] = useState<any>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -39,12 +54,44 @@ export default function NegotiationDetailsPage() {
     loadProjects()
     loadTasks()
     loadProjectTemplates()
+    loadUsers()
+    loadCurrentUser()
   }, [negotiationId, router])
+
+  useEffect(() => {
+    if (negotiation && (negotiation.status === 'FECHADA' || negotiation.status === 'DECLINADA' || negotiation.status === 'CANCELADA')) {
+      loadRelatedInvoices()
+    }
+  }, [negotiation?.id, negotiation?.status])
+
+  // Debug: monitorar mudanças em calculatedParcels
+  useEffect(() => {
+    console.log('calculatedParcels mudou:', calculatedParcels)
+    console.log('Quantidade de parcelas:', calculatedParcels.length)
+  }, [calculatedParcels])
 
   const loadNegotiation = async () => {
     try {
       setLoading(true)
       const response = await api.get(`/negotiations/${negotiationId}`)
+      console.log('Negociação carregada:', response.data)
+      console.log('Parcelas da negociação (raw):', response.data.parcelas)
+      console.log('Tipo de parcelas:', typeof response.data.parcelas)
+      
+      // Se parcelas é string, fazer parse
+      if (typeof response.data.parcelas === 'string') {
+        try {
+          response.data.parcelas = JSON.parse(response.data.parcelas)
+          console.log('Parcelas parseadas após loadNegotiation:', response.data.parcelas)
+        } catch (e) {
+          console.error('Erro ao fazer parse das parcelas em loadNegotiation:', e)
+        }
+      }
+      
+      console.log('Parcelas da negociação (após parse):', response.data.parcelas)
+      console.log('Quantidade de parcelas:', Array.isArray(response.data.parcelas) ? response.data.parcelas.length : 'não é array')
+      console.log('Valor Proposta:', response.data.valorProposta)
+      console.log('Valor Total:', response.data.valorTotal)
       setNegotiation(response.data)
     } catch (error: any) {
       console.error('Erro ao carregar negociação:', error)
@@ -80,10 +127,58 @@ export default function NegotiationDetailsPage() {
 
   const loadProjectTemplates = async () => {
     try {
-      const response = await api.get('/project-templates')
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/project-templates?companyId=${companyId}` : '/project-templates'
+      const response = await api.get(url)
       setProjectTemplates(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar templates:', error)
+    }
+  }
+
+  const getCompanyIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.companyId || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
+    }
+  }
+
+  const getUserIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.sub || payload.userId || payload.id || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
+    }
+  }
+
+  const loadUsers = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      if (!companyId) return
+      const response = await api.get(`/users?companyId=${companyId}`)
+      setUsers(Array.isArray(response.data) ? response.data : [])
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error)
+    }
+  }
+
+  const loadCurrentUser = async () => {
+    try {
+      const userId = getUserIdFromToken()
+      if (!userId) return
+      const response = await api.get(`/users/${userId}`)
+      setCurrentUser(response.data)
+    } catch (error) {
+      console.error('Erro ao carregar usuário atual:', error)
     }
   }
 
@@ -100,11 +195,14 @@ export default function NegotiationDetailsPage() {
     return date.toLocaleDateString('pt-BR')
   }
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | string | null | undefined) => {
+    if (!value) return 'R$ 0,00'
+    const numValue = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value
+    if (isNaN(numValue)) return 'R$ 0,00'
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
-    }).format(value)
+    }).format(numValue)
   }
 
   const getStatusColor = (status: string) => {
@@ -147,12 +245,109 @@ export default function NegotiationDetailsPage() {
     return labels[serviceType] || serviceType
   }
 
+  const getStatusDateLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      ENVIADA: 'Data do Envio',
+      RE_ENVIADA: 'Data do Re-envio',
+      REVISADA: 'Data da Revisão',
+      FECHADA: 'Data do Fechamento',
+      DECLINADA: 'Data do Declínio',
+      CANCELADA: 'Data do Cancelamento',
+    }
+    return labels[status] || null
+  }
+
+  const getStatusDate = (negotiation: any) => {
+    const status = negotiation.status
+    switch (status) {
+      case 'ENVIADA':
+        return negotiation.dataEnvio
+      case 'RE_ENVIADA':
+        return negotiation.dataReEnvio
+      case 'REVISADA':
+        return negotiation.dataRevisao
+      case 'FECHADA':
+        return negotiation.dataFechamento
+      case 'DECLINADA':
+        return negotiation.dataDeclinio
+      case 'CANCELADA':
+        return negotiation.dataCancelamento
+      default:
+        return null
+    }
+  }
+
+
+  const loadRelatedInvoices = async () => {
+    try {
+      const response = await api.get(`/invoices/by-proposal/${negotiationId}`)
+      const invoices = response.data || []
+      setRelatedInvoices(invoices)
+      
+      // Separar por status
+      const provisionadas = invoices.filter((inv: any) => inv.status === 'PROVISIONADA')
+      const faturadas = invoices.filter((inv: any) => inv.status === 'FATURADA')
+      const recebidas = invoices.filter((inv: any) => inv.status === 'RECEBIDA')
+      
+      setFaturadaInvoices(faturadas)
+      setRecebidaInvoices(recebidas)
+      
+      // Mapear invoices por número da parcela (extrair do invoiceNumber)
+      const invoicesByParcelaMap: Record<number, any> = {}
+      invoices.forEach((inv: any) => {
+        // O invoiceNumber tem formato NEG-XXXX-NNN, onde NNN é o número da parcela (pode ter zeros à esquerda)
+        // Exemplo: NEG-0002-001, NEG-0002-002, etc.
+        // Buscar o último segmento numérico após o último hífen
+        const parts = inv.invoiceNumber?.split('-')
+        if (parts && parts.length >= 3) {
+          const parcelaNumStr = parts[parts.length - 1] // Último segmento
+          const parcelaNum = parseInt(parcelaNumStr)
+          if (!isNaN(parcelaNum)) {
+            invoicesByParcelaMap[parcelaNum] = inv
+          }
+        }
+      })
+      setInvoicesByParcela(invoicesByParcelaMap)
+      
+      return { provisionadas, faturadas, recebidas }
+    } catch (error) {
+      console.error('Erro ao carregar contas a receber:', error)
+      return { provisionadas: [], faturadas: [], recebidas: [] }
+    }
+  }
+
   const handleStatusChange = async (newStatus: string) => {
+    // Se for FECHADA, usar lógica existente
     if (newStatus === 'FECHADA' && negotiation.status !== 'FECHADA') {
       setShowCloseNegotiationModal(true)
       return
     }
 
+    // Se for CANCELADA ou DECLINADA
+    if ((newStatus === 'CANCELADA' || newStatus === 'DECLINADA')) {
+      const allowedStatuses = ['RASCUNHO', 'ENVIADA', 'RE_ENVIADA', 'REVISADA', 'FECHADA']
+      if (!allowedStatuses.includes(negotiation.status)) {
+        alert('Não é possível alterar o status para ' + (newStatus === 'CANCELADA' ? 'Cancelada' : 'Declinada') + ' a partir do status atual.')
+        return
+      }
+
+      // Se status atual for FECHADA, precisa validar contas a receber
+      if (negotiation.status === 'FECHADA') {
+        const invoices = await loadRelatedInvoices()
+        
+        // Preparar dados do modal
+        setCancelDeclineData({ tipo: newStatus, motivo: '' })
+        setShowCancelDeclineModal(true)
+        return
+      }
+
+      // Para outros status, apenas pedir motivo
+      setCancelDeclineData({ tipo: newStatus, motivo: '' })
+      setShowCancelDeclineModal(true)
+      return
+    }
+
+    // Para outros status, usar lógica padrão
     try {
       await api.put(`/negotiations/${negotiationId}`, { status: newStatus })
       await loadNegotiation()
@@ -165,50 +360,269 @@ export default function NegotiationDetailsPage() {
     }
   }
 
+  const handleConfirmCancelDecline = async (skipValidation = false) => {
+    if (!skipValidation && !cancelDeclineData.motivo.trim()) {
+      alert('Por favor, informe o motivo do ' + (cancelDeclineData.tipo === 'CANCELADA' ? 'cancelamento' : 'declínio'))
+      return
+    }
+
+    // Se status atual for FECHADA, processar contas a receber
+    if (negotiation.status === 'FECHADA' && !skipValidation) {
+      const invoices = await loadRelatedInvoices()
+      
+      // 1. Verificar Provisionadas
+      if (invoices.provisionadas.length > 0) {
+        const confirmCancel = confirm(
+          `Existem ${invoices.provisionadas.length} conta(s) a receber em status PROVISIONADA.\n\n` +
+          `Deseja cancelar essas parcelas?`
+        )
+        
+        if (confirmCancel) {
+          const ids = invoices.provisionadas.map((inv: any) => inv.id)
+          await api.put('/invoices/update-multiple-status', { ids, status: 'CANCELADA' })
+        }
+      }
+
+      // 2. Verificar Faturadas
+      if (invoices.faturadas.length > 0) {
+        setShowFaturadaOptionsModal(true)
+        return // A lógica continua no handleFaturadaOption
+      }
+
+      // 3. Verificar Recebidas (junto com a lógica de faturadas se houver)
+      if (invoices.recebidas.length > 0) {
+        alert(
+          `ATENÇÃO: Existem ${invoices.recebidas.length} conta(s) a receber em status RECEBIDA.\n\n` +
+          `Essas parcelas serão mantidas no sistema, mas as parcelas PROVISIONADAS serão canceladas.`
+        )
+      }
+
+      // Cancelar provisionadas se houver (e não foram canceladas acima)
+      if (invoices.provisionadas.length > 0) {
+        const ids = invoices.provisionadas.map((inv: any) => inv.id)
+        await api.put('/invoices/update-multiple-status', { ids, status: 'CANCELADA' })
+      }
+    }
+
+    // Atualizar status da negociação
+    try {
+      const updateData: any = {
+        status: cancelDeclineData.tipo,
+      }
+      
+      if (cancelDeclineData.tipo === 'CANCELADA') {
+        updateData.motivoCancelamento = cancelDeclineData.motivo
+      } else {
+        updateData.motivoDeclinio = cancelDeclineData.motivo
+      }
+
+      await api.put(`/negotiations/${negotiationId}`, updateData)
+      await loadNegotiation()
+      await loadRelatedInvoices()
+      setShowCancelDeclineModal(false)
+      setShowFaturadaOptionsModal(false)
+      setShowInvoiceConfirmModal(false)
+      setCancelDeclineData({ tipo: '', motivo: '' })
+      alert('Status atualizado com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao atualizar status:', error)
+      alert(error.response?.data?.message || 'Erro ao atualizar status')
+    }
+  }
+
+  const handleFaturadaOption = async (option: 'cancelar' | 'manter') => {
+    if (option === 'cancelar') {
+      const confirmCancel = confirm(
+        `ATENÇÃO: Você selecionou cancelar as parcelas FATURADAS.\n\n` +
+        `IMPORTANTE: Será necessário cancelar as notas fiscais correspondentes no sistema fiscal.\n\n` +
+        `Deseja continuar?`
+      )
+
+      if (confirmCancel) {
+        const ids = faturadaInvoices.map((inv: any) => inv.id)
+        await api.put('/invoices/update-multiple-status', { ids, status: 'CANCELADA' })
+        
+        // Cancelar provisionadas também
+        const provisionadas = relatedInvoices.filter((inv: any) => inv.status === 'PROVISIONADA')
+        if (provisionadas.length > 0) {
+          const provisionadasIds = provisionadas.map((inv: any) => inv.id)
+          await api.put('/invoices/update-multiple-status', { ids: provisionadasIds, status: 'CANCELADA' })
+        }
+
+        // Verificar recebidas e alertar
+        if (recebidaInvoices.length > 0) {
+          alert(
+            `ATENÇÃO: Existem ${recebidaInvoices.length} conta(s) a receber em status RECEBIDA.\n\n` +
+            `Essas parcelas serão mantidas no sistema.`
+          )
+        }
+
+        setShowFaturadaOptionsModal(false)
+        // Continuar com o cancelamento da negociação
+        await handleConfirmCancelDecline(true)
+      }
+    } else {
+      // Manter faturadas - mostrar modal para ajustar datas
+      const invoicesWithDates = faturadaInvoices.map((inv: any) => ({
+        ...inv,
+        dueDate: inv.dueDate ? new Date(inv.dueDate).toISOString().split('T')[0] : '',
+        emissionDate: inv.emissionDate ? new Date(inv.emissionDate).toISOString().split('T')[0] : '',
+      }))
+      setAdjustedInvoices(invoicesWithDates)
+      setShowFaturadaOptionsModal(false)
+      setShowInvoiceConfirmModal(true)
+      setInvoiceConfirmData({
+        invoices: faturadaInvoices,
+        action: 'manter'
+      })
+    }
+  }
+
+  const handleConfirmInvoiceAdjustments = async (adjustedInvoices: any[]) => {
+    // Atualizar as parcelas faturadas com novas datas
+    for (const invoice of adjustedInvoices) {
+      await api.put(`/invoices/${invoice.id}`, {
+        dueDate: invoice.dueDate,
+        emissionDate: invoice.emissionDate,
+      })
+    }
+
+    // Cancelar provisionadas
+    const provisionadas = relatedInvoices.filter((inv: any) => inv.status === 'PROVISIONADA')
+    if (provisionadas.length > 0) {
+      const ids = provisionadas.map((inv: any) => inv.id)
+      await api.put('/invoices/update-multiple-status', { ids, status: 'CANCELADA' })
+    }
+
+    // Verificar recebidas e alertar
+    if (recebidaInvoices.length > 0) {
+      alert(
+        `ATENÇÃO: Existem ${recebidaInvoices.length} conta(s) a receber em status RECEBIDA.\n\n` +
+        `Essas parcelas serão mantidas no sistema.`
+      )
+    }
+
+    // Continuar com o cancelamento da negociação
+    setShowInvoiceConfirmModal(false)
+    await handleConfirmCancelDecline(true)
+  }
+
   const handleConfirmCloseNegotiation = () => {
     setShowCloseNegotiationModal(false)
     
-    // Calcular parcelas baseado na proposta
-    const parcels: any[] = []
-    const valorTotal = negotiation.valorTotal || negotiation.valor || 0
+    // Função auxiliar para converter valor para número
+    const getValorAsNumber = (valor: any): number => {
+      if (valor === null || valor === undefined) return 0
+      if (typeof valor === 'number') return valor
+      if (typeof valor === 'string') {
+        // Remove formatação de moeda (R$, pontos, vírgulas)
+        const cleaned = valor.replace(/[R$\s.]/g, '').replace(',', '.')
+        const num = parseFloat(cleaned)
+        return isNaN(num) ? 0 : num
+      }
+      return 0
+    }
     
-    // Verificar se tem parcelas definidas na negociação
-    if (negotiation.parcelas && Array.isArray(negotiation.parcelas) && negotiation.parcelas.length > 0) {
-      negotiation.parcelas.forEach((parcela: any, index: number) => {
+    // Obter parcelas da negociação (se existirem)
+    let parcels: any[] = []
+    
+    console.log('handleConfirmCloseNegotiation - negotiation:', negotiation)
+    console.log('handleConfirmCloseNegotiation - negotiation.parcelas:', negotiation.parcelas)
+    console.log('handleConfirmCloseNegotiation - tipo de parcelas:', typeof negotiation.parcelas)
+    console.log('handleConfirmCloseNegotiation - isArray:', Array.isArray(negotiation.parcelas))
+    
+    // Se parcelas é string (JSON), fazer parse
+    let parcelasArray = negotiation.parcelas
+    if (typeof negotiation.parcelas === 'string') {
+      try {
+        parcelasArray = JSON.parse(negotiation.parcelas)
+        console.log('Parcelas parseadas:', parcelasArray)
+      } catch (e) {
+        console.error('Erro ao fazer parse das parcelas:', e)
+        parcelasArray = []
+      }
+    }
+    
+    // Se a negociação tem parcelas salvas, usar essas
+    if (parcelasArray && Array.isArray(parcelasArray) && parcelasArray.length > 0) {
+      console.log('Usando parcelas da negociação:', parcelasArray.length, 'parcelas')
+      parcels = parcelasArray.map((parcela: any, index: number) => ({
+        numero: parcela.numero || index + 1,
+        valor: getValorAsNumber(parcela.valor),
+        dataFaturamento: parcela.dataFaturamento || negotiation.inicioFaturamento || negotiation.dataFaturamento || new Date().toISOString().split('T')[0],
+        dataVencimento: parcela.dataVencimento || negotiation.vencimento || negotiation.dataVencimento || new Date().toISOString().split('T')[0],
+        clientId: negotiation.clientId,
+      }))
+      console.log('Parcelas mapeadas:', parcels)
+    } else {
+      console.log('Não tem parcelas salvas, criando baseado na forma de faturamento')
+      // Se não tem parcelas, criar baseado na forma de faturamento
+      const valorProposta = getValorAsNumber(negotiation.valorProposta) || 
+                           getValorAsNumber(negotiation.valorTotal) || 
+                           getValorAsNumber(negotiation.valor) || 0
+      const formaFaturamento = negotiation.formaFaturamento || negotiation.tipoFaturamento
+      const quantidadeParcelas = negotiation.quantidadeParcelas ? parseInt(negotiation.quantidadeParcelas) : 1
+      
+      console.log('Valor Proposta calculado:', valorProposta)
+      console.log('Forma Faturamento:', formaFaturamento)
+      console.log('Quantidade de Parcelas:', quantidadeParcelas)
+      
+      if (formaFaturamento === 'ONESHOT') {
         parcels.push({
-          numero: parcela.numero || index + 1,
-          valor: parcela.valor || (valorTotal / negotiation.parcelas.length),
-          dataVencimento: parcela.dataVencimento || parcela.dataVencimento,
+          numero: 1,
+          valor: valorProposta,
+          dataFaturamento: negotiation.dataFaturamento || negotiation.inicioFaturamento || new Date().toISOString().split('T')[0],
+          dataVencimento: negotiation.dataVencimento || negotiation.vencimento || new Date().toISOString().split('T')[0],
           clientId: negotiation.clientId,
         })
-      })
-    } else if (negotiation.tipoFaturamento === 'PARCELADO' && negotiation.quantidadeParcelas) {
-      // Se é parcelado mas não tem parcelas definidas, criar baseado na quantidade
-      const valorParcela = valorTotal / negotiation.quantidadeParcelas
-      const dataInicio = negotiation.dataInicio ? new Date(negotiation.dataInicio) : new Date()
-      
-      for (let i = 0; i < negotiation.quantidadeParcelas; i++) {
-        const dataVencimento = new Date(dataInicio)
-        dataVencimento.setMonth(dataVencimento.getMonth() + i)
+      } else if (formaFaturamento === 'PARCELADO' && quantidadeParcelas > 1) {
+        // Parcelado - criar múltiplas parcelas
+        const valorPorParcela = valorProposta / quantidadeParcelas
+        const dataInicio = negotiation.inicioFaturamento || negotiation.dataFaturamento || negotiation.dataInicio || new Date().toISOString().split('T')[0]
+        const dataInicioObj = new Date(dataInicio)
+        const vencimentoDias = negotiation.vencimento ? parseInt(negotiation.vencimento.toString()) : 30 // dias para vencer
         
+        for (let i = 0; i < quantidadeParcelas; i++) {
+          const dataFaturamento = new Date(dataInicioObj)
+          dataFaturamento.setMonth(dataFaturamento.getMonth() + i)
+          
+          const dataVencimento = new Date(dataFaturamento)
+          dataVencimento.setDate(dataVencimento.getDate() + vencimentoDias)
+          
+          parcels.push({
+            numero: i + 1,
+            valor: valorPorParcela,
+            dataFaturamento: dataFaturamento.toISOString().split('T')[0],
+            dataVencimento: dataVencimento.toISOString().split('T')[0],
+            clientId: negotiation.clientId,
+          })
+        }
+      } else {
+        // Parcelado sem quantidade definida ou quantidade = 1 - criar uma única
         parcels.push({
-          numero: i + 1,
-          valor: valorParcela,
-          dataVencimento: dataVencimento.toISOString().split('T')[0],
+          numero: 1,
+          valor: valorProposta,
+          dataFaturamento: negotiation.dataFaturamento || negotiation.inicioFaturamento || negotiation.dataInicio || new Date().toISOString().split('T')[0],
+          dataVencimento: negotiation.dataVencimento || negotiation.vencimento || negotiation.dataInicio || new Date().toISOString().split('T')[0],
           clientId: negotiation.clientId,
         })
       }
-    } else {
-      // Se não tem parcelas, criar uma única
-      parcels.push({
-        numero: 1,
-        valor: valorTotal,
-        dataVencimento: negotiation.dataInicio || new Date().toISOString().split('T')[0],
-        clientId: negotiation.clientId,
-      })
     }
     
+    console.log('Parcelas finais para exibição:', parcels)
+    console.log('Quantidade de parcelas:', parcels.length)
+    console.log('Parcelas detalhadas:', JSON.stringify(parcels, null, 2))
     setCalculatedParcels(parcels)
+    
+    // Inicializar valores dos inputs
+    const inputValues: Record<number, string> = {}
+    parcels.forEach((parcela, index) => {
+      const valor = typeof parcela.valor === 'number' ? parcela.valor : parseFloat(String(parcela.valor).replace(/[R$\s.]/g, '').replace(',', '.')) || 0
+      inputValues[index] = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    })
+    setParcelInputValues(inputValues)
+    
+    console.log('calculatedParcels após setState:', parcels)
     setShowParcelsModal(true)
   }
 
@@ -220,18 +634,71 @@ export default function NegotiationDetailsPage() {
       
       setShowParcelsModal(false)
       
-      // Perguntar se quer associar template de projeto
-      if (projectTemplates.length > 0) {
-        setShowProjectTemplateModal(true)
-      } else {
-        // Se não tem templates, apenas atualizar status
-        await api.put(`/negotiations/${negotiationId}`, { status: 'FECHADA' })
-        await loadNegotiation()
-        alert('Negociação fechada e parcelas criadas com sucesso!')
-      }
+      // Sempre perguntar sobre projeto (template ou manual)
+      setShowProjectChoiceModal(true)
     } catch (error: any) {
       console.error('Erro ao criar parcelas:', error)
       alert(error.response?.data?.message || 'Erro ao criar parcelas')
+    }
+  }
+
+  const handleChooseProjectTemplate = () => {
+    setShowProjectChoiceModal(false)
+    if (projectTemplates.length > 0) {
+      setProjectCreationMode('template')
+      setShowProjectTemplateModal(true)
+    } else {
+      alert('Nenhum template de projeto disponível. Criando projeto manualmente.')
+      handleCreateProjectManually()
+    }
+  }
+
+  const handleCreateProjectManually = async () => {
+    setShowProjectChoiceModal(false)
+    setProjectCreationMode('manual')
+    
+    try {
+      const companyId = getCompanyIdFromToken()
+      if (!companyId) {
+        alert('Erro: Não foi possível identificar a empresa. Faça login novamente.')
+        return
+      }
+
+      const projectName = negotiation.titulo || negotiation.title || `Projeto - ${negotiation.numero || negotiationId}`
+      const projectData = {
+        companyId,
+        proposalId: negotiationId,
+        clientId: negotiation.clientId,
+        name: projectName,
+        description: `Projeto criado automaticamente a partir da negociação ${negotiation.numero || negotiationId}`,
+        serviceType: negotiation.serviceType,
+        status: 'PENDENTE',
+        dataInicio: negotiation.dataInicio || negotiation.inicio || new Date().toISOString().split('T')[0],
+        previsaoConclusao: negotiation.previsaoConclusao || null,
+      }
+
+      await api.post('/projects', projectData)
+      
+      // Atualizar status da negociação
+      await api.put(`/negotiations/${negotiationId}`, { status: 'FECHADA' })
+      await loadNegotiation()
+      await loadProjects()
+      alert('Projeto criado manualmente com sucesso! Você pode adicionar tarefas na aba de Projetos.')
+    } catch (error: any) {
+      console.error('Erro ao criar projeto manualmente:', error)
+      alert(error.response?.data?.message || 'Erro ao criar projeto manualmente')
+    }
+  }
+
+  const handleSkipProject = async () => {
+    setShowProjectChoiceModal(false)
+    try {
+      await api.put(`/negotiations/${negotiationId}`, { status: 'FECHADA' })
+      await loadNegotiation()
+      alert('Negociação fechada com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao fechar negociação:', error)
+      alert('Erro ao fechar negociação')
     }
   }
 
@@ -242,22 +709,75 @@ export default function NegotiationDetailsPage() {
     }
 
     try {
+      // Buscar template com tarefas
+      const templateResponse = await api.get(`/project-templates/${selectedTemplateId}`)
+      const template = templateResponse.data
+
+      if (!template || !template.tasks) {
+        alert('Template não encontrado ou sem tarefas')
+        return
+      }
+
+      // Calcular datas das tarefas baseado na data de início da negociação
       const startDate = negotiation.dataInicio 
         ? new Date(negotiation.dataInicio).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0]
 
-      const response = await api.post(`/negotiations/${negotiationId}/create-project-from-template`, {
-        templateId: selectedTemplateId,
-        startDate,
-      })
+      const startDateObj = new Date(startDate)
+      
+      // Ordenar tarefas por ordem
+      const sortedTasks = [...template.tasks].sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0))
+      
+      // Calcular datas para cada tarefa (usar loop para poder referenciar tarefas anteriores)
+      const calculatedTasksList: any[] = []
+      const taskMap = new Map<string, any>()
+      
+      for (let index = 0; index < sortedTasks.length; index++) {
+        const templateTask = sortedTasks[index]
+        let taskStartDate: Date
 
-      setCalculatedTasks(response.data.tasks || [])
-      setTasksToCreate(response.data.tasks || [])
+        if (templateTask.diasAposInicioProjeto !== null && templateTask.diasAposInicioProjeto !== undefined) {
+          taskStartDate = new Date(startDateObj)
+          taskStartDate.setDate(taskStartDate.getDate() + templateTask.diasAposInicioProjeto)
+        } else if (templateTask.tarefaAnteriorId && taskMap.has(templateTask.tarefaAnteriorId)) {
+          // Se tem tarefa anterior, usar a data de conclusão dela
+          const prevTask = taskMap.get(templateTask.tarefaAnteriorId)
+          taskStartDate = new Date(prevTask.dataConclusao || startDateObj)
+        } else if (index > 0 && calculatedTasksList[index - 1]) {
+          // Se não tem diasAposInicioProjeto nem tarefaAnteriorId, usar a tarefa anterior na lista
+          const prevTask = calculatedTasksList[index - 1]
+          taskStartDate = new Date(prevTask.dataConclusao || startDateObj)
+        } else {
+          taskStartDate = new Date(startDateObj)
+        }
+
+        const taskEndDate = new Date(taskStartDate)
+        taskEndDate.setDate(taskEndDate.getDate() + (templateTask.duracaoPrevistaDias || 1))
+
+        const calculatedTask = {
+          id: `temp-${index}`,
+          templateTaskId: templateTask.id,
+          name: templateTask.name,
+          description: '', // Deixar em branco para permitir digitação
+          dataInicio: taskStartDate.toISOString().split('T')[0],
+          dataConclusao: taskEndDate.toISOString().split('T')[0],
+          ordem: templateTask.ordem || index + 1,
+          usuarioResponsavelId: currentUser?.id || '',
+          usuarioExecutorId: currentUser?.id || '',
+          horasEstimadas: templateTask.horasEstimadas || '',
+        }
+
+        calculatedTasksList.push(calculatedTask)
+        taskMap.set(templateTask.id, calculatedTask)
+      }
+
+      setCalculatedTasks(calculatedTasksList)
+      setTasksToCreate(calculatedTasksList)
       setShowProjectTemplateModal(false)
       setShowTasksReviewModal(true)
     } catch (error: any) {
-      console.error('Erro ao criar projeto:', error)
-      alert(error.response?.data?.message || 'Erro ao criar projeto')
+      console.error('Erro ao carregar template:', error)
+      alert(error.response?.data?.message || 'Erro ao carregar template')
     }
   }
 
@@ -278,12 +798,104 @@ export default function NegotiationDetailsPage() {
     setTasksToCreate(tasksToCreate.map(task => 
       task.id === taskId ? { ...task, [field]: value } : task
     ))
+    // Também atualizar calculatedTasks para manter sincronizado
+    setCalculatedTasks(calculatedTasks.map(task => 
+      task.id === taskId ? { ...task, [field]: value } : task
+    ))
+  }
+
+  const handleAddNewTask = () => {
+    const startDate = negotiation.dataInicio 
+      ? new Date(negotiation.dataInicio).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+    
+    const newTask = {
+      id: `new-${Date.now()}`,
+      templateTaskId: null, // Nova tarefa não vem do template
+      name: '',
+      description: '',
+      dataInicio: startDate,
+      dataConclusao: startDate,
+      ordem: tasksToCreate.length + 1,
+      usuarioResponsavelId: currentUser?.id || '',
+      usuarioExecutorId: currentUser?.id || '',
+      horasEstimadas: '',
+    }
+    
+    setTasksToCreate([...tasksToCreate, newTask])
+    setCalculatedTasks([...calculatedTasks, newTask])
+  }
+
+  const handleRemoveTask = (taskId: string) => {
+    // Não permitir remover tarefas que vêm do template (apenas novas)
+    const task = tasksToCreate.find(t => t.id === taskId)
+    if (task && !task.templateTaskId) {
+      setTasksToCreate(tasksToCreate.filter(t => t.id !== taskId))
+      setCalculatedTasks(calculatedTasks.filter(t => t.id !== taskId))
+    }
   }
 
   const handleConfirmCreateProject = async () => {
     try {
-      // O projeto já foi criado, apenas atualizar as tarefas se necessário
-      await api.put(`/proposals/${negotiationId}`, { status: 'FECHADA' })
+      const companyId = getCompanyIdFromToken()
+      if (!companyId) {
+        alert('Erro: Não foi possível identificar a empresa. Faça login novamente.')
+        return
+      }
+
+      const startDate = negotiation.dataInicio 
+        ? new Date(negotiation.dataInicio).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0]
+
+      // Buscar template para obter dados do projeto
+      const templateResponse = await api.get(`/project-templates/${selectedTemplateId}`)
+      const template = templateResponse.data
+
+      // Criar projeto
+      const projectName = template.name || negotiation.titulo || negotiation.title || `Projeto - ${negotiation.numero || negotiationId}`
+      const projectData = {
+        companyId,
+        proposalId: negotiationId,
+        clientId: negotiation.clientId,
+        templateId: selectedTemplateId,
+        name: projectName,
+        description: template.description || `Projeto criado automaticamente a partir da negociação ${negotiation.numero || negotiationId}`,
+        serviceType: template.serviceType || negotiation.serviceType,
+        status: 'PENDENTE',
+        dataInicio: startDate,
+      }
+
+      const projectResponse = await api.post('/projects', projectData)
+      const createdProject = projectResponse.data
+
+      // Criar tarefas com os ajustes feitos pelo usuário
+      for (const task of tasksToCreate) {
+        const taskData: any = {
+          name: task.name,
+          description: task.description || '',
+          dataInicio: task.dataInicio,
+          dataConclusao: task.dataConclusao,
+          status: 'PENDENTE',
+          ordem: task.ordem,
+        }
+        
+        if (task.usuarioResponsavelId) {
+          taskData.usuarioResponsavelId = task.usuarioResponsavelId
+        }
+        
+        if (task.usuarioExecutorId) {
+          taskData.usuarioExecutorId = task.usuarioExecutorId
+        }
+        
+        if (task.horasEstimadas) {
+          taskData.horasEstimadas = task.horasEstimadas
+        }
+        
+        await api.post(`/projects/${createdProject.id}/tasks`, taskData)
+      }
+
+      // Atualizar status da negociação
+      await api.put(`/negotiations/${negotiationId}`, { status: 'FECHADA' })
       await loadNegotiation()
       await loadProjects()
       await loadTasks()
@@ -413,6 +1025,9 @@ export default function NegotiationDetailsPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
+                {negotiation.numero && (
+                  <p className="text-sm text-gray-500 mb-1">Número: {negotiation.numero}</p>
+                )}
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {negotiation.title || negotiation.titulo || 'Negociação sem título'}
                 </h1>
@@ -443,7 +1058,7 @@ export default function NegotiationDetailsPage() {
               </div>
               <div>
                 <span className="text-sm text-gray-500">Status:</span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <select
                     value={negotiation.status || 'RASCUNHO'}
                     onChange={(e) => handleStatusChange(e.target.value)}
@@ -457,9 +1072,28 @@ export default function NegotiationDetailsPage() {
                     <option value="DECLINADA">Declinada</option>
                     <option value="CANCELADA">Cancelada</option>
                   </select>
+                  {getStatusDate(negotiation) && (
+                    <span className="text-xs text-gray-600">
+                      ({getStatusDateLabel(negotiation.status)}: {formatDate(getStatusDate(negotiation))})
+                    </span>
+                  )}
                 </div>
               </div>
-              {negotiation.valorTotal && (
+              {negotiation.serviceType && (
+                <div>
+                  <span className="text-sm text-gray-500">Tipo de Serviço:</span>
+                  <p className="font-medium">{getServiceTypeLabel(negotiation.serviceType)}</p>
+                </div>
+              )}
+              {negotiation.valorProposta && (
+                <div>
+                  <span className="text-sm text-gray-500">Valor da Proposta:</span>
+                  <p className="font-medium text-lg text-green-600">
+                    {formatCurrency(negotiation.valorProposta)}
+                  </p>
+                </div>
+              )}
+              {negotiation.valorTotal && !negotiation.valorProposta && (
                 <div>
                   <span className="text-sm text-gray-500">Valor Total:</span>
                   <p className="font-medium text-lg text-green-600">
@@ -467,22 +1101,85 @@ export default function NegotiationDetailsPage() {
                   </p>
                 </div>
               )}
+              {negotiation.valorPorHora && (
+                <div>
+                  <span className="text-sm text-gray-500">Valor por Hora:</span>
+                  <p className="font-medium text-green-600">
+                    {formatCurrency(negotiation.valorPorHora)}
+                  </p>
+                </div>
+              )}
               {negotiation.tipoContratacao && (
                 <div>
                   <span className="text-sm text-gray-500">Tipo de Contratação:</span>
-                  <p className="font-medium">{negotiation.tipoContratacao}</p>
+                  <p className="font-medium">
+                    {negotiation.tipoContratacao === 'FIXO_RECORRENTE' ? 'Fixo Recorrente' :
+                     negotiation.tipoContratacao === 'HORAS' ? 'Por Horas' :
+                     negotiation.tipoContratacao === 'PROJETO' ? 'Por Projeto' :
+                     negotiation.tipoContratacao}
+                  </p>
                 </div>
               )}
-              {negotiation.tipoFaturamento && (
+              {negotiation.formaFaturamento && (
+                <div>
+                  <span className="text-sm text-gray-500">Forma de Faturamento:</span>
+                  <p className="font-medium">
+                    {negotiation.formaFaturamento === 'ONESHOT' ? 'OneShot' :
+                     negotiation.formaFaturamento === 'PARCELADO' ? 'Parcelado' :
+                     negotiation.formaFaturamento}
+                  </p>
+                  {negotiation.formaFaturamento === 'PARCELADO' && (() => {
+                    let parcelasArray = negotiation.parcelas
+                    if (typeof negotiation.parcelas === 'string') {
+                      try {
+                        parcelasArray = JSON.parse(negotiation.parcelas)
+                      } catch (e) {
+                        parcelasArray = null
+                      }
+                    }
+                    const quantidadeParcelas = Array.isArray(parcelasArray) ? parcelasArray.length : (negotiation.quantidadeParcelas ? parseInt(negotiation.quantidadeParcelas) : null)
+                    return quantidadeParcelas ? (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {quantidadeParcelas} {quantidadeParcelas === 1 ? 'parcela' : 'parcelas'}
+                      </p>
+                    ) : null
+                  })()}
+                </div>
+              )}
+              {negotiation.tipoFaturamento && !negotiation.formaFaturamento && (
                 <div>
                   <span className="text-sm text-gray-500">Tipo de Faturamento:</span>
                   <p className="font-medium">{negotiation.tipoFaturamento}</p>
+                </div>
+              )}
+              {negotiation.horasEstimadas && (
+                <div>
+                  <span className="text-sm text-gray-500">Horas Estimadas:</span>
+                  <p className="font-medium">{negotiation.horasEstimadas}</p>
                 </div>
               )}
               {negotiation.dataInicio && (
                 <div>
                   <span className="text-sm text-gray-500">Data de Início:</span>
                   <p className="font-medium text-sm">{formatDate(negotiation.dataInicio)}</p>
+                </div>
+              )}
+              {negotiation.previsaoConclusao && (
+                <div>
+                  <span className="text-sm text-gray-500">Previsão de Conclusão:</span>
+                  <p className="font-medium text-sm">{formatDate(negotiation.previsaoConclusao)}</p>
+                </div>
+              )}
+              {negotiation.inicioFaturamento && (
+                <div>
+                  <span className="text-sm text-gray-500">Início de Faturamento:</span>
+                  <p className="font-medium text-sm">{formatDate(negotiation.inicioFaturamento)}</p>
+                </div>
+              )}
+              {negotiation.vencimento && (
+                <div>
+                  <span className="text-sm text-gray-500">Vencimento:</span>
+                  <p className="font-medium text-sm">{formatDate(negotiation.vencimento)}</p>
                 </div>
               )}
               {negotiation.createdAt && (
@@ -492,8 +1189,204 @@ export default function NegotiationDetailsPage() {
                 </div>
               )}
             </div>
+
+            {/* Informações de Migração de Dados - apenas se houver dados */}
+            {(negotiation.sistemaOrigem || negotiation.sistemaDestino || negotiation.dataEntregaHomologacao || negotiation.dataEntregaProducao || negotiation.dataInicioTrabalho || negotiation.dataFaturamento || negotiation.dataVencimento) && (
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações de Migração de Dados</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {negotiation.sistemaOrigem && (
+                    <div>
+                      <span className="text-sm text-gray-500">Sistema de Origem:</span>
+                      <p className="font-medium">{negotiation.sistemaOrigem}</p>
+                    </div>
+                  )}
+                  {negotiation.sistemaDestino && (
+                    <div>
+                      <span className="text-sm text-gray-500">Sistema de Destino:</span>
+                      <p className="font-medium">{negotiation.sistemaDestino}</p>
+                    </div>
+                  )}
+                  {negotiation.dataEntregaHomologacao && (
+                    <div>
+                      <span className="text-sm text-gray-500">Data de Entrega da Homologação:</span>
+                      <p className="font-medium text-sm">{formatDate(negotiation.dataEntregaHomologacao)}</p>
+                    </div>
+                  )}
+                  {negotiation.dataEntregaProducao && (
+                    <div>
+                      <span className="text-sm text-gray-500">Data de Entrega da Produção:</span>
+                      <p className="font-medium text-sm">{formatDate(negotiation.dataEntregaProducao)}</p>
+                    </div>
+                  )}
+                  {negotiation.dataInicioTrabalho && (
+                    <div>
+                      <span className="text-sm text-gray-500">Data do Início do Trabalho:</span>
+                      <p className="font-medium text-sm">{formatDate(negotiation.dataInicioTrabalho)}</p>
+                    </div>
+                  )}
+                  {negotiation.dataFaturamento && (
+                    <div>
+                      <span className="text-sm text-gray-500">Data do Faturamento:</span>
+                      <p className="font-medium text-sm">{formatDate(negotiation.dataFaturamento)}</p>
+                    </div>
+                  )}
+                  {negotiation.dataVencimento && (
+                    <div>
+                      <span className="text-sm text-gray-500">Data do Vencimento:</span>
+                      <p className="font-medium text-sm">{formatDate(negotiation.dataVencimento)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
+
+        {/* Parcelas - Container Separado */}
+        {(() => {
+          // Parse das parcelas se necessário
+          let parcelasArray = negotiation?.parcelas
+          if (typeof negotiation?.parcelas === 'string') {
+            try {
+              parcelasArray = JSON.parse(negotiation.parcelas)
+            } catch (e) {
+              parcelasArray = null
+            }
+          }
+          
+          // Se não tem parcelas mas é PARCELADO, tentar criar baseado na quantidade
+          if (!parcelasArray && negotiation?.formaFaturamento === 'PARCELADO' && negotiation?.quantidadeParcelas) {
+            const quantidade = parseInt(negotiation.quantidadeParcelas) || 0
+            const valorProposta = negotiation.valorProposta || negotiation.valorTotal || 0
+            if (quantidade > 0 && valorProposta > 0) {
+              const valorPorParcela = valorProposta / quantidade
+              const dataInicio = negotiation.inicioFaturamento || negotiation.dataFaturamento || negotiation.dataInicio || new Date().toISOString().split('T')[0]
+              const dataInicioObj = new Date(dataInicio)
+              const vencimentoDias = negotiation.vencimento ? parseInt(negotiation.vencimento.toString()) : 30
+              
+              parcelasArray = []
+              for (let i = 0; i < quantidade; i++) {
+                const dataFaturamento = new Date(dataInicioObj)
+                dataFaturamento.setMonth(dataFaturamento.getMonth() + i)
+                
+                const dataVencimento = new Date(dataFaturamento)
+                dataVencimento.setDate(dataVencimento.getDate() + vencimentoDias)
+                
+                parcelasArray.push({
+                  numero: i + 1,
+                  valor: valorPorParcela,
+                  dataFaturamento: dataFaturamento.toISOString().split('T')[0],
+                  dataVencimento: dataVencimento.toISOString().split('T')[0],
+                })
+              }
+            }
+          }
+          
+          const getInvoiceStatus = (parcelaNum: number) => {
+            const invoice = invoicesByParcela[parcelaNum]
+            return invoice?.status || null
+          }
+
+          const getInvoiceForParcela = (parcelaNum: number) => {
+            return invoicesByParcela[parcelaNum] || null
+          }
+
+          const getStatusColor = (status: string | null) => {
+            if (!status) return 'bg-gray-100 text-gray-800'
+            const colors: Record<string, string> = {
+              PROVISIONADA: 'bg-blue-100 text-blue-800',
+              FATURADA: 'bg-purple-100 text-purple-800',
+              RECEBIDA: 'bg-green-100 text-green-800',
+              CANCELADA: 'bg-red-100 text-red-800',
+              EMITIDA: 'bg-yellow-100 text-yellow-800',
+            }
+            return colors[status] || 'bg-gray-100 text-gray-800'
+          }
+
+          const getStatusLabel = (status: string | null) => {
+            if (!status) return 'Aguardando fechamento'
+            const labels: Record<string, string> = {
+              PROVISIONADA: 'Provisionada',
+              FATURADA: 'Faturada',
+              RECEBIDA: 'Recebida',
+              CANCELADA: 'Cancelada',
+              EMITIDA: 'Emitida',
+            }
+            return labels[status] || status
+          }
+          
+          return parcelasArray && Array.isArray(parcelasArray) && parcelasArray.length > 0 ? (
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Parcelas ({parcelasArray.length} {parcelasArray.length === 1 ? 'parcela' : 'parcelas'})
+                </h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parcela</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data de Faturamento</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {parcelasArray.map((parcela: any, index: number) => {
+                      const parcelaNum = parcela.numero || index + 1
+                      const invoiceStatus = getInvoiceStatus(parcelaNum)
+                      const invoice = getInvoiceForParcela(parcelaNum)
+                      const hasInvoice = invoice && invoice.id
+                      
+                      const handleRowClick = () => {
+                        if (hasInvoice) {
+                          router.push(`/contas-receber/${invoice.id}`)
+                        }
+                      }
+
+                      return (
+                        <tr 
+                          key={index} 
+                          onClick={handleRowClick}
+                          className={`hover:bg-gray-50 ${hasInvoice ? 'cursor-pointer' : ''}`}
+                        >
+                          <td className="px-6 py-4 text-sm font-medium">
+                            {parcelaNum}/{parcelasArray.length}
+                          </td>
+                          <td className="px-6 py-4 text-sm">
+                            {formatCurrency(parcela.valor || 0)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {formatDate(parcela.dataFaturamento)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {formatDate(parcela.dataVencimento)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoiceStatus)}`}>
+                              {getStatusLabel(invoiceStatus)}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot className="bg-gray-50">
+                    <tr>
+                      <td colSpan={5} className="px-6 py-3 text-sm font-semibold text-right">
+                        Total: {formatCurrency(parcelasArray.reduce((sum: number, p: any) => sum + (p.valor || 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ) : null
+        })()}
 
         {/* Projetos Vinculados - Só mostrar se status for FECHADA, DECLINADA ou CANCELADA */}
         {shouldShowLinkedItems && (
@@ -562,12 +1455,15 @@ export default function NegotiationDetailsPage() {
             <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
               <h2 className="text-2xl font-bold mb-4">Confirmar Fechamento da Negociação</h2>
               <div className="space-y-2 mb-6">
-                <p><strong>Cliente:</strong> {negotiation.client?.razaoSocial || '-'}</p>
-                <p><strong>Valor Total:</strong> {formatCurrency(negotiation.valorTotal || 0)}</p>
+                <p><strong>Cliente:</strong> {negotiation.client?.razaoSocial || negotiation.client?.name || '-'}</p>
+                <p><strong>Valor da Proposta:</strong> {formatCurrency(negotiation.valorProposta || negotiation.valorTotal || 0)}</p>
                 {negotiation.tipoContratacao && (
                   <p><strong>Tipo de Contratação:</strong> {negotiation.tipoContratacao}</p>
                 )}
-                {negotiation.tipoFaturamento && (
+                {negotiation.formaFaturamento && (
+                  <p><strong>Forma de Faturamento:</strong> {negotiation.formaFaturamento === 'ONESHOT' ? 'OneShot' : negotiation.formaFaturamento === 'PARCELADO' ? 'Parcelado' : negotiation.formaFaturamento}</p>
+                )}
+                {negotiation.tipoFaturamento && !negotiation.formaFaturamento && (
                   <p><strong>Tipo de Faturamento:</strong> {negotiation.tipoFaturamento}</p>
                 )}
                 {negotiation.dataInicio && (
@@ -596,28 +1492,114 @@ export default function NegotiationDetailsPage() {
         {showParcelsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-4">Parcelas a serem Criadas</h2>
+              <h2 className="text-2xl font-bold mb-4">Confirmação das Parcelas</h2>
+              <p className="mb-4 text-gray-600">
+                Verifique as parcelas, ajuste caso necessário e confirme.
+              </p>
               <div className="mb-4">
+                {(() => {
+                  console.log('Modal renderizado - calculatedParcels:', calculatedParcels)
+                  console.log('Modal renderizado - quantidade:', calculatedParcels?.length || 0)
+                  console.log('Modal renderizado - isArray:', Array.isArray(calculatedParcels))
+                  return null
+                })()}
+                <p className="text-xs text-gray-500 mb-2">
+                  Total de parcelas: {calculatedParcels?.length || 0}
+                </p>
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nº</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data de Faturamento</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {calculatedParcels.map((parcela, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-2">{parcela.numero}</td>
-                        <td className="px-4 py-2">{formatCurrency(parcela.valor)}</td>
-                        <td className="px-4 py-2">{formatDate(parcela.dataVencimento)}</td>
+                    {calculatedParcels && Array.isArray(calculatedParcels) && calculatedParcels.length > 0 ? calculatedParcels.map((parcela, index) => {
+                      const getValorAsNumber = (valor: any): number => {
+                        if (valor === null || valor === undefined) return 0
+                        if (typeof valor === 'number') return valor
+                        if (typeof valor === 'string') {
+                          const cleaned = valor.replace(/[R$\s.]/g, '').replace(',', '.')
+                          const num = parseFloat(cleaned)
+                          return isNaN(num) ? 0 : num
+                        }
+                        return 0
+                      }
+                      
+                      // Obter valor do input (ou valor formatado da parcela se não houver)
+                      const inputValue = parcelInputValues[index] !== undefined 
+                        ? parcelInputValues[index]
+                        : (typeof parcela.valor === 'number' 
+                            ? parcela.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : getValorAsNumber(parcela.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                      
+                      return (
+                        <tr key={index}>
+                          <td className="px-4 py-2">{parcela.numero}</td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="text"
+                              value={inputValue}
+                              onChange={(e) => {
+                                // Permite digitação livre - atualiza apenas o estado do input
+                                const newValue = e.target.value
+                                setParcelInputValues({ ...parcelInputValues, [index]: newValue })
+                              }}
+                              onBlur={(e) => {
+                                // Ao sair do campo, converte e atualiza a parcela
+                                const cleaned = e.target.value.replace(/[R$\s.]/g, '').replace(',', '.')
+                                const num = parseFloat(cleaned) || 0
+                                const novasParcelas = [...calculatedParcels]
+                                novasParcelas[index].valor = num
+                                setCalculatedParcels(novasParcelas)
+                                // Atualiza o input formatado
+                                setParcelInputValues({ ...parcelInputValues, [index]: num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })
+                              }}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-right"
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="date"
+                              value={parcela.dataFaturamento ? parcela.dataFaturamento.split('T')[0] : ''}
+                              onChange={(e) => {
+                                const novasParcelas = [...calculatedParcels]
+                                novasParcelas[index].dataFaturamento = e.target.value
+                                setCalculatedParcels(novasParcelas)
+                              }}
+                              className="w-full px-2 py-1 border border-gray-300 rounded"
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="date"
+                              value={parcela.dataVencimento ? parcela.dataVencimento.split('T')[0] : ''}
+                              onChange={(e) => {
+                                const novasParcelas = [...calculatedParcels]
+                                novasParcelas[index].dataVencimento = e.target.value
+                                setCalculatedParcels(novasParcelas)
+                              }}
+                              className="w-full px-2 py-1 border border-gray-300 rounded"
+                            />
+                          </td>
+                        </tr>
+                      )
+                    }) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-2 text-center text-gray-500">
+                          Nenhuma parcela encontrada
+                        </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
-                <p className="mt-4 text-sm text-gray-600">
-                  Total: {formatCurrency(calculatedParcels.reduce((sum, p) => sum + (p.valor || 0), 0))}
+                <p className="mt-4 text-sm font-semibold text-gray-700">
+                  Total: {formatCurrency(calculatedParcels.reduce((sum, p) => {
+                    const valor = typeof p.valor === 'number' ? p.valor : (typeof p.valor === 'string' ? parseFloat(p.valor.replace(/[R$\s.]/g, '').replace(',', '.')) : 0) || 0
+                    return sum + valor
+                  }, 0))}
                 </p>
               </div>
               <div className="flex gap-2 justify-end">
@@ -638,13 +1620,49 @@ export default function NegotiationDetailsPage() {
           </div>
         )}
 
+        {/* Modal de Escolha de Projeto */}
+        {showProjectChoiceModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+              <h2 className="text-2xl font-bold mb-4">Criar Projeto</h2>
+              <p className="mb-4 text-gray-600">
+                Deseja criar um projeto para esta negociação?
+              </p>
+              <div className="space-y-3 mb-6">
+                <button
+                  onClick={handleChooseProjectTemplate}
+                  className="w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-left"
+                >
+                  <div className="font-semibold">Usar Template</div>
+                  <div className="text-sm text-primary-100">Aplicar um template de projeto existente</div>
+                </button>
+                <button
+                  onClick={handleCreateProjectManually}
+                  className="w-full px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-left"
+                >
+                  <div className="font-semibold">Criar Manualmente</div>
+                  <div className="text-sm text-gray-100">Criar projeto com dados da negociação (número, cliente, tipo de serviço). As tarefas podem ser adicionadas posteriormente na aba de Projetos.</div>
+                </button>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={handleSkipProject}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Pular
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal de Seleção de Template */}
         {showProjectTemplateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
               <h2 className="text-2xl font-bold mb-4">Associar Template de Projeto</h2>
               <p className="mb-4 text-gray-600">
-                Deseja associar um template de projeto a esta negociação?
+                Selecione um template de projeto para aplicar:
               </p>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -665,10 +1683,13 @@ export default function NegotiationDetailsPage() {
               </div>
               <div className="flex gap-2 justify-end">
                 <button
-                  onClick={handleSkipProjectTemplate}
+                  onClick={() => {
+                    setShowProjectTemplateModal(false)
+                    setShowProjectChoiceModal(true)
+                  }}
                   className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
-                  Pular
+                  Voltar
                 </button>
                 <button
                   onClick={handleSelectProjectTemplate}
@@ -684,36 +1705,119 @@ export default function NegotiationDetailsPage() {
         {/* Modal de Revisão de Tarefas */}
         {showTasksReviewModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-4">Revisar Tarefas do Projeto</h2>
-              <div className="mb-4">
+            <div className="bg-white rounded-lg p-6 max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4">Prévia das Tarefas do Projeto</h2>
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Informação:</strong> Você pode ajustar as tarefas abaixo antes de criar o projeto. 
+                  Se salvar sem fazer alterações, as alterações podem ser feitas posteriormente na seção de Tarefas do projeto.
+                </p>
+              </div>
+              <div className="mb-4 flex justify-between items-center">
+                <button
+                  onClick={handleAddNewTask}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+                >
+                  + Adicionar Nova Tarefa
+                </button>
+              </div>
+              <div className="mb-4 overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Conclusão</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conclusão</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Responsável</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Executor</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Horas Estimadas</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {tasksToCreate.map((task, index) => (
-                      <tr key={task.id || index}>
-                        <td className="px-4 py-2">{task.name}</td>
-                        <td className="px-4 py-2">
+                      <tr key={task.id || index} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={task.name || ''}
+                            onChange={(e) => handleUpdateTask(task.id, 'name', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={task.description || ''}
+                            onChange={(e) => handleUpdateTask(task.id, 'description', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            placeholder="Descrição..."
+                          />
+                        </td>
+                        <td className="px-4 py-3">
                           <input
                             type="date"
                             value={task.dataInicio ? task.dataInicio.split('T')[0] : ''}
                             onChange={(e) => handleUpdateTask(task.id, 'dataInicio', e.target.value)}
-                            className="px-2 py-1 border border-gray-300 rounded"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                           />
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-3">
                           <input
                             type="date"
                             value={task.dataConclusao ? task.dataConclusao.split('T')[0] : ''}
                             onChange={(e) => handleUpdateTask(task.id, 'dataConclusao', e.target.value)}
-                            className="px-2 py-1 border border-gray-300 rounded"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                           />
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={task.usuarioResponsavelId || ''}
+                            onChange={(e) => handleUpdateTask(task.id, 'usuarioResponsavelId', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="">Selecione...</option>
+                            {users.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.name || user.email}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={task.usuarioExecutorId || ''}
+                            onChange={(e) => handleUpdateTask(task.id, 'usuarioExecutorId', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="">Selecione...</option>
+                            {users.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.name || user.email}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={task.horasEstimadas || ''}
+                            onChange={(e) => handleUpdateTask(task.id, 'horasEstimadas', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            placeholder="Ex: 8:00"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          {!task.templateTaskId && (
+                            <button
+                              onClick={() => handleRemoveTask(task.id)}
+                              className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                              title="Remover tarefa"
+                            >
+                              Remover
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -722,10 +1826,13 @@ export default function NegotiationDetailsPage() {
               </div>
               <div className="flex gap-2 justify-end">
                 <button
-                  onClick={() => setShowTasksReviewModal(false)}
+                  onClick={() => {
+                    setShowTasksReviewModal(false)
+                    setShowProjectChoiceModal(true)
+                  }}
                   className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
-                  Cancelar
+                  Voltar
                 </button>
                 <button
                   onClick={handleConfirmCreateProject}
@@ -737,7 +1844,166 @@ export default function NegotiationDetailsPage() {
             </div>
           </div>
         )}
+
+        {/* Modal de Motivo para Cancelamento/Declínio */}
+        {showCancelDeclineModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">
+                {cancelDeclineData.tipo === 'CANCELADA' ? 'Cancelar Negociação' : 'Declinar Negociação'}
+              </h2>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Motivo *
+                </label>
+                <textarea
+                  value={cancelDeclineData.motivo}
+                  onChange={(e) => setCancelDeclineData({ ...cancelDeclineData, motivo: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  rows={4}
+                  placeholder="Descreva o motivo do cancelamento/declínio..."
+                  required
+                />
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => {
+                    setShowCancelDeclineModal(false)
+                    setCancelDeclineData({ tipo: '', motivo: '' })
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmCancelDecline}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Opções para Parcelas Faturadas */}
+        {showFaturadaOptionsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">Parcelas Faturadas</h2>
+              <p className="mb-4 text-gray-600">
+                Existem {faturadaInvoices.length} parcela(s) em status FATURADA.
+              </p>
+              <p className="mb-6 text-gray-600">
+                Como deseja proceder?
+              </p>
+              <div className="space-y-3 mb-6">
+                <button
+                  onClick={() => handleFaturadaOption('cancelar')}
+                  className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 text-left"
+                >
+                  <div className="font-semibold">Cancelar as parcelas</div>
+                  <div className="text-sm opacity-90">As notas fiscais precisarão ser canceladas no sistema fiscal</div>
+                </button>
+                <button
+                  onClick={() => handleFaturadaOption('manter')}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-left"
+                >
+                  <div className="font-semibold">Manter as parcelas faturadas</div>
+                  <div className="text-sm opacity-90">Ajustar datas e manter em aberto</div>
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  setShowFaturadaOptionsModal(false)
+                  setCancelDeclineData({ tipo: '', motivo: '' })
+                }}
+                className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar Operação
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Ajuste de Datas das Parcelas Faturadas */}
+        {showInvoiceConfirmModal && invoiceConfirmData && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">Ajustar Datas das Parcelas Faturadas</h2>
+              <p className="mb-4 text-gray-600">
+                Ajuste as datas das parcelas faturadas que serão mantidas em aberto:
+              </p>
+              <div className="mb-4">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data de Emissão</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {adjustedInvoices.map((invoice: any, index: number) => (
+                      <tr key={invoice.id}>
+                        <td className="px-4 py-3">{invoice.invoiceNumber}</td>
+                        <td className="px-4 py-3">
+                          R$ {parseFloat(invoice.grossValue?.toString() || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="date"
+                            value={invoice.emissionDate || ''}
+                            onChange={(e) => {
+                              const newInvoices = [...adjustedInvoices]
+                              newInvoices[index].emissionDate = e.target.value
+                              setAdjustedInvoices(newInvoices)
+                            }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="date"
+                            value={invoice.dueDate || ''}
+                            onChange={(e) => {
+                              const newInvoices = [...adjustedInvoices]
+                              newInvoices[index].dueDate = e.target.value
+                              setAdjustedInvoices(newInvoices)
+                            }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => {
+                    setShowInvoiceConfirmModal(false)
+                    setInvoiceConfirmData(null)
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    await handleConfirmInvoiceAdjustments(adjustedInvoices)
+                  }}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Confirmar Ajustes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
+

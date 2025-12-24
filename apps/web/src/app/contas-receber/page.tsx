@@ -11,6 +11,9 @@ export default function ContasReceberPage() {
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -19,12 +22,28 @@ export default function ContasReceberPage() {
       return
     }
     loadInvoices()
-  }, [router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const getCompanyIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.companyId || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
+    }
+  }
 
   const loadInvoices = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/invoices')
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/invoices?companyId=${companyId}` : '/invoices'
+      const response = await api.get(url)
       setInvoices(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar contas a receber:', error)
@@ -36,13 +55,22 @@ export default function ContasReceberPage() {
 
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '-'
-    const date = new Date(dateString)
-    return date.toLocaleDateString('pt-BR')
+    // Corrigir problema de timezone - usar apenas a data sem hora
+    const date = typeof dateString === 'string' 
+      ? new Date(dateString + 'T00:00:00') 
+      : new Date(dateString)
+    // Ajustar para timezone local
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${day}/${month}/${year}`
   }
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       EMITIDA: 'bg-yellow-100 text-yellow-800',
+      PROVISIONADA: 'bg-blue-100 text-blue-800',
+      FATURADA: 'bg-purple-100 text-purple-800',
       RECEBIDA: 'bg-green-100 text-green-800',
       CANCELADA: 'bg-red-100 text-red-800',
     }
@@ -52,25 +80,73 @@ export default function ContasReceberPage() {
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       EMITIDA: 'Emitida',
+      PROVISIONADA: 'Provisionada',
+      FATURADA: 'Faturada',
       RECEBIDA: 'Recebida',
       CANCELADA: 'Cancelada',
     }
     return labels[status] || status
   }
 
-  const calculateTotalTaxes = (invoice: any) => {
-    if (!invoice.taxes || invoice.taxes.length === 0) return 0
-    return invoice.taxes.reduce((sum: number, tax: any) => sum + parseFloat(tax.provisionedValue.toString()), 0)
+  const calculateImpostos = (invoice: any) => {
+    // Se status for FATURADA, calcular 6% do valor faturado
+    if (invoice.status === 'FATURADA') {
+      const valorFaturado = parseFloat(invoice.grossValue?.toString() || '0')
+      return valorFaturado * 0.06
+    }
+    // Caso contrário, usar impostos cadastrados (se houver)
+    if (invoice.taxes && invoice.taxes.length > 0) {
+      return invoice.taxes.reduce((sum: number, tax: any) => sum + parseFloat(tax.provisionedValue.toString()), 0)
+    }
+    return 0
   }
 
   const filteredInvoices = invoices.filter((invoice) => {
-    if (!filter) return true
-    const searchTerm = filter.toLowerCase()
-    return (
-      invoice.invoiceNumber?.toLowerCase().includes(searchTerm) ||
-      invoice.client?.razaoSocial?.toLowerCase().includes(searchTerm)
-    )
+    // Filtro de texto
+    if (filter) {
+      const searchTerm = filter.toLowerCase()
+      const matchesText = (
+        invoice.invoiceNumber?.toLowerCase().includes(searchTerm) ||
+        invoice.client?.razaoSocial?.toLowerCase().includes(searchTerm) ||
+        invoice.numeroNF?.toLowerCase().includes(searchTerm)
+      )
+      if (!matchesText) return false
+    }
+
+    // Filtro de status
+    if (statusFilter && invoice.status !== statusFilter) {
+      return false
+    }
+
+    // Filtro de período (data de vencimento)
+    if (dateFrom) {
+      const invoiceDate = new Date(invoice.dueDate)
+      const fromDate = new Date(dateFrom)
+      if (invoiceDate < fromDate) return false
+    }
+
+    if (dateTo) {
+      const invoiceDate = new Date(invoice.dueDate)
+      const toDate = new Date(dateTo)
+      toDate.setHours(23, 59, 59, 999) // Incluir o dia inteiro
+      if (invoiceDate > toDate) return false
+    }
+
+    return true
   })
+
+  // Calcular totalizadores por status
+  const totalizadores = {
+    PROVISIONADA: filteredInvoices
+      .filter(inv => inv.status === 'PROVISIONADA')
+      .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0),
+    FATURADA: filteredInvoices
+      .filter(inv => inv.status === 'FATURADA')
+      .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0),
+    RECEBIDA: filteredInvoices
+      .filter(inv => inv.status === 'RECEBIDA')
+      .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0),
+  }
 
   if (loading) {
     return (
@@ -106,15 +182,76 @@ export default function ContasReceberPage() {
           </div>
         </div>
 
-        {/* Filtro */}
+        {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <input
-            type="text"
-            placeholder="Buscar por número da NF ou cliente..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-2">
+              <input
+                type="text"
+                placeholder="Buscar por número da NF ou cliente..."
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              />
+            </div>
+            <div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              >
+                <option value="">Todos os Status</option>
+                <option value="PROVISIONADA">Provisionada</option>
+                <option value="FATURADA">Faturada</option>
+                <option value="RECEBIDA">Recebida</option>
+                <option value="EMITIDA">Emitida</option>
+                <option value="CANCELADA">Cancelada</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Data Inicial (Vencimento)</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Data Final (Vencimento)</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Totalizadores por Status */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <h2 className="text-lg font-semibold mb-4 text-gray-900">Totalizadores por Status</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="text-sm font-medium text-blue-800 mb-1">Provisionada</div>
+              <div className="text-2xl font-bold text-blue-900">
+                R$ {totalizadores.PROVISIONADA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <div className="text-sm font-medium text-purple-800 mb-1">Faturada</div>
+              <div className="text-2xl font-bold text-purple-900">
+                R$ {totalizadores.FATURADA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <div className="text-sm font-medium text-green-800 mb-1">Recebida</div>
+              <div className="text-2xl font-bold text-green-900">
+                R$ {totalizadores.RECEBIDA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Lista de Notas Fiscais */}
@@ -137,7 +274,7 @@ export default function ContasReceberPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origem</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emissão</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
@@ -149,13 +286,16 @@ export default function ContasReceberPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredInvoices.map((invoice) => {
-                  const totalTaxes = calculateTotalTaxes(invoice)
+                  const impostos = calculateImpostos(invoice)
                   return (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
+                    <tr 
+                      key={invoice.id} 
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/contas-receber/${invoice.id}`)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {invoice.invoiceNumber}
-                          {invoice.series && ` - Série ${invoice.series}`}
+                          {invoice.origem === 'NEGOCIACAO' ? 'Negociação' : invoice.origem === 'TIMESHEET' ? 'Timesheet' : 'Manual'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -171,7 +311,13 @@ export default function ContasReceberPage() {
                         R$ {parseFloat(invoice.grossValue.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        R$ {totalTaxes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {invoice.status === 'FATURADA' ? (
+                          <span className="font-semibold">
+                            R$ {impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span>R$ {impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
