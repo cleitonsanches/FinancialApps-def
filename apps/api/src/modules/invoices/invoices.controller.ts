@@ -28,10 +28,20 @@ export class InvoicesController {
 
   @Post('from-proposal-parcels/:proposalId')
   async createFromProposalParcels(@Param('proposalId') proposalId: string, @Body() body: { parcels: any[] }, @Request() req: any) {
-    const companyId = req.user?.companyId;
+    let companyId = req.user?.companyId;
+    
+    // Se não tiver companyId no req.user, buscar da proposta
     if (!companyId) {
-      throw new BadRequestException('Usuário não possui empresa vinculada');
+      const proposal = await this.invoicesService.getProposalCompanyId(proposalId);
+      if (proposal) {
+        companyId = proposal.companyId;
+      }
     }
+    
+    if (!companyId) {
+      throw new BadRequestException('Usuário não possui empresa vinculada e não foi possível obter da proposta');
+    }
+    
     return this.invoicesService.createFromProposalParcels(proposalId, body.parcels, companyId);
   }
 

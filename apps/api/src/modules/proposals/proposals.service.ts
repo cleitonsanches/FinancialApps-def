@@ -26,41 +26,192 @@ export class ProposalsService {
     if (companyId) {
       where.companyId = companyId;
     }
-    return this.proposalRepository.find({ 
+    const proposals = await this.proposalRepository.find({ 
       where,
       relations: ['client', 'user'],
       order: { createdAt: 'DESC' },
     });
-  }
-
-  async findOne(id: string): Promise<Proposal> {
-    return this.proposalRepository.findOne({ 
-      where: { id },
-      relations: ['client', 'user'],
+    
+    // Converter parcelas de JSON string para array em cada proposta
+    return proposals.map(proposal => {
+      if (proposal.parcelas) {
+        try {
+          (proposal as any).parcelas = JSON.parse(proposal.parcelas);
+        } catch (e) {
+          // Se não for JSON válido, manter como está
+        }
+      }
+      return proposal;
     });
   }
 
-  async create(proposalData: Partial<Proposal>): Promise<Proposal> {
-    const proposal = this.proposalRepository.create(proposalData);
-    return this.proposalRepository.save(proposal);
+  async findOne(id: string): Promise<Proposal> {
+    const proposal = await this.proposalRepository.findOne({ 
+      where: { id },
+      relations: ['client', 'user'],
+    });
+    
+    console.log('ProposalsService.findOne - Proposta encontrada:', proposal?.id);
+    console.log('ProposalsService.findOne - Parcelas (raw):', proposal?.parcelas);
+    console.log('ProposalsService.findOne - Tipo de parcelas:', typeof proposal?.parcelas);
+    
+    // Converter parcelas de JSON string para array
+    if (proposal && proposal.parcelas) {
+      try {
+        (proposal as any).parcelas = JSON.parse(proposal.parcelas);
+        console.log('ProposalsService.findOne - Parcelas parseadas:', (proposal as any).parcelas);
+        console.log('ProposalsService.findOne - Quantidade de parcelas:', Array.isArray((proposal as any).parcelas) ? (proposal as any).parcelas.length : 'não é array');
+      } catch (e) {
+        console.error('ProposalsService.findOne - Erro ao fazer parse das parcelas:', e);
+        // Se não for JSON válido, manter como está
+      }
+    }
+    
+    return proposal;
   }
 
-  async update(id: string, proposalData: Partial<Proposal>): Promise<Proposal> {
+  async create(proposalData: Partial<Proposal>): Promise<Proposal> {
+    // Garantir que status seja RASCUNHO ao criar
+    proposalData.status = 'RASCUNHO';
+    
+    // Gerar número sequencial no formato: sequencial/ano
+    if (!proposalData.numero) {
+      const currentYear = new Date().getFullYear();
+      const count = await this.proposalRepository.count({
+        where: { companyId: proposalData.companyId },
+      });
+      const sequencial = count + 1;
+      proposalData.numero = `${sequencial}/${currentYear}`;
+    }
+    
+    // Converter parcelas para JSON string se existir
+    if ((proposalData as any).parcelas && Array.isArray((proposalData as any).parcelas)) {
+      console.log('ProposalsService.create - Parcelas recebidas:', (proposalData as any).parcelas);
+      (proposalData as any).parcelas = JSON.stringify((proposalData as any).parcelas);
+      console.log('ProposalsService.create - Parcelas convertidas para JSON:', (proposalData as any).parcelas);
+    }
+    
+    const proposal = this.proposalRepository.create(proposalData);
+    const saved = await this.proposalRepository.save(proposal);
+    
+    console.log('ProposalsService.create - Proposta salva:', saved);
+    console.log('ProposalsService.create - Parcelas salvas (string):', saved.parcelas);
+    
+    // Converter parcelas de volta para array ao retornar
+    if (saved.parcelas) {
+      try {
+        (saved as any).parcelas = JSON.parse(saved.parcelas);
+        console.log('ProposalsService.create - Parcelas parseadas de volta:', (saved as any).parcelas);
+      } catch (e) {
+        console.error('ProposalsService.create - Erro ao fazer parse das parcelas:', e);
+        // Se não for JSON válido, manter como está
+      }
+    }
+    
+    return saved;
+  }
+
+  async update(id: string, proposalData: any): Promise<Proposal> {
+    // Mapear campos do frontend para a entidade
+    const updateData: Partial<Proposal> = {}
+    
+    // Campos básicos
+    if (proposalData.clientId !== undefined) updateData.clientId = proposalData.clientId
+    if (proposalData.companyId !== undefined) updateData.companyId = proposalData.companyId
+    if (proposalData.title !== undefined) updateData.title = proposalData.title
+    if (proposalData.status !== undefined) updateData.status = proposalData.status
+    if (proposalData.serviceType !== undefined) updateData.serviceType = proposalData.serviceType
+    
+    // Campos de valores
+    if (proposalData.valorTotal !== undefined) updateData.valorTotal = proposalData.valorTotal
+    if (proposalData.valorProposta !== undefined) updateData.valorProposta = proposalData.valorProposta
+    if (proposalData.valorPorHora !== undefined) updateData.valorPorHora = proposalData.valorPorHora
+    
+    // Campos de contratação e faturamento
+    if (proposalData.tipoContratacao !== undefined) updateData.tipoContratacao = proposalData.tipoContratacao
+    if (proposalData.tipoFaturamento !== undefined) updateData.tipoFaturamento = proposalData.tipoFaturamento
+    if (proposalData.formaFaturamento !== undefined) updateData.formaFaturamento = proposalData.formaFaturamento
+    if (proposalData.horasEstimadas !== undefined) updateData.horasEstimadas = proposalData.horasEstimadas
+    
+    // Campos de datas - mapear 'inicio' para 'dataInicio' (não incluir 'inicio' diretamente)
+    if (proposalData.inicio !== undefined) {
+      updateData.dataInicio = proposalData.inicio
+    } else if (proposalData.dataInicio !== undefined) {
+      updateData.dataInicio = proposalData.dataInicio
+    }
+    if (proposalData.previsaoConclusao !== undefined) updateData.previsaoConclusao = proposalData.previsaoConclusao
+    if (proposalData.inicioFaturamento !== undefined) updateData.inicioFaturamento = proposalData.inicioFaturamento
+    if (proposalData.vencimento !== undefined) updateData.vencimento = proposalData.vencimento
+    
+    // Campos específicos para Migração de Dados
+    if (proposalData.sistemaOrigem !== undefined) updateData.sistemaOrigem = proposalData.sistemaOrigem
+    if (proposalData.sistemaDestino !== undefined) updateData.sistemaDestino = proposalData.sistemaDestino
+    if (proposalData.dataEntregaHomologacao !== undefined) updateData.dataEntregaHomologacao = proposalData.dataEntregaHomologacao
+    if (proposalData.dataEntregaProducao !== undefined) updateData.dataEntregaProducao = proposalData.dataEntregaProducao
+    if (proposalData.dataInicioTrabalho !== undefined) updateData.dataInicioTrabalho = proposalData.dataInicioTrabalho
+    if (proposalData.dataFaturamento !== undefined) updateData.dataFaturamento = proposalData.dataFaturamento
+    if (proposalData.dataVencimento !== undefined) updateData.dataVencimento = proposalData.dataVencimento
+    
+    // Campos de data de status (geralmente gerenciados automaticamente, mas podem ser passados manualmente)
+    if (proposalData.dataEnvio !== undefined) updateData.dataEnvio = proposalData.dataEnvio
+    if (proposalData.dataReEnvio !== undefined) updateData.dataReEnvio = proposalData.dataReEnvio
+    if (proposalData.dataRevisao !== undefined) updateData.dataRevisao = proposalData.dataRevisao
+    if (proposalData.dataFechamento !== undefined) updateData.dataFechamento = proposalData.dataFechamento
+    if (proposalData.dataDeclinio !== undefined) updateData.dataDeclinio = proposalData.dataDeclinio
+    if (proposalData.dataCancelamento !== undefined) updateData.dataCancelamento = proposalData.dataCancelamento
+    
+    // Converter parcelas para JSON string se existir
+    if ((proposalData as any).parcelas && Array.isArray((proposalData as any).parcelas)) {
+      console.log('ProposalsService.update - Parcelas recebidas:', (proposalData as any).parcelas);
+      updateData.parcelas = JSON.stringify((proposalData as any).parcelas);
+      console.log('ProposalsService.update - Parcelas convertidas para JSON:', updateData.parcelas);
+    } else if ((proposalData as any).parcelas !== undefined) {
+      updateData.parcelas = (proposalData as any).parcelas;
+      console.log('ProposalsService.update - Parcelas (não array):', updateData.parcelas);
+    }
+    
     const existingProposal = await this.findOne(id);
     if (!existingProposal) {
       throw new Error('Proposta não encontrada');
     }
 
     // Lógica para lidar com mudanças de status
-    if (proposalData.status && proposalData.status !== existingProposal.status) {
+    if (updateData.status && updateData.status !== existingProposal.status) {
+      const today = new Date()
+      
+      // Registrar data da mudança de status
+      switch (updateData.status) {
+        case 'ENVIADA':
+          updateData.dataEnvio = today
+          break
+        case 'RE_ENVIADA':
+          updateData.dataReEnvio = today
+          break
+        case 'REVISADA':
+          updateData.dataRevisao = today
+          break
+        case 'FECHADA':
+          updateData.dataFechamento = today
+          break
+        case 'DECLINADA':
+          updateData.dataDeclinio = today
+          break
+        case 'CANCELADA':
+          updateData.dataCancelamento = today
+          break
+      }
+
       const linkedProjects = await this.projectRepository.find({
         where: { proposalId: id },
         relations: ['tasks'],
-      });
+      })
+
+      // Status ENVIADA, RE_ENVIADA e REVISADA não realizam ações, apenas registram a data
+      // (já registrado acima)
 
       // Se status mudou de FECHADA para outro (RASCUNHO, ENVIADA, etc.), deletar projetos e tarefas
       if (existingProposal.status === 'FECHADA' && 
-          ['RASCUNHO', 'ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(proposalData.status)) {
+          ['RASCUNHO', 'ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(updateData.status)) {
         for (const project of linkedProjects) {
           if (project.tasks) {
             await this.projectTaskRepository.delete({ projectId: project.id });
@@ -70,7 +221,7 @@ export class ProposalsService {
       }
 
       // Se status mudou para DECLINADA, deletar projetos e tarefas
-      if (proposalData.status === 'DECLINADA') {
+      if (updateData.status === 'DECLINADA') {
         for (const project of linkedProjects) {
           if (project.tasks) {
             await this.projectTaskRepository.delete({ projectId: project.id });
@@ -80,7 +231,7 @@ export class ProposalsService {
       }
 
       // Se status mudou para CANCELADA, alterar status dos projetos e tarefas
-      if (proposalData.status === 'CANCELADA') {
+      if (updateData.status === 'CANCELADA') {
         for (const project of linkedProjects) {
           await this.projectRepository.update(project.id, { status: 'NEGOCIACAO_CANCELADA' });
           if (project.tasks) {
@@ -93,8 +244,11 @@ export class ProposalsService {
       }
     }
 
-    await this.proposalRepository.update(id, proposalData);
-    return this.findOne(id);
+    console.log('ProposalsService.update - Dados para atualizar:', updateData);
+    await this.proposalRepository.update(id, updateData);
+    const updated = await this.findOne(id);
+    console.log('ProposalsService.update - Proposta atualizada:', updated);
+    return updated;
   }
 
   async delete(id: string): Promise<void> {

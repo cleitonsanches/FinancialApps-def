@@ -1,7 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { DatabaseConfig } from './config/database.config';
+import { ensureProposalNumeroColumn } from './database/ensure-proposal-numero';
+import { ensureProposalStatusDatesColumns } from './database/ensure-proposal-status-dates';
+import { ensureInvoiceFields } from './database/ensure-invoice-fields';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -14,6 +19,7 @@ import { ProjectTemplatesModule } from './modules/project-templates/project-temp
 import { ProposalTemplatesModule } from './modules/proposal-templates/proposal-templates.module';
 import { UsersModule } from './modules/users/users.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
+import { ServiceTypesModule } from './modules/service-types/service-types.module';
 
 @Module({
   imports: [
@@ -37,8 +43,23 @@ import { ContactsModule } from './modules/contacts/contacts.module';
     ProposalTemplatesModule,
     UsersModule,
     ContactsModule,
+    ServiceTypesModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements OnModuleInit {
+  constructor(
+    @InjectDataSource()
+    private dataSource: DataSource,
+  ) {}
+
+  async onModuleInit() {
+    // Garantir que a coluna numero existe na tabela proposals
+    await ensureProposalNumeroColumn(this.dataSource);
+    // Garantir que as colunas de data de status existem na tabela proposals
+    await ensureProposalStatusDatesColumns(this.dataSource);
+    // Garantir que as colunas data_recebimento e numero_nf existem na tabela invoices
+    await ensureInvoiceFields(this.dataSource);
+  }
+}
 
 

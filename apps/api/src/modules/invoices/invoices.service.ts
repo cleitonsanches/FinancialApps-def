@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Invoice, InvoiceTax } from '../../database/entities/invoice.entity';
+import { Proposal } from '../../database/entities/proposal.entity';
 
 @Injectable()
 export class InvoicesService {
@@ -10,6 +11,8 @@ export class InvoicesService {
     private invoiceRepository: Repository<Invoice>,
     @InjectRepository(InvoiceTax)
     private invoiceTaxRepository: Repository<InvoiceTax>,
+    @InjectRepository(Proposal)
+    private proposalRepository: Repository<Proposal>,
   ) {}
 
   async findAll(companyId?: string): Promise<Invoice[]> {
@@ -43,20 +46,37 @@ export class InvoicesService {
     await this.invoiceRepository.delete(id);
   }
 
+  async getProposalCompanyId(proposalId: string): Promise<{ companyId: string } | null> {
+    const proposal = await this.proposalRepository.findOne({
+      where: { id: proposalId },
+      select: ['companyId'],
+    });
+    return proposal ? { companyId: proposal.companyId } : null;
+  }
+
   async createFromProposalParcels(proposalId: string, parcels: any[], companyId: string) {
     if (!parcels || parcels.length === 0) {
       throw new BadRequestException('Nenhuma parcela fornecida para criação de contas a receber.');
     }
 
     const invoicesToCreate = parcels.map(parcel => {
-      const invoiceNumber = `NEG-${proposalId.substring(0, 4)}-${parcel.numero}`;
+      const invoiceNumber = `NEG-${proposalId.substring(0, 4)}-${String(parcel.numero).padStart(3, '0')}`;
+      
+      // Corrigir problema de timezone - garantir que a data seja interpretada como local
+      const parseDate = (dateString: string): Date => {
+        if (!dateString) return new Date();
+        // Se a string já está no formato YYYY-MM-DD, adicionar T00:00:00 para evitar conversão UTC
+        const dateStr = dateString.includes('T') ? dateString : `${dateString}T00:00:00`;
+        return new Date(dateStr);
+      };
+      
       return this.invoiceRepository.create({
         companyId,
         clientId: parcel.clientId,
         proposalId,
         invoiceNumber,
-        emissionDate: new Date(),
-        dueDate: new Date(parcel.dataVencimento),
+        emissionDate: parcel.dataFaturamento ? parseDate(parcel.dataFaturamento) : new Date(),
+        dueDate: parseDate(parcel.dataVencimento),
         grossValue: parcel.valor,
         status: 'PROVISIONADA',
         origem: 'NEGOCIACAO',

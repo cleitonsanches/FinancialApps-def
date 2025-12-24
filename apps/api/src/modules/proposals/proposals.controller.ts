@@ -19,10 +19,37 @@ export class ProposalsController {
 
   @Post()
   async create(@Body() proposalData: Partial<Proposal>, @Request() req?: any): Promise<Proposal> {
-    const companyId = req?.user?.companyId;
+    const companyId = req?.user?.companyId || proposalData.companyId;
+    const userId = req?.user?.id || proposalData.userId;
+    
+    console.log('ProposalsController.create - req?.user:', req?.user);
+    console.log('ProposalsController.create - companyId:', companyId, 'userId:', userId);
+    console.log('ProposalsController.create - proposalData recebido:', proposalData);
+    
     if (companyId && !proposalData.companyId) {
       proposalData.companyId = companyId;
     }
+    
+    if (userId && !proposalData.userId) {
+      proposalData.userId = userId;
+    }
+    
+    // Validar campos obrigatórios
+    if (!proposalData.companyId) {
+      throw new Error('companyId é obrigatório');
+    }
+    if (!proposalData.userId) {
+      throw new Error('userId é obrigatório');
+    }
+    if (!proposalData.clientId) {
+      throw new Error('clientId é obrigatório');
+    }
+    if (!proposalData.title) {
+      throw new Error('title é obrigatório');
+    }
+    
+    console.log('ProposalsController.create - proposalData final:', proposalData);
+    
     return this.proposalsService.create(proposalData);
   }
 

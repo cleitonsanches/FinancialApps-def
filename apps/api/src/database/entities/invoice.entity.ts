@@ -60,6 +60,12 @@ export class Invoice {
   @Column({ name: 'timesheet_id', nullable: true })
   timesheetId?: string; // ID do lançamento de horas trabalhadas (quando origem for TIMESHEET)
 
+  @Column({ name: 'data_recebimento', type: 'date', nullable: true })
+  dataRecebimento?: Date;
+
+  @Column({ name: 'numero_nf', type: 'varchar', length: 50, nullable: true })
+  numeroNF?: string;
+
   @OneToMany(() => InvoiceTax, tax => tax.invoice, { cascade: true })
   taxes?: InvoiceTax[];
 
