@@ -8,6 +8,11 @@ import { ensureProposalNumeroColumn } from './database/ensure-proposal-numero';
 import { ensureProposalStatusDatesColumns } from './database/ensure-proposal-status-dates';
 import { ensureInvoiceFields } from './database/ensure-invoice-fields';
 import { ensureProposalMotivoFields } from './database/ensure-proposal-motivo-fields';
+import { ensureInvoiceChartOfAccounts } from './database/ensure-invoice-chart-of-accounts';
+import { ensureProposalServiceFields } from './database/ensure-proposal-service-fields';
+import { ensureProposalAditivosTable } from './database/ensure-proposal-aditivos-table';
+import { ensureSubscriptionProductsTable } from './database/ensure-subscription-products-table';
+import { ensureInvoiceRecebimentoFields } from './database/ensure-invoice-recebimento-fields';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -21,6 +26,8 @@ import { ProposalTemplatesModule } from './modules/proposal-templates/proposal-t
 import { UsersModule } from './modules/users/users.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { ServiceTypesModule } from './modules/service-types/service-types.module';
+import { SubscriptionProductsModule } from './modules/subscription-products/subscription-products.module';
+import { ProposalAditivosModule } from './modules/proposal-aditivos/proposal-aditivos.module';
 
 @Module({
   imports: [
@@ -45,6 +52,8 @@ import { ServiceTypesModule } from './modules/service-types/service-types.module
     UsersModule,
     ContactsModule,
     ServiceTypesModule,
+    SubscriptionProductsModule,
+    ProposalAditivosModule,
   ],
 })
 export class AppModule implements OnModuleInit {
@@ -62,6 +71,16 @@ export class AppModule implements OnModuleInit {
     await ensureInvoiceFields(this.dataSource);
     // Garantir que as colunas motivo_cancelamento e motivo_declinio existem na tabela proposals
     await ensureProposalMotivoFields(this.dataSource);
+    // Garantir que a coluna chart_of_accounts_id existe na tabela invoices
+    await ensureInvoiceChartOfAccounts(this.dataSource);
+    // Garantir que os campos específicos de serviços existem na tabela proposals
+    await ensureProposalServiceFields(this.dataSource);
+    // Garantir que a tabela proposal_aditivos existe
+    await ensureProposalAditivosTable(this.dataSource);
+    // Garantir que a tabela subscription_products existe
+    await ensureSubscriptionProductsTable(this.dataSource);
+    // Garantir que os campos de recebimento existem na tabela invoices
+    await ensureInvoiceRecebimentoFields(this.dataSource);
   }
 }
 

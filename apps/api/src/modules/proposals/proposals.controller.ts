@@ -71,5 +71,23 @@ export class ProposalsController {
     const startDate = new Date(body.startDate);
     return this.proposalsService.createProjectFromTemplate(proposalId, body.templateId, startDate);
   }
+
+  @Post(':id/criar-manutencao-vinculada')
+  async criarManutencaoVinculada(
+    @Param('id') propostaPrincipalId: string,
+    @Body() dadosManutencao: {
+      valorMensalManutencao?: number;
+      dataInicioManutencao?: string;
+      descricaoManutencao?: string;
+      vencimentoManutencao?: string;
+    },
+  ): Promise<Proposal> {
+    return this.proposalsService.criarPropostaManutencaoVinculada(propostaPrincipalId, {
+      valorMensalManutencao: dadosManutencao.valorMensalManutencao,
+      dataInicioManutencao: dadosManutencao.dataInicioManutencao ? new Date(dadosManutencao.dataInicioManutencao) : undefined,
+      vencimentoManutencao: dadosManutencao.vencimentoManutencao ? new Date(dadosManutencao.vencimentoManutencao) : undefined,
+      descricaoManutencao: dadosManutencao.descricaoManutencao,
+    });
+  }
 }
 

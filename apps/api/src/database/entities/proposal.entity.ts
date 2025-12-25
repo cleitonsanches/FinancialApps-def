@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { Company } from './company.entity';
 import { Client } from './client.entity';
 import { User } from './user.entity';
+import { ProposalAditivo } from './proposal-aditivo.entity';
 
 @Entity('proposals')
 @Index('IX_proposals_company_id', ['companyId'])
@@ -124,7 +125,67 @@ export class Proposal {
   motivoCancelamento?: string;
 
   @Column({ name: 'motivo_declinio', type: 'text', nullable: true })
-  motivoDeclinio?: string; // JSON string com array de parcelas
+  motivoDeclinio?: string;
+
+  // Campos para Análise de Dados
+  @Column({ name: 'data_inicio_analise', type: 'date', nullable: true })
+  dataInicioAnalise?: Date;
+
+  @Column({ name: 'data_programada_homologacao', type: 'date', nullable: true })
+  dataProgramadaHomologacao?: Date;
+
+  @Column({ name: 'data_programada_producao', type: 'date', nullable: true })
+  dataProgramadaProducao?: Date;
+
+  // Campos para Assinaturas
+  @Column({ name: 'tipo_produto_assinado', type: 'varchar', length: 100, nullable: true })
+  tipoProdutoAssinado?: string;
+
+  @Column({ name: 'quantidade_usuarios', type: 'integer', nullable: true })
+  quantidadeUsuarios?: number;
+
+  @Column({ name: 'valor_unitario_usuario', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  valorUnitarioUsuario?: number;
+
+  @Column({ name: 'data_inicio_assinatura', type: 'date', nullable: true })
+  dataInicioAssinatura?: Date;
+
+  @Column({ name: 'vencimento_assinatura', type: 'date', nullable: true })
+  vencimentoAssinatura?: Date;
+
+  // Campos para Manutenções
+  @Column({ name: 'descricao_manutencao', type: 'text', nullable: true })
+  descricaoManutencao?: string;
+
+  @Column({ name: 'valor_mensal_manutencao', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  valorMensalManutencao?: number;
+
+  @Column({ name: 'data_inicio_manutencao', type: 'date', nullable: true })
+  dataInicioManutencao?: Date;
+
+  @Column({ name: 'vencimento_manutencao', type: 'date', nullable: true })
+  vencimentoManutencao?: Date;
+
+  // Campos para Contrato Fixo
+  @Column({ name: 'valor_mensal_fixo', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  valorMensalFixo?: number;
+
+  @Column({ name: 'data_fim_contrato', type: 'date', nullable: true })
+  dataFimContrato?: Date;
+
+  // Campos genéricos
+  @Column({ name: 'tem_manutencao_vinculada', type: 'boolean', default: false })
+  temManutencaoVinculada?: boolean;
+
+  @Column({ name: 'proposta_manutencao_id', type: 'varchar', length: 36, nullable: true })
+  propostaManutencaoId?: string;
+
+  @ManyToOne(() => Proposal, { nullable: true })
+  @JoinColumn({ name: 'proposta_manutencao_id' })
+  propostaManutencao?: Proposal;
+
+  @OneToMany(() => ProposalAditivo, aditivo => aditivo.proposal)
+  aditivos?: ProposalAditivo[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

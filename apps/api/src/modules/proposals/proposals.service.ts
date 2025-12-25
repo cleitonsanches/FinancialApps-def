@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Proposal } from '../../database/entities/proposal.entity';
@@ -357,6 +357,99 @@ export class ProposalsService {
         dataConclusao: task.dataConclusao ? task.dataConclusao.toISOString().split('T')[0] : null,
       })),
     };
+  }
+
+  /**
+   * Calcula a data de vencimento (12 meses a partir da data de início)
+   * @param dataInicio Data de início
+   * @returns Data de vencimento (12 meses depois)
+   */
+  calcularVencimento12Meses(dataInicio: Date | string): Date {
+    const inicio = typeof dataInicio === 'string' ? new Date(dataInicio) : dataInicio;
+    const vencimento = new Date(inicio);
+    vencimento.setMonth(vencimento.getMonth() + 12);
+    return vencimento;
+  }
+
+  /**
+   * Cria uma proposta de manutenção vinculada a uma proposta principal
+   * @param propostaPrincipalId ID da proposta principal
+   * @param dadosManutencao Dados específicos da manutenção
+   * @returns Proposta de manutenção criada
+   */
+  async criarPropostaManutencaoVinculada(
+    propostaPrincipalId: string,
+    dadosManutencao: {
+      valorMensalManutencao?: number;
+      dataInicioManutencao?: Date | string;
+      descricaoManutencao?: string;
+      vencimentoManutencao?: Date | string;
+    }
+  ): Promise<Proposal> {
+    const propostaPrincipal = await this.findOne(propostaPrincipalId);
+    
+    if (!propostaPrincipal) {
+      throw new NotFoundException(`Proposta principal com ID ${propostaPrincipalId} não encontrada`);
+    }
+
+    // Calcular valor sugerido (pode ser baseado em percentual da proposta principal)
+    const valorMensal = dadosManutencao.valorMensalManutencao || 
+                        (propostaPrincipal.valorProposta ? propostaPrincipal.valorProposta * 0.1 : 0);
+
+    // Calcular data de início sugerida (pode ser baseada na data de conclusão da proposta principal)
+    const dataInicio = dadosManutencao.dataInicioManutencao 
+      ? (typeof dadosManutencao.dataInicioManutencao === 'string' 
+          ? new Date(dadosManutencao.dataInicioManutencao) 
+          : dadosManutencao.dataInicioManutencao)
+      : (propostaPrincipal.previsaoConclusao || new Date());
+
+    // Calcular vencimento (12 meses após início)
+    const vencimento = dadosManutencao.vencimentoManutencao
+      ? (typeof dadosManutencao.vencimentoManutencao === 'string'
+          ? new Date(dadosManutencao.vencimentoManutencao)
+          : dadosManutencao.vencimentoManutencao)
+      : this.calcularVencimento12Meses(dataInicio);
+
+    // Criar proposta de manutenção
+    const propostaManutencao = this.proposalRepository.create({
+      companyId: propostaPrincipal.companyId,
+      clientId: propostaPrincipal.clientId,
+      userId: propostaPrincipal.userId,
+      serviceType: 'MANUTENCOES',
+      status: 'RASCUNHO',
+      title: `Manutenção - ${propostaPrincipal.title}`,
+      valorMensalManutencao: valorMensal,
+      dataInicioManutencao: dataInicio,
+      vencimentoManutencao: vencimento,
+      descricaoManutencao: dadosManutencao.descricaoManutencao || 
+                          `Manutenção vinculada à proposta ${propostaPrincipal.numero}`,
+      tipoContratacao: 'FIXO_RECORRENTE',
+      formaFaturamento: 'PARCELADO',
+      valorProposta: valorMensal,
+    });
+
+    const propostaManutencaoSalva = await this.proposalRepository.save(propostaManutencao);
+
+    // Atualizar proposta principal para indicar que tem manutenção vinculada
+    await this.proposalRepository.update(propostaPrincipalId, {
+      temManutencaoVinculada: true,
+      propostaManutencaoId: propostaManutencaoSalva.id,
+    });
+
+    return propostaManutencaoSalva;
+  }
+
+  /**
+   * Calcula o valor sugerido para manutenção baseado na proposta principal
+   * @param propostaPrincipal Proposta principal
+   * @returns Valor mensal sugerido
+   */
+  calcularValorSugeridoManutencao(propostaPrincipal: Proposal): number {
+    // Sugestão: 10% do valor da proposta principal
+    if (propostaPrincipal.valorProposta) {
+      return propostaPrincipal.valorProposta * 0.1;
+    }
+    return 0;
   }
 }
 

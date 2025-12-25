@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Invoice, InvoiceTax } from '../../database/entities/invoice.entity';
 import { Proposal } from '../../database/entities/proposal.entity';
+import { ChartOfAccounts } from '../../database/entities/chart-of-accounts.entity';
 
 @Injectable()
 export class InvoicesService {
@@ -13,22 +14,24 @@ export class InvoicesService {
     private invoiceTaxRepository: Repository<InvoiceTax>,
     @InjectRepository(Proposal)
     private proposalRepository: Repository<Proposal>,
+    @InjectRepository(ChartOfAccounts)
+    private chartOfAccountsRepository: Repository<ChartOfAccounts>,
   ) {}
 
   async findAll(companyId?: string): Promise<Invoice[]> {
     if (companyId) {
       return this.invoiceRepository.find({ 
         where: { companyId },
-        relations: ['client', 'proposal'],
+        relations: ['client', 'proposal', 'chartOfAccounts', 'contaCorrente'],
       });
     }
-    return this.invoiceRepository.find({ relations: ['client', 'proposal'] });
+    return this.invoiceRepository.find({ relations: ['client', 'proposal', 'chartOfAccounts', 'contaCorrente'] });
   }
 
   async findOne(id: string): Promise<Invoice> {
     return this.invoiceRepository.findOne({ 
       where: { id },
-      relations: ['client', 'proposal', 'taxes'],
+      relations: ['client', 'proposal', 'taxes', 'chartOfAccounts', 'contaCorrente'],
     });
   }
 
@@ -54,9 +57,77 @@ export class InvoicesService {
     return proposal ? { companyId: proposal.companyId } : null;
   }
 
+  /**
+   * Busca ou cria automaticamente a classificação de honorários para um tipo de serviço
+   */
+  private async obterOuCriarClassificacaoHonorarios(
+    serviceType: string,
+    companyId: string
+  ): Promise<ChartOfAccounts | null> {
+    if (!serviceType) return null;
+
+    // Mapear nome do tipo de serviço para exibição
+    const serviceTypeNames: Record<string, string> = {
+      'ANALISE_DADOS': 'Análise de Dados',
+      'ASSINATURAS': 'Assinaturas',
+      'AUTOMACOES': 'Automações',
+      'CONSULTORIA': 'Consultoria',
+      'DESENVOLVIMENTOS': 'Desenvolvimentos',
+      'MANUTENCOES': 'Manutenções',
+      'MIGRACAO_DADOS': 'Migração de Dados',
+      'TREINAMENTO': 'Treinamento',
+    };
+
+    const nomeTipoServico = serviceTypeNames[serviceType] || serviceType;
+    const nomeClassificacao = `Honorários - ${nomeTipoServico}`;
+    
+    // Buscar se já existe
+    let classificacao = await this.chartOfAccountsRepository.findOne({
+      where: {
+        companyId,
+        name: nomeClassificacao,
+        type: 'RECEITA'
+      }
+    });
+    
+    // Se não existe, criar
+    if (!classificacao) {
+      const code = `HON-${serviceType.substring(0, 3).toUpperCase()}`;
+      classificacao = this.chartOfAccountsRepository.create({
+        companyId,
+        name: nomeClassificacao,
+        type: 'RECEITA',
+        status: 'ATIVA',
+        code: code
+      });
+      classificacao = await this.chartOfAccountsRepository.save(classificacao);
+      console.log(`✅ Classificação "${nomeClassificacao}" criada automaticamente`);
+    }
+    
+    return classificacao;
+  }
+
   async createFromProposalParcels(proposalId: string, parcels: any[], companyId: string) {
     if (!parcels || parcels.length === 0) {
       throw new BadRequestException('Nenhuma parcela fornecida para criação de contas a receber.');
+    }
+
+    // Buscar proposta para obter serviceType
+    const proposal = await this.proposalRepository.findOne({ 
+      where: { id: proposalId },
+      select: ['serviceType', 'companyId']
+    });
+
+    // Obter ou criar classificação de honorários
+    let chartOfAccountsId: string | null = null;
+    if (proposal?.serviceType) {
+      const classificacao = await this.obterOuCriarClassificacaoHonorarios(
+        proposal.serviceType,
+        companyId
+      );
+      if (classificacao) {
+        chartOfAccountsId = classificacao.id;
+      }
     }
 
     const invoicesToCreate = parcels.map(parcel => {
@@ -74,6 +145,7 @@ export class InvoicesService {
         companyId,
         clientId: parcel.clientId,
         proposalId,
+        chartOfAccountsId, // ✅ Associar classificação
         invoiceNumber,
         emissionDate: parcel.dataFaturamento ? parseDate(parcel.dataFaturamento) : new Date(),
         dueDate: parseDate(parcel.dataVencimento),
@@ -90,7 +162,7 @@ export class InvoicesService {
   async findByProposalId(proposalId: string): Promise<Invoice[]> {
     return this.invoiceRepository.find({
       where: { proposalId },
-      relations: ['client', 'proposal'],
+      relations: ['client', 'proposal', 'chartOfAccounts'],
       order: { emissionDate: 'ASC' },
     });
   }

@@ -2,6 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMan
 import { Company } from './company.entity';
 import { Client } from './client.entity';
 import { Proposal } from './proposal.entity';
+import { ChartOfAccounts } from './chart-of-accounts.entity';
+import { BankAccount } from './bank-account.entity';
 
 @Entity('invoices')
 @Index('IX_invoices_company_id', ['companyId'])
@@ -65,6 +67,29 @@ export class Invoice {
 
   @Column({ name: 'numero_nf', type: 'varchar', length: 50, nullable: true })
   numeroNF?: string;
+
+  @Column({ name: 'tipo_emissao', type: 'varchar', length: 10, nullable: true })
+  tipoEmissao?: 'NF' | 'EF'; // NF = Nota Fiscal, EF = Emissão Fiscal (sem NF)
+
+  @Column({ name: 'desconto', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  desconto?: number;
+
+  @Column({ name: 'acrescimo', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  acrescimo?: number;
+
+  @Column({ name: 'conta_corrente_id', type: 'varchar', length: 36, nullable: true })
+  contaCorrenteId?: string;
+
+  @ManyToOne(() => BankAccount, { nullable: true })
+  @JoinColumn({ name: 'conta_corrente_id' })
+  contaCorrente?: BankAccount;
+
+  @Column({ name: 'chart_of_accounts_id', type: 'varchar', length: 36, nullable: true })
+  chartOfAccountsId?: string;
+
+  @ManyToOne(() => ChartOfAccounts, { nullable: true })
+  @JoinColumn({ name: 'chart_of_accounts_id' })
+  chartOfAccounts?: ChartOfAccounts;
 
   @OneToMany(() => InvoiceTax, tax => tax.invoice, { cascade: true })
   taxes?: InvoiceTax[];

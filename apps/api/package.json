@@ -27,7 +27,13 @@
     "create:service-types-table": "node create-table-service-types.js",
     "check:bank-accounts": "ts-node -r tsconfig-paths/register src/database/check-bank-accounts.ts",
     "seed:admin": "ts-node -r tsconfig-paths/register src/database/seed-admin.ts",
-    "test:login": "ts-node -r tsconfig-paths/register src/database/test-login.ts"
+    "test:login": "ts-node -r tsconfig-paths/register src/database/test-login.ts",
+    "migrate:invoice-chart-of-accounts": "node add-invoice-chart-of-accounts.js",
+    "migrate:proposal-service-fields": "node add-proposal-service-fields.js",
+    "migrate:proposal-aditivos": "node create-proposal-aditivos-table.js",
+    "migrate:subscription-products": "node create-subscription-products-table.js",
+    "migrate:invoice-recebimento": "node add-invoice-recebimento-fields.js",
+    "clear:proposals-invoices": "node clear-proposals-invoices.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
