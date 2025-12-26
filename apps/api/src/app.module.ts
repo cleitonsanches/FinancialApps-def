@@ -16,7 +16,9 @@ import { ensureInvoiceRecebimentoFields } from './database/ensure-invoice-recebi
 import { ensureProposalValidadeFields } from './database/ensure-proposal-validade-fields';
 import { ensureProjectTaskTipoFields } from './database/ensure-project-task-tipo-fields';
 import { ensureTimeEntriesTable } from './database/ensure-time-entries-table';
+import { ensureTimeEntriesVinculos } from './database/ensure-time-entries-vinculos';
 import { ensureProjectTaskVinculos } from './database/ensure-project-task-vinculos';
+import { ensureProjectTaskExigirHoras } from './database/ensure-project-task-exigir-horas';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -91,8 +93,12 @@ export class AppModule implements OnModuleInit {
     await ensureProjectTaskTipoFields(this.dataSource);
     // Garantir que a tabela time_entries existe
     await ensureTimeEntriesTable(this.dataSource);
+    // Garantir que os campos de vínculos (proposal_id, client_id) existem na tabela time_entries
+    await ensureTimeEntriesVinculos(this.dataSource);
     // Garantir que os campos de vínculos (proposal_id, client_id) existem na tabela project_tasks
     await ensureProjectTaskVinculos(this.dataSource);
+    // Garantir que o campo exigir_lancamento_horas existe na tabela project_tasks
+    await ensureProjectTaskExigirHoras(this.dataSource);
   }
 }
 

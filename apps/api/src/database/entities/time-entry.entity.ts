@@ -28,17 +28,17 @@ export class TimeEntry {
   @JoinColumn({ name: 'task_id' })
   task?: ProjectTask;
 
-  @Column({ name: 'proposal_id', nullable: true })
+  @Column({ name: 'proposal_id', nullable: true, select: false })
   proposalId?: string;
 
-  @ManyToOne(() => Proposal, { nullable: true })
+  @ManyToOne(() => Proposal, { nullable: true, createForeignKeyConstraints: false })
   @JoinColumn({ name: 'proposal_id' })
   proposal?: Proposal;
 
-  @Column({ name: 'client_id', nullable: true })
+  @Column({ name: 'client_id', nullable: true, select: false })
   clientId?: string;
 
-  @ManyToOne(() => Client, { nullable: true })
+  @ManyToOne(() => Client, { nullable: true, createForeignKeyConstraints: false })
   @JoinColumn({ name: 'client_id' })
   client?: Client;
 

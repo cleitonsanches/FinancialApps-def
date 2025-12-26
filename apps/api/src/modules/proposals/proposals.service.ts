@@ -328,6 +328,9 @@ export class ProposalsService {
       const taskEndDate = new Date(taskStartDate);
       taskEndDate.setDate(taskEndDate.getDate() + templateTask.duracaoPrevistaDias);
 
+      // Se a negociação for "Por Horas", marcar como exigir lançamento de horas
+      const exigirLancamentoHoras = proposal.tipoContratacao === 'HORAS';
+      
       const task = this.projectTaskRepository.create({
         projectId: savedProject.id,
         name: templateTask.name,
@@ -336,6 +339,7 @@ export class ProposalsService {
         dataConclusao: taskEndDate,
         status: 'PENDENTE',
         ordem: templateTask.ordem,
+        exigirLancamentoHoras: exigirLancamentoHoras,
       });
 
       const savedTask = await this.projectTaskRepository.save(task);

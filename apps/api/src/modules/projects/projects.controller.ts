@@ -103,7 +103,8 @@ export class ProjectsController {
     if (!task) {
       throw new Error('Tarefa não encontrada');
     }
-    return this.projectsService.updateTask(task.projectId, taskId, taskData);
+    // Passar projectId mesmo se for null/undefined
+    return this.projectsService.updateTask(task.projectId || null, taskId, taskData);
   }
 }
 

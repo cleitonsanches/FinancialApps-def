@@ -39,7 +39,8 @@
     "clear:old-projects": "node clear-old-projects.js",
     "migrate:project-task-tipo": "node add-project-task-tipo-fields.js",
     "create:time-entries-table": "node create-time-entries-table.js",
-    "migrate:project-task-vinculos": "node add-project-task-vinculos.js"
+    "migrate:project-task-vinculos": "node add-project-task-vinculos.js",
+    "migrate:project-task-exigir-horas": "node add-project-task-exigir-horas.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

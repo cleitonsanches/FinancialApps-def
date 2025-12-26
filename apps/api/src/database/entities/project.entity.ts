@@ -147,6 +147,9 @@ export class ProjectTask {
   @Column({ name: 'dia_inteiro', type: 'boolean', default: false })
   diaInteiro?: boolean; // Para eventos: se true, oculta horários e trata como bloqueio de dia
 
+  @Column({ name: 'exigir_lancamento_horas', type: 'boolean', default: false })
+  exigirLancamentoHoras?: boolean; // Se true, exige lançamento de horas ao concluir
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
