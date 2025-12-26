@@ -33,7 +33,13 @@
     "migrate:proposal-aditivos": "node create-proposal-aditivos-table.js",
     "migrate:subscription-products": "node create-subscription-products-table.js",
     "migrate:invoice-recebimento": "node add-invoice-recebimento-fields.js",
-    "clear:proposals-invoices": "node clear-proposals-invoices.js"
+    "migrate:proposal-validade": "node add-proposal-validade-fields.js",
+    "clear:proposals-invoices": "node clear-proposals-invoices.js",
+    "clear:project-tasks": "node clear-project-tasks.js",
+    "clear:old-projects": "node clear-old-projects.js",
+    "migrate:project-task-tipo": "node add-project-task-tipo-fields.js",
+    "create:time-entries-table": "node create-time-entries-table.js",
+    "migrate:project-task-vinculos": "node add-project-task-vinculos.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

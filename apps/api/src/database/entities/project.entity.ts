@@ -70,16 +70,32 @@ export class Project {
 
 @Entity('project_tasks')
 @Index('IX_project_tasks_project_id', ['projectId'])
+@Index('IX_project_tasks_proposal_id', ['proposalId'])
+@Index('IX_project_tasks_client_id', ['clientId'])
 export class ProjectTask {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'project_id' })
-  projectId: string;
+  @Column({ name: 'project_id', nullable: true })
+  projectId?: string;
 
-  @ManyToOne(() => Project, project => project.tasks, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Project, project => project.tasks, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'project_id' })
-  project: Project;
+  project?: Project;
+
+  @Column({ name: 'proposal_id', nullable: true, select: false })
+  proposalId?: string;
+
+  @ManyToOne(() => Proposal, { nullable: true, createForeignKeyConstraints: false })
+  @JoinColumn({ name: 'proposal_id' })
+  proposal?: Proposal;
+
+  @Column({ name: 'client_id', nullable: true, select: false })
+  clientId?: string;
+
+  @ManyToOne(() => Client, { nullable: true, createForeignKeyConstraints: false })
+  @JoinColumn({ name: 'client_id' })
+  client?: Client;
 
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
@@ -115,6 +131,21 @@ export class ProjectTask {
 
   @Column({ name: 'horas_estimadas', type: 'varchar', length: 20, nullable: true })
   horasEstimadas?: string;
+
+  @Column({ name: 'tipo', type: 'varchar', length: 20, default: 'ATIVIDADE' })
+  tipo?: string; // ATIVIDADE ou EVENTO
+
+  @Column({ name: 'hora_inicio', type: 'varchar', length: 10, nullable: true })
+  horaInicio?: string; // Para eventos: formato HH:MM
+
+  @Column({ name: 'hora_fim', type: 'varchar', length: 10, nullable: true })
+  horaFim?: string; // Para eventos: formato HH:MM
+
+  @Column({ name: 'sem_prazo_definido', type: 'boolean', default: false })
+  semPrazoDefinido?: boolean; // Para atividades: se true, só precisa dataInicio
+
+  @Column({ name: 'dia_inteiro', type: 'boolean', default: false })
+  diaInteiro?: boolean; // Para eventos: se true, oculta horários e trata como bloqueio de dia
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

@@ -13,6 +13,10 @@ import { ensureProposalServiceFields } from './database/ensure-proposal-service-
 import { ensureProposalAditivosTable } from './database/ensure-proposal-aditivos-table';
 import { ensureSubscriptionProductsTable } from './database/ensure-subscription-products-table';
 import { ensureInvoiceRecebimentoFields } from './database/ensure-invoice-recebimento-fields';
+import { ensureProposalValidadeFields } from './database/ensure-proposal-validade-fields';
+import { ensureProjectTaskTipoFields } from './database/ensure-project-task-tipo-fields';
+import { ensureTimeEntriesTable } from './database/ensure-time-entries-table';
+import { ensureProjectTaskVinculos } from './database/ensure-project-task-vinculos';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -81,6 +85,14 @@ export class AppModule implements OnModuleInit {
     await ensureSubscriptionProductsTable(this.dataSource);
     // Garantir que os campos de recebimento existem na tabela invoices
     await ensureInvoiceRecebimentoFields(this.dataSource);
+    // Garantir que os campos de validade existem na tabela proposals
+    await ensureProposalValidadeFields(this.dataSource);
+    // Garantir que os campos de tipo existem na tabela project_tasks
+    await ensureProjectTaskTipoFields(this.dataSource);
+    // Garantir que a tabela time_entries existe
+    await ensureTimeEntriesTable(this.dataSource);
+    // Garantir que os campos de vínculos (proposal_id, client_id) existem na tabela project_tasks
+    await ensureProjectTaskVinculos(this.dataSource);
   }
 }
 

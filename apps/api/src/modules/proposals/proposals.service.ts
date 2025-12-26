@@ -21,10 +21,13 @@ export class ProposalsService {
     private projectTemplateTaskRepository: Repository<ProjectTemplateTask>,
   ) {}
 
-  async findAll(companyId?: string): Promise<Proposal[]> {
+  async findAll(companyId?: string, status?: string): Promise<Proposal[]> {
     const where: any = {};
     if (companyId) {
       where.companyId = companyId;
+    }
+    if (status) {
+      where.status = status;
     }
     const proposals = await this.proposalRepository.find({ 
       where,
@@ -165,6 +168,10 @@ export class ProposalsService {
     if (proposalData.motivoDeclinio !== undefined) updateData.motivoDeclinio = proposalData.motivoDeclinio
     if (proposalData.dataDeclinio !== undefined) updateData.dataDeclinio = proposalData.dataDeclinio
     if (proposalData.dataCancelamento !== undefined) updateData.dataCancelamento = proposalData.dataCancelamento
+    
+    // Campos de validade
+    if (proposalData.dataValidade !== undefined) updateData.dataValidade = proposalData.dataValidade
+    if (proposalData.dataLimiteAceite !== undefined) updateData.dataLimiteAceite = proposalData.dataLimiteAceite
     
     // Converter parcelas para JSON string se existir
     if ((proposalData as any).parcelas && Array.isArray((proposalData as any).parcelas)) {
@@ -410,8 +417,8 @@ export class ProposalsService {
           : dadosManutencao.vencimentoManutencao)
       : this.calcularVencimento12Meses(dataInicio);
 
-    // Criar proposta de manutenção
-    const propostaManutencao = this.proposalRepository.create({
+    // Criar proposta de manutenção usando o método create para gerar número automaticamente
+    const propostaManutencaoData: Partial<Proposal> = {
       companyId: propostaPrincipal.companyId,
       clientId: propostaPrincipal.clientId,
       userId: propostaPrincipal.userId,
@@ -426,9 +433,17 @@ export class ProposalsService {
       tipoContratacao: 'FIXO_RECORRENTE',
       formaFaturamento: 'PARCELADO',
       valorProposta: valorMensal,
-    });
+    };
 
-    const propostaManutencaoSalva = await this.proposalRepository.save(propostaManutencao);
+    // Gerar número sequencial no formato: sequencial/ano
+    const currentYear = new Date().getFullYear();
+    const count = await this.proposalRepository.count({
+      where: { companyId: propostaPrincipal.companyId },
+    });
+    const sequencial = count + 1;
+    propostaManutencaoData.numero = `${sequencial}/${currentYear}`;
+
+    const propostaManutencaoSalva = await this.create(propostaManutencaoData);
 
     // Atualizar proposta principal para indicar que tem manutenção vinculada
     await this.proposalRepository.update(propostaPrincipalId, {

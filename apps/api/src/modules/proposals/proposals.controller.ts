@@ -7,9 +7,13 @@ export class ProposalsController {
   constructor(private proposalsService: ProposalsService) {}
 
   @Get()
-  async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<Proposal[]> {
+  async findAll(
+    @Query('companyId') companyId?: string,
+    @Query('status') status?: string,
+    @Request() req?: any
+  ): Promise<Proposal[]> {
     const effectiveCompanyId = companyId || req?.user?.companyId;
-    return this.proposalsService.findAll(effectiveCompanyId);
+    return this.proposalsService.findAll(effectiveCompanyId, status);
   }
 
   @Get(':id')

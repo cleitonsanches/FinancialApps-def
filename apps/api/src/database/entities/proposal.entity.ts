@@ -118,6 +118,12 @@ export class Proposal {
   @Column({ name: 'data_cancelamento', type: 'date', nullable: true })
   dataCancelamento?: Date;
 
+  @Column({ name: 'data_validade', type: 'date', nullable: true })
+  dataValidade?: Date; // Data de validade da proposta
+
+  @Column({ name: 'data_limite_aceite', type: 'date', nullable: true })
+  dataLimiteAceite?: Date; // Data limite para aceite da proposta (início dos trabalhos condicionado ao aceite até esta data)
+
   @Column({ name: 'parcelas', type: 'text', nullable: true })
   parcelas?: string;
 
