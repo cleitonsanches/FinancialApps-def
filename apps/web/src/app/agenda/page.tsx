@@ -352,10 +352,12 @@ export default function AgendaPage() {
     descricao: '',
   })
   const [negotiations, setNegotiations] = useState<any[]>([])
+  const [projectPhases, setProjectPhases] = useState<any[]>([])
   const [newTask, setNewTask] = useState({
     projectId: '',
     proposalId: '',
     clientId: '',
+    phaseId: '',
     name: '',
     description: '',
     horasEstimadas: '',
@@ -578,6 +580,7 @@ export default function AgendaPage() {
           usuarioResponsavelId: newTask.usuarioResponsavelId || currentUser?.id || '',
           usuarioExecutorId: newTask.usuarioExecutorId || currentUser?.id || '',
           exigirLancamentoHoras: newTask.exigirLancamentoHoras || false,
+          phaseId: newTask.phaseId || null, // Incluir phaseId se selecionado
         })
       } else {
         // Usar a nova rota standalone
@@ -592,15 +595,18 @@ export default function AgendaPage() {
           usuarioResponsavelId: newTask.usuarioResponsavelId || currentUser?.id || '',
           usuarioExecutorId: newTask.usuarioExecutorId || currentUser?.id || '',
           exigirLancamentoHoras: newTask.exigirLancamentoHoras || false,
+          phaseId: newTask.phaseId || null, // Incluir phaseId se selecionado
         })
       }
       
       alert('Tarefa criada com sucesso!')
+      setProjectPhases([])
       setShowCreateTaskModal(false)
       setNewTask({
         projectId: '',
         proposalId: '',
         clientId: '',
+        phaseId: '',
         name: '',
         description: '',
         horasEstimadas: '',
@@ -1580,9 +1586,24 @@ export default function AgendaPage() {
                             }
                           }
                           
+                          // Carregar fases do projeto selecionado
+                          if (projectId) {
+                            try {
+                              const phasesResponse = await api.get(`/phases?projectId=${projectId}`)
+                              setProjectPhases(phasesResponse.data || [])
+                            } catch (error) {
+                              console.error('Erro ao carregar fases:', error)
+                              setProjectPhases([])
+                            }
+                          } else {
+                            // Se não há projeto selecionado, limpar fases
+                            setProjectPhases([])
+                          }
+                          
                           setNewTask({ 
                             ...newTask, 
                             projectId,
+                            phaseId: '', // Limpar fase quando mudar projeto
                             exigirLancamentoHoras: exigirHoras,
                             // Limpar outros vínculos quando selecionar projeto
                             proposalId: projectId ? '' : newTask.proposalId,
@@ -1667,6 +1688,37 @@ export default function AgendaPage() {
                     <p className="text-xs text-red-600 mt-2">⚠️ Selecione pelo menos um vínculo</p>
                   )}
                 </div>
+                
+                {/* Campo de seleção de fase - aparece apenas quando um projeto é selecionado */}
+                {newTask.projectId && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Fase (opcional)
+                    </label>
+                    <select
+                      value={newTask.phaseId}
+                      onChange={(e) => setNewTask({ ...newTask, phaseId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Sem fase (atividade geral do projeto)</option>
+                      {projectPhases.length > 0 ? (
+                        projectPhases.map((phase) => (
+                          <option key={phase.id} value={phase.id}>
+                            {phase.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>Nenhuma fase criada para este projeto</option>
+                      )}
+                    </select>
+                    {projectPhases.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Este projeto não possui fases criadas. A atividade será vinculada diretamente ao projeto.
+                      </p>
+                    )}
+                  </div>
+                )}
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nome *</label>
                   <input

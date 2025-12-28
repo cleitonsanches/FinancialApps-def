@@ -4,6 +4,7 @@ import { Client } from './client.entity';
 import { Proposal } from './proposal.entity';
 import { ProjectTemplate } from './project-template.entity';
 import { User } from './user.entity';
+import { Phase } from './phase.entity';
 
 @Entity('projects')
 @Index('IX_projects_company_id', ['companyId'])
@@ -19,8 +20,8 @@ export class Project {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @Column({ name: 'client_id' })
-  clientId: string;
+  @Column({ name: 'client_id', nullable: true })
+  clientId?: string;
 
   @ManyToOne(() => Client)
   @JoinColumn({ name: 'client_id' })
@@ -61,6 +62,9 @@ export class Project {
   @OneToMany(() => ProjectTask, task => task.project, { cascade: true })
   tasks?: ProjectTask[];
 
+  @OneToMany(() => Phase, phase => phase.project, { cascade: true })
+  phases?: Phase[];
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
@@ -72,6 +76,7 @@ export class Project {
 @Index('IX_project_tasks_project_id', ['projectId'])
 @Index('IX_project_tasks_proposal_id', ['proposalId'])
 @Index('IX_project_tasks_client_id', ['clientId'])
+@Index('IX_project_tasks_phase_id', ['phaseId'])
 export class ProjectTask {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -82,6 +87,13 @@ export class ProjectTask {
   @ManyToOne(() => Project, project => project.tasks, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'project_id' })
   project?: Project;
+
+  @Column({ name: 'phase_id', nullable: true })
+  phaseId?: string;
+
+  @ManyToOne(() => Phase, phase => phase.tasks, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'phase_id' })
+  phase?: Phase;
 
   @Column({ name: 'proposal_id', nullable: true, select: false })
   proposalId?: string;

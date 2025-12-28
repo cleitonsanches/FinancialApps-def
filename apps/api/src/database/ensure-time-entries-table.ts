@@ -41,3 +41,4 @@ export async function ensureTimeEntriesTable(dataSource: DataSource): Promise<vo
   }
 }
 
+

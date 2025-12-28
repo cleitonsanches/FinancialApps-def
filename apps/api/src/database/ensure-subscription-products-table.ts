@@ -40,3 +40,4 @@ export async function ensureSubscriptionProductsTable(dataSource: DataSource): P
   }
 }
 
+

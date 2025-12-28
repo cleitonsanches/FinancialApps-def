@@ -14,6 +14,7 @@ export default function InvoiceDetailsPage() {
   const [invoice, setInvoice] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
+  const [approvedTimeEntries, setApprovedTimeEntries] = useState<any[]>([])
   
   // Modal FATURADA
   const [showFaturadaModal, setShowFaturadaModal] = useState(false)
@@ -75,6 +76,105 @@ export default function InvoiceDetailsPage() {
           numeroNF: response.data.numeroNF || '',
           tipoEmissao: response.data.tipoEmissao || 'NF',
         })
+
+        // Carregar horas aprovadas se a invoice tiver origem TIMESHEET
+        if (response.data.origem === 'TIMESHEET') {
+          console.log('Invoice origem TIMESHEET detectada')
+          console.log('approvedTimeEntries raw:', response.data.approvedTimeEntries)
+          if (response.data.approvedTimeEntries) {
+            try {
+              const entryIds = JSON.parse(response.data.approvedTimeEntries)
+              console.log('Entry IDs parseados:', entryIds)
+              if (Array.isArray(entryIds) && entryIds.length > 0) {
+                // Buscar time entries pelos IDs específicos
+                try {
+                  const idsParam = encodeURIComponent(JSON.stringify(entryIds))
+                  console.log('Buscando entries com IDs:', entryIds)
+                  console.log('IDs codificados:', idsParam)
+                  const url = `/projects/time-entries?ids=${idsParam}`
+                  const fullUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${url}`
+                  console.log('URL da requisição:', url)
+                  console.log('URL completa:', fullUrl)
+                  console.log('Fazendo requisição para:', fullUrl)
+                  
+                  // Testar se a URL está correta fazendo uma requisição fetch direta também
+                  try {
+                    const testResponse = await fetch(fullUrl, {
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json',
+                      },
+                    })
+                    console.log('Teste com fetch - Status:', testResponse.status)
+                    const testData = await testResponse.text()
+                    console.log('Teste com fetch - Response (text):', testData)
+                    try {
+                      const testJson = JSON.parse(testData)
+                      console.log('Teste com fetch - Response (JSON):', testJson)
+                    } catch (e) {
+                      console.log('Teste com fetch - Response não é JSON válido')
+                    }
+                  } catch (fetchError) {
+                    console.error('Erro no teste com fetch:', fetchError)
+                  }
+                  
+                  const entriesResponse = await api.get(url)
+                  console.log('Resposta recebida:', entriesResponse)
+                  console.log('Status:', entriesResponse.status)
+                  const entries = entriesResponse.data || []
+                  console.log('Entries encontradas por IDs:', entries.length)
+                  console.log('Entries:', entries)
+                  
+                  if (entries.length === 0) {
+                    console.warn('Nenhuma entry encontrada. Tentando método alternativo...')
+                    // Tentar método alternativo: buscar todas e filtrar
+                    const allEntriesResponse = await api.get('/projects/time-entries')
+                    const allEntries = allEntriesResponse.data || []
+                    console.log('Total de entries no sistema:', allEntries.length)
+                    console.log('IDs disponíveis:', allEntries.map((e: any) => e.id))
+                    const filteredEntries = allEntries.filter((e: any) => entryIds.includes(e.id))
+                    console.log('Entries encontradas (método alternativo):', filteredEntries.length)
+                    setApprovedTimeEntries(filteredEntries)
+                  } else {
+                    setApprovedTimeEntries(entries)
+                  }
+                } catch (error: any) {
+                  console.error('Erro ao buscar horas trabalhadas:', error)
+                  console.error('Detalhes do erro:', error.response?.data || error.message)
+                  console.error('Status do erro:', error.response?.status)
+                  console.error('URL que causou erro:', error.config?.url)
+                  
+                  // Tentar método alternativo: buscar todas e filtrar
+                  try {
+                    console.log('Tentando método alternativo...')
+                    const allEntriesResponse = await api.get('/projects/time-entries')
+                    const allEntries = allEntriesResponse.data || []
+                    console.log('Total de entries (método alternativo):', allEntries.length)
+                    const filteredEntries = allEntries.filter((e: any) => entryIds.includes(e.id))
+                    console.log('Entries encontradas (método alternativo após erro):', filteredEntries.length)
+                    setApprovedTimeEntries(filteredEntries)
+                  } catch (error2: any) {
+                    console.error('Erro no método alternativo:', error2)
+                    console.error('Detalhes do erro alternativo:', error2.response?.data || error2.message)
+                    setApprovedTimeEntries([])
+                  }
+                }
+              } else {
+                console.log('Nenhum entry ID encontrado ou array vazio')
+                setApprovedTimeEntries([]) // Se não há IDs, não há horas
+              }
+            } catch (error) {
+              console.error('Erro ao parsear approved_time_entries:', error)
+              console.error('Valor que causou erro:', response.data.approvedTimeEntries)
+              setApprovedTimeEntries([]) // Em caso de erro, limpar estado
+            }
+          } else {
+            console.log('approvedTimeEntries não existe ou está vazio')
+            setApprovedTimeEntries([]) // Se não tem approvedTimeEntries, não há horas
+          }
+        } else {
+          setApprovedTimeEntries([]) // Se não é TIMESHEET, limpar estado
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar conta a receber:', error)
@@ -505,13 +605,13 @@ export default function InvoiceDetailsPage() {
                   <p className="mt-1 text-sm text-gray-900">{invoice.contaCorrente.bankName} - {invoice.contaCorrente.accountNumber}</p>
                 </div>
               )}
-              {invoice.desconto && parseFloat(invoice.desconto.toString()) > 0 && (
+              {invoice.desconto != null && parseFloat(invoice.desconto.toString()) > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Desconto</label>
                   <p className="mt-1 text-sm text-gray-900 text-red-600">{formatCurrency(invoice.desconto)}</p>
                 </div>
               )}
-              {invoice.acrescimo && parseFloat(invoice.acrescimo.toString()) > 0 && (
+              {invoice.acrescimo != null && parseFloat(invoice.acrescimo.toString()) > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Acréscimo</label>
                   <p className="mt-1 text-sm text-gray-900 text-green-600">{formatCurrency(invoice.acrescimo)}</p>
@@ -540,6 +640,62 @@ export default function InvoiceDetailsPage() {
               )}
             </div>
           </div>
+
+          {/* Horas Aprovadas (se origem TIMESHEET) */}
+          {invoice && invoice.origem === 'TIMESHEET' && (
+            <div>
+              <h2 className="text-xl font-semibold mb-4 text-gray-900">Horas Aprovadas</h2>
+              {approvedTimeEntries.length > 0 ? (
+                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                  <div className="space-y-3">
+                    {approvedTimeEntries.map((entry: any) => (
+                      <div key={entry.id} className="flex justify-between items-start pb-3 border-b border-blue-200 last:border-0 last:pb-0">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-blue-900">
+                            {formatDate(entry.data)}
+                          </p>
+                          {entry.descricao && (
+                            <p className="text-xs text-blue-700 mt-1">{entry.descricao}</p>
+                          )}
+                          {entry.user && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              Usuário: {entry.user.name || entry.user.email}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right ml-4">
+                          <p className="text-sm font-semibold text-blue-900">
+                            {parseFloat(entry.horas || 0).toFixed(2)}h
+                          </p>
+                          {entry.proposal?.valorPorHora && (
+                            <p className="text-xs text-green-700 mt-1">
+                              R$ {(parseFloat(entry.horas || 0) * parseFloat(entry.proposal.valorPorHora)).toFixed(2).replace('.', ',')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-3 mt-3 border-t border-blue-300">
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm font-semibold text-blue-900">
+                          Total de Horas:
+                        </p>
+                        <p className="text-sm font-semibold text-blue-900">
+                          {approvedTimeEntries.reduce((sum, e) => sum + (parseFloat(e.horas) || 0), 0).toFixed(2)}h
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                  <p className="text-sm text-blue-700">
+                    Nenhuma hora aprovada vinculada a esta conta a receber.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Impostos */}
           <div>

@@ -62,6 +62,9 @@ export class Invoice {
   @Column({ name: 'timesheet_id', nullable: true })
   timesheetId?: string; // ID do lançamento de horas trabalhadas (quando origem for TIMESHEET)
 
+  @Column({ name: 'approved_time_entries', type: 'text', nullable: true })
+  approvedTimeEntries?: string; // JSON array com IDs das horas aprovadas que compõem esta invoice
+
   @Column({ name: 'data_recebimento', type: 'date', nullable: true })
   dataRecebimento?: Date;
 

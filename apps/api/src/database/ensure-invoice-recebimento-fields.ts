@@ -56,3 +56,4 @@ export async function ensureInvoiceRecebimentoFields(dataSource: DataSource): Pr
   }
 }
 
+

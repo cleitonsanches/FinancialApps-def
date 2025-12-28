@@ -29,10 +29,16 @@ export class InvoicesService {
   }
 
   async findOne(id: string): Promise<Invoice> {
-    return this.invoiceRepository.findOne({ 
+    const invoice = await this.invoiceRepository.findOne({ 
       where: { id },
       relations: ['client', 'proposal', 'taxes', 'chartOfAccounts', 'contaCorrente'],
     });
+    // Log para debug
+    if (invoice && invoice.origem === 'TIMESHEET') {
+      console.log('Invoice TIMESHEET encontrada:', invoice.id);
+      console.log('approvedTimeEntries:', invoice.approvedTimeEntries);
+    }
+    return invoice;
   }
 
   async create(invoiceData: Partial<Invoice>): Promise<Invoice> {

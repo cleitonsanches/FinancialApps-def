@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
-import { formatHoursFromDecimal } from '@/utils/hourFormatter'
+import { formatHoursFromDecimal, parseHoursToDecimal } from '@/utils/hourFormatter'
 
 export default function HorasTrabalhadasPage() {
   const router = useRouter()
@@ -16,9 +16,26 @@ export default function HorasTrabalhadasPage() {
   const [projectFilter, setProjectFilter] = useState('')
   const [clientFilter, setClientFilter] = useState('')
   const [faturavelFilter, setFaturavelFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('PENDENTE') // Padrão: Pendente
   const [projects, setProjects] = useState<any[]>([])
   const [proposals, setProposals] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
+  const [tasks, setTasks] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [showCreateTimeEntryModal, setShowCreateTimeEntryModal] = useState(false)
+  const [showApproveModal, setShowApproveModal] = useState(false)
+  const [entryToApprove, setEntryToApprove] = useState<any>(null)
+  const [newTimeEntry, setNewTimeEntry] = useState({
+    projectId: '',
+    taskId: '',
+    proposalId: '',
+    clientId: '',
+    userId: '',
+    data: new Date().toISOString().split('T')[0],
+    horas: '',
+    descricao: '',
+  })
 
   const handleClearFilters = () => {
     setProjectFilter('')
@@ -26,6 +43,7 @@ export default function HorasTrabalhadasPage() {
     setFaturavelFilter('')
     setDateFrom('')
     setDateTo('')
+    setStatusFilter('PENDENTE') // Voltar ao padrão: Pendente
   }
 
   useEffect(() => {
@@ -38,6 +56,8 @@ export default function HorasTrabalhadasPage() {
     loadProjects()
     loadProposals()
     loadClients()
+    loadUsers()
+    loadCurrentUser()
   }, [router])
 
   const getCompanyIdFromToken = (): string | null => {
@@ -92,14 +112,15 @@ export default function HorasTrabalhadasPage() {
       })
       
       // Criar mapa de negociações para verificação rápida
-      const proposalsMap: Record<string, { tipoContratacao?: string; numero?: string; titulo?: string; clientId?: string; clientName?: string }> = {}
+      const proposalsMap: Record<string, { tipoContratacao?: string; numero?: string; titulo?: string; clientId?: string; clientName?: string; valorPorHora?: number }> = {}
       allProposals.forEach((proposal: any) => {
         proposalsMap[proposal.id] = {
           tipoContratacao: proposal.tipoContratacao,
           numero: proposal.numero,
           titulo: proposal.titulo || proposal.title,
           clientId: proposal.clientId,
-          clientName: proposal.client?.name || proposal.client?.razaoSocial
+          clientName: proposal.client?.name || proposal.client?.razaoSocial,
+          valorPorHora: proposal.valorPorHora || 0
         }
       })
       
@@ -134,17 +155,25 @@ export default function HorasTrabalhadasPage() {
         const timeEntryPromises = allProjects.map(async (project: any) => {
           try {
             const timeEntriesResponse = await api.get(`/projects/${project.id}/time-entries`)
-            const entries = (timeEntriesResponse.data || []).map((entry: any) => ({
-              ...entry,
-              projectName: project.name,
-              projectId: project.id,
-              proposalId: project.proposalId,
-              proposalNumero: project.proposalId ? proposalsMap[project.proposalId]?.numero : null,
-              proposalTitulo: project.proposalId ? proposalsMap[project.proposalId]?.titulo : null,
-              clientId: project.clientId || proposalsMap[project.proposalId]?.clientId,
-              clientName: project.client?.name || project.client?.razaoSocial || proposalsMap[project.proposalId]?.clientName,
-              isFaturavel: isFaturavel({ ...entry, projectId: project.id, proposalId: project.proposalId })
-            }))
+            const entries = (timeEntriesResponse.data || []).map((entry: any) => {
+              // Tentar obter proposal do mapa ou da relação direta
+              const proposal = project.proposalId ? proposalsMap[project.proposalId] : null
+              const entryProposal = entry.proposal || (entry.proposalId ? proposalsMap[entry.proposalId] : null)
+              const finalProposal = proposal || entryProposal
+              
+              return {
+                ...entry,
+                projectName: project.name,
+                projectId: project.id,
+                proposalId: project.proposalId || entry.proposalId,
+                proposalNumero: finalProposal?.numero || entry.proposal?.numero || null,
+                proposalTitulo: finalProposal?.titulo || entry.proposal?.titulo || null,
+                clientId: project.clientId || finalProposal?.clientId || entry.clientId,
+                clientName: project.client?.name || project.client?.razaoSocial || finalProposal?.clientName || entry.client?.name || entry.client?.razaoSocial,
+                isFaturavel: isFaturavel({ ...entry, projectId: project.id, proposalId: project.proposalId || entry.proposalId }),
+                valorPorHora: finalProposal?.valorPorHora || entry.proposal?.valorPorHora || 0
+              }
+            })
             return entries
           } catch (error) {
             // Ignorar erros de projetos específicos
@@ -173,7 +202,8 @@ export default function HorasTrabalhadasPage() {
               proposalTitulo: proposal?.titulo || null,
               clientId: entry.clientId || proposal?.clientId,
               clientName: entry.client?.name || entry.client?.razaoSocial || proposal?.clientName,
-              isFaturavel: isFaturavel(entry)
+              isFaturavel: isFaturavel(entry),
+              valorPorHora: proposal?.valorPorHora || 0
             })
           }
         })
@@ -234,6 +264,135 @@ export default function HorasTrabalhadasPage() {
     }
   }
 
+  const loadTasksForProject = async (projectId: string) => {
+    try {
+      const response = await api.get(`/projects/${projectId}/tasks`)
+      setTasks(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar tarefas:', error)
+      setTasks([])
+    }
+  }
+
+  const loadUsers = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      if (companyId) {
+        const response = await api.get(`/users?companyId=${companyId}`)
+        setUsers(response.data || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error)
+    }
+  }
+
+  const getUserIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.id || payload.sub || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
+    }
+  }
+
+  const loadCurrentUser = async () => {
+    try {
+      const userId = getUserIdFromToken()
+      if (userId) {
+        try {
+          const response = await api.get(`/users/${userId}`)
+          setCurrentUser(response.data)
+        } catch (error) {
+          // Se não conseguir carregar o usuário, apenas usar o ID do token
+          console.error('Erro ao carregar usuário atual:', error)
+        }
+        // Pré-preencher userId com o usuário atual
+        setNewTimeEntry(prev => ({ ...prev, userId: userId }))
+      }
+    } catch (error) {
+      console.error('Erro ao carregar usuário atual:', error)
+    }
+  }
+
+  useEffect(() => {
+    // Quando projectId mudar no modal, carregar tarefas do projeto
+    if (showCreateTimeEntryModal && newTimeEntry.projectId) {
+      loadTasksForProject(newTimeEntry.projectId)
+    } else if (!newTimeEntry.projectId) {
+      setTasks([])
+      setNewTimeEntry(prev => ({ ...prev, taskId: '' }))
+    }
+  }, [newTimeEntry.projectId, showCreateTimeEntryModal])
+
+  const handleCreateTimeEntry = async () => {
+    // Validar que pelo menos um vínculo existe
+    if (!newTimeEntry.projectId && !newTimeEntry.proposalId && !newTimeEntry.clientId) {
+      alert('Por favor, selecione um Projeto, Negociação ou Cliente.')
+      return
+    }
+
+    if (!newTimeEntry.horas) {
+      alert('Por favor, preencha as horas trabalhadas.')
+      return
+    }
+
+    if (!newTimeEntry.data) {
+      alert('Por favor, preencha a data.')
+      return
+    }
+
+    // Converter horas para decimal
+    const horasDecimal = parseHoursToDecimal(newTimeEntry.horas)
+    if (horasDecimal === null) {
+      alert('Formato de horas inválido. Use formatos como: 40h, 1h30min, 50 horas')
+      return
+    }
+
+    try {
+      const payload: any = {
+        projectId: newTimeEntry.projectId || null,
+        taskId: newTimeEntry.taskId || null,
+        proposalId: newTimeEntry.proposalId || null,
+        clientId: newTimeEntry.clientId || null,
+        userId: newTimeEntry.userId || null,
+        data: newTimeEntry.data,
+        horas: horasDecimal,
+        descricao: newTimeEntry.descricao || null,
+      }
+
+      // Remover campos null/undefined
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === null || payload[key] === '') {
+          delete payload[key]
+        }
+      })
+
+      await api.post('/projects/time-entries', payload)
+
+      alert('Hora trabalhada registrada com sucesso!')
+      setShowCreateTimeEntryModal(false)
+      setNewTimeEntry({
+        projectId: '',
+        taskId: '',
+        proposalId: '',
+        clientId: '',
+        userId: currentUser?.id || getUserIdFromToken() || '',
+        data: new Date().toISOString().split('T')[0],
+        horas: '',
+        descricao: '',
+      })
+      setTasks([])
+      loadTimeEntries()
+    } catch (error: any) {
+      console.error('Erro ao registrar hora trabalhada:', error)
+      alert(error.response?.data?.message || 'Erro ao registrar hora trabalhada')
+    }
+  }
+
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '-'
     const date = typeof dateString === 'string' 
@@ -246,6 +405,14 @@ export default function HorasTrabalhadasPage() {
   }
 
   const filteredTimeEntries = timeEntries.filter((entry) => {
+    // Filtro de status
+    if (statusFilter) {
+      const entryStatus = entry.status || 'PENDENTE' // Se não tiver status, considerar como PENDENTE
+      if (entryStatus !== statusFilter) {
+        return false
+      }
+    }
+
     // Filtro de projeto
     if (projectFilter && entry.projectId !== projectFilter) {
       return false
@@ -310,15 +477,19 @@ export default function HorasTrabalhadasPage() {
     }
   }
 
-  const handleAprovar = async (entryId: string) => {
-    // A lógica de aprovação será implementada depois
-    if (!confirm('Tem certeza que deseja aprovar este lançamento de horas?')) {
-      return
-    }
+  const handleAprovar = async (entry: any) => {
+    setEntryToApprove(entry)
+    setShowApproveModal(true)
+  }
+
+  const confirmApprove = async () => {
+    if (!entryToApprove) return
 
     try {
-      await api.patch(`/projects/time-entries/${entryId}`, { status: 'APROVADA' })
+      const response = await api.post(`/projects/time-entries/${entryToApprove.id}/approve`)
       alert('Lançamento aprovado com sucesso!')
+      setShowApproveModal(false)
+      setEntryToApprove(null)
       loadTimeEntries()
     } catch (error: any) {
       console.error('Erro ao aprovar lançamento:', error)
@@ -416,6 +587,21 @@ export default function HorasTrabalhadasPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="PENDENTE">Pendente</option>
+                <option value="APROVADA">Aprovada</option>
+                <option value="REPROVADA">Reprovada</option>
+                <option value="">Todos os Status</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Faturável
               </label>
               <select
@@ -484,12 +670,12 @@ export default function HorasTrabalhadasPage() {
               >
                 Limpar Filtros
               </button>
-              <Link
-                href="/horas-trabalhadas/nova"
+              <button
+                onClick={() => setShowCreateTimeEntryModal(true)}
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
               >
                 + Registrar Nova Hora
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -498,17 +684,17 @@ export default function HorasTrabalhadasPage() {
         {filteredTimeEntries.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <p className="text-gray-600 mb-4">
-              {(projectFilter || clientFilter || faturavelFilter || dateFrom || dateTo) 
+              {(projectFilter || clientFilter || faturavelFilter || statusFilter || dateFrom || dateTo) 
                 ? 'Nenhuma hora encontrada com o filtro aplicado' 
                 : 'Nenhuma hora trabalhada registrada'}
             </p>
-            {!(projectFilter || clientFilter || faturavelFilter || dateFrom || dateTo) && (
-              <Link
-                href="/horas-trabalhadas/nova"
+            {!(projectFilter || clientFilter || faturavelFilter || statusFilter || dateFrom || dateTo) && (
+              <button
+                onClick={() => setShowCreateTimeEntryModal(true)}
                 className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
               >
                 Registrar Primeira Hora
-              </Link>
+              </button>
             )}
           </div>
         ) : (
@@ -611,6 +797,15 @@ export default function HorasTrabalhadasPage() {
                                 <span className="text-blue-600 font-semibold">
                                   {formatHoursFromDecimal(entry.horas)}
                                 </span>
+                                {entry.isFaturavel && entry.valorPorHora > 0 && (() => {
+                                  const horas = typeof entry.horas === 'number' ? entry.horas : parseFloat(String(entry.horas)) || 0
+                                  const valorTotal = horas * entry.valorPorHora
+                                  return (
+                                    <span className="text-green-700 font-semibold ml-2">
+                                      (R$ {valorTotal.toFixed(2).replace('.', ',')})
+                                    </span>
+                                  )
+                                })()}
                               </div>
                             </div>
                             {entry.descricao && (
@@ -636,7 +831,7 @@ export default function HorasTrabalhadasPage() {
                               Reprovar
                             </button>
                             <button
-                              onClick={() => handleAprovar(entry.id)}
+                              onClick={() => handleAprovar(entry)}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm whitespace-nowrap"
                             >
                               Aprovar
@@ -649,6 +844,264 @@ export default function HorasTrabalhadasPage() {
                 </div>
               ))
             })()}
+          </div>
+        )}
+
+        {/* Modal: Registrar Nova Hora Trabalhada */}
+        {showCreateTimeEntryModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Registrar Nova Hora Trabalhada</h2>
+              <div className="space-y-4">
+                {/* Vínculo - Projeto, Negociação ou Cliente */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-blue-800 font-medium mb-2">Vínculo (selecione pelo menos um):</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Projeto</label>
+                      <select
+                        value={newTimeEntry.projectId}
+                        onChange={async (e) => {
+                          const projectId = e.target.value
+                          setNewTimeEntry({ ...newTimeEntry, projectId, taskId: '', proposalId: '', clientId: '' })
+                          if (projectId) {
+                            await loadTasksForProject(projectId)
+                          } else {
+                            setTasks([])
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">Selecione o projeto...</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Negociação</label>
+                      <select
+                        value={newTimeEntry.proposalId}
+                        onChange={(e) => {
+                          setNewTimeEntry({ ...newTimeEntry, proposalId: e.target.value, projectId: '', taskId: '', clientId: '' })
+                          setTasks([])
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">Selecione a negociação...</option>
+                        {proposals.map((proposal) => (
+                          <option key={proposal.id} value={proposal.id}>
+                            {proposal.numero ? `${proposal.numero} - ` : ''}{proposal.titulo || proposal.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
+                      <select
+                        value={newTimeEntry.clientId}
+                        onChange={(e) => {
+                          setNewTimeEntry({ ...newTimeEntry, clientId: e.target.value, projectId: '', taskId: '', proposalId: '' })
+                          setTasks([])
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">Selecione o cliente...</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.razaoSocial || client.name || client.id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {!newTimeEntry.projectId && !newTimeEntry.proposalId && !newTimeEntry.clientId && (
+                    <p className="text-xs text-red-600 mt-2">⚠️ Selecione pelo menos um vínculo</p>
+                  )}
+                </div>
+
+                {/* Tarefa (se projeto selecionado) */}
+                {newTimeEntry.projectId && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tarefa
+                    </label>
+                    <select
+                      value={newTimeEntry.taskId}
+                      onChange={(e) => setNewTimeEntry({ ...newTimeEntry, taskId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Selecione a tarefa (opcional)</option>
+                      {tasks.map((task) => (
+                        <option key={task.id} value={task.id}>
+                          {task.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Data */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={newTimeEntry.data}
+                    onChange={(e) => setNewTimeEntry({ ...newTimeEntry, data: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+
+                {/* Horas */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Horas Trabalhadas <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newTimeEntry.horas}
+                    onChange={(e) => setNewTimeEntry({ ...newTimeEntry, horas: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ex: 40h, 1h30min, 50 horas"
+                    required
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Formatos aceitos: 40h, 1h30min, 50 horas, 1:30, 90min
+                  </p>
+                </div>
+
+                {/* Usuário */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Usuário
+                  </label>
+                  <select
+                    value={newTimeEntry.userId}
+                    onChange={(e) => setNewTimeEntry({ ...newTimeEntry, userId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Selecione o usuário</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name || user.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Descrição */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={newTimeEntry.descricao}
+                    onChange={(e) => setNewTimeEntry({ ...newTimeEntry, descricao: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={3}
+                    placeholder="Descrição do trabalho realizado..."
+                  />
+                </div>
+
+                {/* Botões */}
+                <div className="flex justify-end gap-4 pt-6 border-t">
+                  <button
+                    onClick={() => {
+                      setShowCreateTimeEntryModal(false)
+                      setNewTimeEntry({
+                        projectId: '',
+                        taskId: '',
+                        proposalId: '',
+                        clientId: '',
+                        userId: currentUser?.id || getUserIdFromToken() || '',
+                        data: new Date().toISOString().split('T')[0],
+                        horas: '',
+                        descricao: '',
+                      })
+                      setTasks([])
+                    }}
+                    className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCreateTimeEntry}
+                    className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Confirmar Aprovação */}
+        {showApproveModal && entryToApprove && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Confirmar Aprovação</h2>
+              <div className="space-y-4">
+                <p className="text-gray-700">
+                  Tem certeza que deseja aprovar este lançamento de horas?
+                </p>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div>
+                    <span className="font-semibold">Data:</span>{' '}
+                    {formatDate(entryToApprove.data)}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Horas:</span>{' '}
+                    {formatHoursFromDecimal(entryToApprove.horas)}
+                  </div>
+                  {entryToApprove.isFaturavel && entryToApprove.valorPorHora > 0 && (
+                    <div>
+                      <span className="font-semibold">Valor a faturar:</span>{' '}
+                      <span className="text-green-700 font-semibold">
+                        R$ {(parseFloat(String(entryToApprove.horas)) * entryToApprove.valorPorHora).toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                  )}
+                  {entryToApprove.isFaturavel ? (
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                      <p className="text-sm text-blue-800">
+                        ✓ Esta hora é faturável. Uma conta a receber será criada ou atualizada.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
+                      <p className="text-sm text-gray-600">
+                        Esta hora não é faturável. Apenas o status será alterado para "Aprovada".
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-4 pt-4 border-t">
+                  <button
+                    onClick={() => {
+                      setShowApproveModal(false)
+                      setEntryToApprove(null)
+                    }}
+                    className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmApprove}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    Confirmar Aprovação
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

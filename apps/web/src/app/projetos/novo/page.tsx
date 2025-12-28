@@ -102,13 +102,11 @@ export default function NovoProjetoPage() {
         name: formData.name,
         status: formData.status,
         companyId: companyId,
+        clientId: formData.clientId || null, // Sempre enviar, mesmo que seja null
       }
 
       if (formData.description) {
         payload.description = formData.description
-      }
-      if (formData.clientId) {
-        payload.clientId = formData.clientId
       }
       if (formData.dataInicio) {
         payload.dataInicio = formData.dataInicio
@@ -124,8 +122,10 @@ export default function NovoProjetoPage() {
       }
 
       const response = await api.post('/projects', payload)
-      alert('Projeto criado com sucesso!')
-      router.push(`/projetos/${response.data.id}`)
+      
+      // Após criar o projeto, redirecionar para a página de criação de fases
+      // O usuário poderá criar as fases antes de criar as atividades
+      router.push(`/projetos/${response.data.id}/fases`)
     } catch (error: any) {
       console.error('Erro ao criar projeto:', error)
       alert(error.response?.data?.message || 'Erro ao criar projeto')

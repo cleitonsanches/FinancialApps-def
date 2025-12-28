@@ -12,3 +12,4 @@ import { ServiceTypesController } from './service-types.controller';
 })
 export class ServiceTypesModule {}
 
+

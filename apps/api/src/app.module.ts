@@ -22,6 +22,9 @@ import { ensureProjectTaskVinculos } from './database/ensure-project-task-vincul
 import { ensureProjectTaskExigirHoras } from './database/ensure-project-task-exigir-horas';
 import { ensureAccountsPayableTable } from './database/ensure-accounts-payable-table';
 import { ensureReimbursementsTable } from './database/ensure-reimbursements-table';
+import { ensurePhasesTable } from './database/ensure-phases-table';
+import { ensureProjectClientNullable } from './database/ensure-project-client-nullable';
+import { ensureInvoiceApprovedTimeEntries } from './database/ensure-invoice-approved-time-entries';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -39,6 +42,7 @@ import { SubscriptionProductsModule } from './modules/subscription-products/subs
 import { ProposalAditivosModule } from './modules/proposal-aditivos/proposal-aditivos.module';
 import { AccountsPayableModule } from './modules/accounts-payable/accounts-payable.module';
 import { ReimbursementsModule } from './modules/reimbursements/reimbursements.module';
+import { PhasesModule } from './modules/phases/phases.module';
 
 @Module({
   imports: [
@@ -67,6 +71,7 @@ import { ReimbursementsModule } from './modules/reimbursements/reimbursements.mo
     ProposalAditivosModule,
     AccountsPayableModule,
     ReimbursementsModule,
+    PhasesModule,
   ],
 })
 export class AppModule implements OnModuleInit {
@@ -112,6 +117,12 @@ export class AppModule implements OnModuleInit {
     await ensureAccountsPayableTable(this.dataSource);
     // Garantir que a tabela reimbursements existe
     await ensureReimbursementsTable(this.dataSource);
+    // Garantir que a tabela phases existe e a coluna phase_id em project_tasks
+    await ensurePhasesTable(this.dataSource);
+    // Garantir que a coluna client_id na tabela projects é nullable
+    await ensureProjectClientNullable(this.dataSource);
+    // Garantir que a coluna approved_time_entries existe na tabela invoices
+    await ensureInvoiceApprovedTimeEntries(this.dataSource);
   }
 }
 

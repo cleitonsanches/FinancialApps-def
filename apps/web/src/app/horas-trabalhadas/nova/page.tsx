@@ -229,22 +229,19 @@ export default function NovaHoraTrabalhadaPage() {
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 space-y-6">
           {/* Vínculo - Projeto, Negociação ou Cliente */}
-          <div className="border-b pb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Vínculo (selecione pelo menos um)</h2>
-            
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-blue-800 font-medium mb-2">Vínculo (selecione pelo menos um):</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Projeto
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Projeto</label>
                 <select
                   value={formData.projectId}
                   onChange={(e) => {
                     setFormData({ ...formData, projectId: e.target.value, taskId: '', proposalId: '', clientId: '' })
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
-                  <option value="">Selecione o projeto</option>
+                  <option value="">Selecione o projeto...</option>
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}
@@ -254,17 +251,15 @@ export default function NovaHoraTrabalhadaPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Negociação
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Negociação</label>
                 <select
                   value={formData.proposalId}
                   onChange={(e) => {
                     setFormData({ ...formData, proposalId: e.target.value, projectId: '', taskId: '', clientId: '' })
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
-                  <option value="">Selecione a negociação</option>
+                  <option value="">Selecione a negociação...</option>
                   {proposals.map((proposal) => (
                     <option key={proposal.id} value={proposal.id}>
                       {proposal.numero ? `${proposal.numero} - ` : ''}{proposal.titulo || proposal.title}
@@ -274,17 +269,15 @@ export default function NovaHoraTrabalhadaPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cliente
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
                 <select
                   value={formData.clientId}
                   onChange={(e) => {
                     setFormData({ ...formData, clientId: e.target.value, projectId: '', taskId: '', proposalId: '' })
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
-                  <option value="">Selecione o cliente</option>
+                  <option value="">Selecione o cliente...</option>
                   {clients.map((client) => (
                     <option key={client.id} value={client.id}>
                       {client.razaoSocial || client.name || client.id}
@@ -293,6 +286,9 @@ export default function NovaHoraTrabalhadaPage() {
                 </select>
               </div>
             </div>
+            {!formData.projectId && !formData.proposalId && !formData.clientId && (
+              <p className="text-xs text-red-600 mt-2">⚠️ Selecione pelo menos um vínculo</p>
+            )}
           </div>
 
           {/* Tarefa (se projeto selecionado) */}

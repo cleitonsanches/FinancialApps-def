@@ -11,9 +11,13 @@ export default function ProjetosPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [timeEntries, setTimeEntries] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('')
+  const [filterClient, setFilterClient] = useState<string>('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const loadingRef = useRef(false)
 
   useEffect(() => {
@@ -24,6 +28,7 @@ export default function ProjetosPage() {
     }
     loadProjects()
     loadTasks()
+    loadClients()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -67,6 +72,23 @@ export default function ProjetosPage() {
         // Silenciosamente falhar - tarefas não são críticas para a página
       }
     }
+  }
+
+  const loadClients = async () => {
+    try {
+      const response = await api.get('/clients')
+      setClients(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error)
+    }
+  }
+
+  const handleClearFilters = () => {
+    setFilter('')
+    setFilterStatus('')
+    setFilterClient('')
+    setDateFrom('')
+    setDateTo('')
   }
 
   const loadTimeEntries = async (projectsList?: any[]) => {
@@ -217,6 +239,34 @@ export default function ProjetosPage() {
       }
     }
     
+    // Filtrar por cliente
+    if (filterClient) {
+      if (project.clientId !== filterClient) {
+        return false
+      }
+    }
+    
+    // Filtrar por período (data de início ou data de fim)
+    if (dateFrom || dateTo) {
+      const projectData = getProjectData(project)
+      const projectStartDate = projectData.startDate ? new Date(projectData.startDate).toISOString().split('T')[0] : null
+      const projectEndDate = projectData.endDate ? new Date(projectData.endDate).toISOString().split('T')[0] : null
+      
+      if (dateFrom) {
+        // Verificar se a data de início ou fim do projeto está dentro do período
+        if (projectStartDate && projectStartDate < dateFrom && (!projectEndDate || projectEndDate < dateFrom)) {
+          return false
+        }
+      }
+      
+      if (dateTo) {
+        // Verificar se a data de início ou fim do projeto está dentro do período
+        if (projectEndDate && projectEndDate > dateTo && (!projectStartDate || projectStartDate > dateTo)) {
+          return false
+        }
+      }
+    }
+    
     return true
   })
 
@@ -243,20 +293,12 @@ export default function ProjetosPage() {
             </button>
             <NavigationLinks />
           </div>
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Projetos</h1>
-            <Link
-              href="/projetos/novo"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              + Novo Projeto
-            </Link>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900">Projetos</h1>
         </div>
 
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Filtrar por Projeto
@@ -266,7 +308,7 @@ export default function ProjetosPage() {
                 placeholder="Buscar por nome do projeto..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
@@ -276,7 +318,7 @@ export default function ProjetosPage() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Todos os Status</option>
                 <option value="PLANEJAMENTO">Planejamento</option>
@@ -286,23 +328,82 @@ export default function ProjetosPage() {
                 <option value="PAUSADO">Pausado</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Cliente
+              </label>
+              <select
+                value={filterClient}
+                onChange={(e) => setFilterClient(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="">Todos os clientes</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name || client.razaoSocial || client.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Período
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">Data Inicial</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">Data Final</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <div className="flex items-end">
+                    <button
+                      onClick={() => {
+                        setDateFrom('')
+                        setDateTo('')
+                      }}
+                      className="px-3 py-2 text-sm text-red-600 hover:text-red-800 border border-red-300 rounded-lg whitespace-nowrap"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          {(filter || filterStatus) && (
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm text-gray-600">
-                {filteredProjects.length} projeto(s) encontrado(s)
-              </span>
+          {/* Contador e botões em linha separada */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <span className="text-sm text-gray-600 font-medium">
+              {filteredProjects.length} Projeto(s) encontrado(s)
+            </span>
+            <div className="flex gap-2">
               <button
-                onClick={() => {
-                  setFilter('')
-                  setFilterStatus('')
-                }}
-                className="text-sm text-red-600 hover:text-red-800"
+                onClick={handleClearFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
               >
                 Limpar Filtros
               </button>
+              <Link
+                href="/projetos/novo"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
+              >
+                + Novo Projeto
+              </Link>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Lista de Projetos */}

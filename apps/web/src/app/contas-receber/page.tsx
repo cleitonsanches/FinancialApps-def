@@ -101,6 +101,13 @@ export default function ContasReceberPage() {
     return 0
   }
 
+  const handleClearFilters = () => {
+    setFilter('')
+    setStatusFilter('')
+    setDateFrom('')
+    setDateTo('')
+  }
+
   const handleDelete = async (invoiceId: string, e: React.MouseEvent) => {
     e.stopPropagation() // Prevenir que o clique abra os detalhes
     
@@ -188,34 +195,32 @@ export default function ContasReceberPage() {
             </button>
             <NavigationLinks />
           </div>
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Contas a Receber</h1>
-            <Link
-              href="/contas-receber/nova"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              + Nova Nota Fiscal
-            </Link>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900">Contas a Receber</h1>
         </div>
 
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end mb-4">
             <div className="lg:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Buscar
+              </label>
               <input
                 type="text"
                 placeholder="Buscar por número da NF ou cliente..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Status
+              </label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Todos os Status</option>
                 <option value="PROVISIONADA">Provisionada</option>
@@ -225,23 +230,50 @@ export default function ContasReceberPage() {
                 <option value="CANCELADA">Cancelada</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Data Inicial (Vencimento)</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-              />
+            <div className="md:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Período (Vencimento)
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">Data Inicial</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">Data Final</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Data Final (Vencimento)</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-              />
+          </div>
+          {/* Contador e botões em linha separada */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <span className="text-sm text-gray-600 font-medium">
+              {filteredInvoices.length} Conta(s) a Receber encontrada(s)
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+              >
+                Limpar Filtros
+              </button>
+              <Link
+                href="/contas-receber/nova"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
+              >
+                + Nova Nota Fiscal
+              </Link>
             </div>
           </div>
         </div>

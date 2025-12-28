@@ -12,6 +12,46 @@ export class ProjectsController {
     return this.projectsService.findAll(effectiveCompanyId);
   }
 
+  // IMPORTANTE: Rotas literais devem vir ANTES de rotas com parâmetros dinâmicos
+  @Get('time-entries')
+  async findAllTimeEntries(
+    @Query('projectId') projectId?: string, 
+    @Query('proposalId') proposalId?: string, 
+    @Query('clientId') clientId?: string,
+    @Query('ids') ids?: string
+  ): Promise<any[]> {
+    console.log('\n========== Controller findAllTimeEntries CHAMADO ==========');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Query params recebidos:', { projectId, proposalId, clientId, ids });
+    console.log('Tipo de ids:', typeof ids);
+    console.log('Valor de ids:', ids);
+    
+    // Se ids for fornecido, buscar apenas essas entries
+    if (ids) {
+      try {
+        console.log('IDs recebidos (raw):', ids);
+        const idArray = JSON.parse(ids);
+        console.log('Controller recebeu IDs (parseados):', idArray);
+        if (Array.isArray(idArray) && idArray.length > 0) {
+          console.log('Buscando entries com', idArray.length, 'IDs');
+          const result = await this.projectsService.findTimeEntriesByIds(idArray);
+          console.log('Controller retornando entries:', result.length);
+          return result;
+        } else {
+          console.warn('IDs parseados não são um array válido ou está vazio');
+        }
+      } catch (e) {
+        console.error('Erro ao parsear IDs no controller:', e);
+        console.error('Stack:', e.stack);
+        // Se não for JSON válido, continuar com busca normal
+      }
+    }
+    console.log('Buscando todas as entries (sem filtro de IDs)');
+    const result = await this.projectsService.findTimeEntries(projectId, proposalId, clientId);
+    console.log('Controller retornando', result.length, 'entries (busca geral)');
+    return result;
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<Project> {
     return this.projectsService.findOne(id);
@@ -66,11 +106,6 @@ export class ProjectsController {
     return this.projectsService.updateTask(projectId, taskId, taskData);
   }
 
-  @Get('time-entries')
-  async findAllTimeEntries(@Query('projectId') projectId?: string, @Query('proposalId') proposalId?: string, @Query('clientId') clientId?: string): Promise<any[]> {
-    return this.projectsService.findTimeEntries(projectId, proposalId, clientId);
-  }
-
   @Get(':id/time-entries')
   async findTimeEntries(@Param('id') projectId: string): Promise<any[]> {
     return this.projectsService.findTimeEntries(projectId);
@@ -94,6 +129,13 @@ export class ProjectsController {
   @Patch(':id/time-entries/:entryId')
   async updateTimeEntryForProject(@Param('id') projectId: string, @Param('entryId') entryId: string, @Body() timeEntryData: any): Promise<any> {
     return this.projectsService.updateTimeEntry(entryId, { ...timeEntryData, projectId });
+  }
+
+  @Post('time-entries/:id/approve')
+  async approveTimeEntry(@Param('id') entryId: string, @Request() req?: any): Promise<any> {
+    const companyId = req?.user?.companyId;
+    // O service agora busca o companyId automaticamente se não for fornecido
+    return this.projectsService.approveTimeEntry(entryId, companyId);
   }
 
   @Patch('tasks/:taskId')

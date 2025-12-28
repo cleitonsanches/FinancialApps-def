@@ -7,7 +7,21 @@ import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
 import { parseHoursToDecimal, formatHoursFromDecimal } from '@/utils/hourFormatter'
 
-type TabType = 'tasks' | 'kanban' | 'gantt' | 'hours' | 'reports'
+/**
+ * Formata uma data string (YYYY-MM-DD) para o formato brasileiro (DD/MM/YYYY)
+ * Evita problemas de timezone ao não usar new Date()
+ */
+const formatDateString = (dateString: string | null | undefined): string => {
+  if (!dateString) return ''
+  // Se já estiver no formato correto (YYYY-MM-DD), apenas reformatar
+  const parts = dateString.split('T')[0].split('-')
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`
+  }
+  return dateString
+}
+
+type TabType = 'phases' | 'tasks' | 'kanban' | 'gantt' | 'hours' | 'reports'
 
 export default function ProjectDetailsPage() {
   const params = useParams()
@@ -16,6 +30,7 @@ export default function ProjectDetailsPage() {
 
   const [project, setProject] = useState<any>(null)
   const [tasks, setTasks] = useState<any[]>([])
+  const [phases, setPhases] = useState<any[]>([])
   const [timeEntries, setTimeEntries] = useState<any[]>([])
   const [availableTemplates, setAvailableTemplates] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
@@ -26,6 +41,9 @@ export default function ProjectDetailsPage() {
   // Modals
   const [showApplyTemplateModal, setShowApplyTemplateModal] = useState(false)
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+  const [showCreatePhaseModal, setShowCreatePhaseModal] = useState(false)
+  const [showEditPhaseModal, setShowEditPhaseModal] = useState(false)
+  const [editingPhase, setEditingPhase] = useState<any>(null)
   const [showRegisterHoursModal, setShowRegisterHoursModal] = useState(false)
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false)
   const [selectedTaskForHours, setSelectedTaskForHours] = useState<string | null>(null)
@@ -49,12 +67,20 @@ export default function ProjectDetailsPage() {
     semPrazoDefinido: false,
     diaInteiro: false,
     exigirLancamentoHoras: false,
+    phaseId: '', // Campo para vincular a fase
   })
   const [newTimeEntry, setNewTimeEntry] = useState({
     taskId: '',
     horas: '',
     data: new Date().toISOString().split('T')[0],
     descricao: '',
+  })
+  const [newPhase, setNewPhase] = useState({
+    name: '',
+    description: '',
+    dataInicio: '',
+    dataFim: '',
+    status: 'PENDENTE',
   })
 
   useEffect(() => {
@@ -65,6 +91,7 @@ export default function ProjectDetailsPage() {
     }
     loadProject()
     loadTasks()
+    loadPhases()
     loadTimeEntries()
     loadAvailableTemplates()
     loadUsers()
@@ -93,6 +120,15 @@ export default function ProjectDetailsPage() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadPhases = async () => {
+    try {
+      const response = await api.get(`/phases?projectId=${projectId}`)
+      setPhases(response.data || [])
+    } catch (error: any) {
+      console.error('Erro ao carregar fases:', error)
     }
   }
 
@@ -181,6 +217,67 @@ export default function ProjectDetailsPage() {
     }
   }
 
+  const handleCreatePhase = async () => {
+    if (!newPhase.name.trim()) {
+      alert('Preencha o nome da fase')
+      return
+    }
+
+    try {
+      await api.post('/phases', {
+        ...newPhase,
+        projectId,
+      })
+      alert('Fase criada com sucesso!')
+      setShowCreatePhaseModal(false)
+      setNewPhase({
+        name: '',
+        description: '',
+        dataInicio: '',
+        dataFim: '',
+        status: 'PENDENTE',
+      })
+      loadPhases()
+    } catch (error: any) {
+      console.error('Erro ao criar fase:', error)
+      alert(error.response?.data?.message || 'Erro ao criar fase')
+    }
+  }
+
+  const handleUpdatePhase = async () => {
+    if (!editingPhase.name.trim()) {
+      alert('Preencha o nome da fase')
+      return
+    }
+
+    try {
+      await api.put(`/phases/${editingPhase.id}`, editingPhase)
+      alert('Fase atualizada com sucesso!')
+      setShowEditPhaseModal(false)
+      setEditingPhase(null)
+      loadPhases()
+    } catch (error: any) {
+      console.error('Erro ao atualizar fase:', error)
+      alert(error.response?.data?.message || 'Erro ao atualizar fase')
+    }
+  }
+
+  const handleDeletePhase = async (phaseId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta fase? As atividades vinculadas não serão excluídas, mas ficarão sem fase.')) {
+      return
+    }
+
+    try {
+      await api.delete(`/phases/${phaseId}`)
+      alert('Fase excluída com sucesso!')
+      loadPhases()
+      loadTasks() // Recarregar tarefas para atualizar vínculos
+    } catch (error: any) {
+      console.error('Erro ao excluir fase:', error)
+      alert(error.response?.data?.message || 'Erro ao excluir fase')
+    }
+  }
+
   const handleCreateTask = async () => {
     try {
       await api.post(`/projects/${projectId}/tasks`, {
@@ -192,6 +289,7 @@ export default function ProjectDetailsPage() {
         semPrazoDefinido: newTask.tipo === 'ATIVIDADE' ? newTask.semPrazoDefinido : false,
         diaInteiro: newTask.tipo === 'EVENTO' ? newTask.diaInteiro : false,
         exigirLancamentoHoras: newTask.exigirLancamentoHoras || false,
+        phaseId: newTask.phaseId || null, // Incluir phaseId se selecionado
       })
       alert('Tarefa criada com sucesso!')
       setShowCreateTaskModal(false)
@@ -208,8 +306,10 @@ export default function ProjectDetailsPage() {
         horaFim: '',
         semPrazoDefinido: false,
         diaInteiro: false,
+        phaseId: '',
       })
       loadTasks()
+      loadPhases()
       loadProject()
     } catch (error: any) {
       console.error('Erro ao criar tarefa:', error)
@@ -540,7 +640,7 @@ export default function ProjectDetailsPage() {
         <div className="bg-white rounded-lg shadow-md mb-6">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
-              {(['tasks', 'kanban', 'gantt', 'hours', 'reports'] as TabType[]).map((tab) => (
+              {(['phases', 'tasks', 'kanban', 'gantt', 'hours', 'reports'] as TabType[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -550,6 +650,7 @@ export default function ProjectDetailsPage() {
                       : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
+                  {tab === 'phases' && 'Fases'}
                   {tab === 'tasks' && 'Tarefas'}
                   {tab === 'kanban' && 'Kanban'}
                   {tab === 'gantt' && 'Gantt'}
@@ -562,6 +663,89 @@ export default function ProjectDetailsPage() {
         </div>
 
         {/* Tab Content */}
+        {activeTab === 'phases' && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Fases do Projeto</h2>
+              <button
+                onClick={() => setShowCreatePhaseModal(true)}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              >
+                + Nova Fase
+              </button>
+            </div>
+
+            {phases.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p className="mb-4">Nenhuma fase criada ainda.</p>
+                <p className="text-sm">Crie a primeira fase para começar a organizar o projeto.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {phases.map((phase, index) => (
+                  <div
+                    key={phase.id}
+                    className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-sm font-medium text-gray-500">
+                            Fase {index + 1}
+                          </span>
+                          <h3 className="text-lg font-semibold text-gray-900">{phase.name}</h3>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            phase.status === 'PENDENTE' ? 'bg-yellow-100 text-yellow-800' :
+                            phase.status === 'EM_ANDAMENTO' ? 'bg-blue-100 text-blue-800' :
+                            phase.status === 'CONCLUIDA' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {phase.status === 'PENDENTE' ? 'Pendente' :
+                             phase.status === 'EM_ANDAMENTO' ? 'Em Andamento' :
+                             phase.status === 'CONCLUIDA' ? 'Concluída' :
+                             phase.status}
+                          </span>
+                        </div>
+                        {phase.description && (
+                          <p className="text-sm text-gray-600 mb-2">{phase.description}</p>
+                        )}
+                        <div className="flex gap-4 text-xs text-gray-500">
+                          {phase.dataInicio && (
+                            <span>Início: {formatDateString(phase.dataInicio)}</span>
+                          )}
+                          {phase.dataFim && (
+                            <span>Fim: {formatDateString(phase.dataFim)}</span>
+                          )}
+                          {phase.tasks && (
+                            <span>{phase.tasks.length} atividade(s)</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingPhase(phase)
+                            setShowEditPhaseModal(true)
+                          }}
+                          className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeletePhase(phase.id)}
+                          className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'tasks' && (
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
@@ -972,6 +1156,30 @@ export default function ProjectDetailsPage() {
                   </>
                 )}
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fase (opcional)</label>
+                  <select
+                    value={newTask.phaseId}
+                    onChange={(e) => setNewTask({ ...newTask, phaseId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Sem fase (atividade geral do projeto)</option>
+                    {phases && phases.length > 0 ? (
+                      phases.map((phase) => (
+                        <option key={phase.id} value={phase.id}>
+                          {phase.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>Nenhuma fase criada. Crie fases na página de fases do projeto.</option>
+                    )}
+                  </select>
+                  {phases && phases.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Nenhuma fase criada. <Link href={`/projetos/${projectId}/fases`} className="text-primary-600 hover:underline">Criar fases</Link>
+                    </p>
+                  )}
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Envolvidos</label>
                   <select
                     value={newTask.usuarioResponsavelId}
@@ -1030,7 +1238,194 @@ export default function ProjectDetailsPage() {
                       semPrazoDefinido: false,
                       diaInteiro: false,
                       exigirLancamentoHoras: project?.proposal?.tipoContratacao === 'HORAS' || false,
+                      phaseId: '',
                     })
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Criar Fase */}
+        {showCreatePhaseModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Nova Fase</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome da Fase *
+                  </label>
+                  <input
+                    type="text"
+                    value={newPhase.name}
+                    onChange={(e) => setNewPhase({ ...newPhase, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ex: Planejamento, Desenvolvimento, Testes..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={newPhase.description}
+                    onChange={(e) => setNewPhase({ ...newPhase, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={3}
+                    placeholder="Descreva o objetivo desta fase..."
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data de Início
+                    </label>
+                    <input
+                      type="date"
+                      value={newPhase.dataInicio}
+                      onChange={(e) => setNewPhase({ ...newPhase, dataInicio: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data de Fim
+                    </label>
+                    <input
+                      type="date"
+                      value={newPhase.dataFim}
+                      onChange={(e) => setNewPhase({ ...newPhase, dataFim: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={newPhase.status}
+                    onChange={(e) => setNewPhase({ ...newPhase, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="PENDENTE">Pendente</option>
+                    <option value="EM_ANDAMENTO">Em Andamento</option>
+                    <option value="CONCLUIDA">Concluída</option>
+                    <option value="CANCELADA">Cancelada</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={handleCreatePhase}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Criar Fase
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCreatePhaseModal(false)
+                    setNewPhase({
+                      name: '',
+                      description: '',
+                      dataInicio: '',
+                      dataFim: '',
+                      status: 'PENDENTE',
+                    })
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Editar Fase */}
+        {showEditPhaseModal && editingPhase && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Editar Fase</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome da Fase *
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPhase.name}
+                    onChange={(e) => setEditingPhase({ ...editingPhase, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={editingPhase.description || ''}
+                    onChange={(e) => setEditingPhase({ ...editingPhase, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data de Início
+                    </label>
+                    <input
+                      type="date"
+                      value={editingPhase.dataInicio ? (typeof editingPhase.dataInicio === 'string' ? editingPhase.dataInicio.split('T')[0] : new Date(editingPhase.dataInicio).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setEditingPhase({ ...editingPhase, dataInicio: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data de Fim
+                    </label>
+                    <input
+                      type="date"
+                      value={editingPhase.dataFim ? (typeof editingPhase.dataFim === 'string' ? editingPhase.dataFim.split('T')[0] : new Date(editingPhase.dataFim).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setEditingPhase({ ...editingPhase, dataFim: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={editingPhase.status}
+                    onChange={(e) => setEditingPhase({ ...editingPhase, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="PENDENTE">Pendente</option>
+                    <option value="EM_ANDAMENTO">Em Andamento</option>
+                    <option value="CONCLUIDA">Concluída</option>
+                    <option value="CANCELADA">Cancelada</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={handleUpdatePhase}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Salvar Alterações
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEditPhaseModal(false)
+                    setEditingPhase(null)
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
