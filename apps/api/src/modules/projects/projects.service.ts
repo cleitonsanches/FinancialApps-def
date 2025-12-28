@@ -222,7 +222,7 @@ export class ProjectsService {
     try {
       return await this.timeEntryRepository.find({
         where,
-        relations: ['task', 'user', 'project'],
+        relations: ['task', 'user', 'project', 'project.client', 'proposal', 'proposal.client', 'client'],
         order: { data: 'DESC' },
       });
     } catch (error: any) {
@@ -231,7 +231,7 @@ export class ProjectsService {
         console.warn('Erro ao carregar relações de time entries, tentando sem proposal/client:', error.message);
         return await this.timeEntryRepository.find({
           where,
-          relations: ['task', 'user', 'project'],
+          relations: ['task', 'user', 'project', 'project.client'],
           order: { data: 'DESC' },
         });
       }
@@ -258,23 +258,26 @@ export class ProjectsService {
         
         if (proposal && proposal.tipoContratacao === 'HORAS' && proposal.status === 'FECHADA') {
           // Para negociações "Por hora", sempre criar conta a receber quando houver horas lançadas
-          // Obter ou criar classificação de honorários
+          // Buscar classificação de honorários (NÃO criar automaticamente)
           let chartOfAccountsId: string | null = null;
           if (proposal.serviceType) {
-              const serviceTypeNames: Record<string, string> = {
-                'ANALISE_DADOS': 'Análise de Dados',
-                'ASSINATURAS': 'Assinaturas',
-                'AUTOMACOES': 'Automações',
-                'CONSULTORIA': 'Consultoria',
-                'DESENVOLVIMENTOS': 'Desenvolvimentos',
-                'MANUTENCOES': 'Manutenções',
-                'MIGRACAO_DADOS': 'Migração de Dados',
-                'TREINAMENTO': 'Treinamento',
-              };
-              
+            const serviceTypeNames: Record<string, string> = {
+              'ANALISE_DADOS': 'Análise de Dados',
+              'ASSINATURAS': 'Assinaturas',
+              'AUTOMACOES': 'Automações',
+              'CONSULTORIA': 'Consultoria',
+              'DESENVOLVIMENTOS': 'Desenvolvimentos',
+              'MANUTENCOES': 'Manutenções',
+              'MIGRACAO_DADOS': 'Migração de Dados',
+              'TREINAMENTO': 'Treinamento',
+              'TREINAMENTOS': 'Treinamento', // Variação comum
+              'CONTRATO_FIXO': 'Contrato Fixo',
+            };
+            
             const nomeTipoServico = serviceTypeNames[proposal.serviceType] || proposal.serviceType;
             const nomeClassificacao = `Honorários - ${nomeTipoServico}`;
             
+            // Buscar classificação existente
             let classificacao = await this.chartOfAccountsRepository.findOne({
               where: {
                 companyId: proposal.companyId,
@@ -283,19 +286,28 @@ export class ProjectsService {
               }
             });
             
+            // Se não encontrou pelo nome exato, tentar busca mais flexível
             if (!classificacao) {
-              const code = `HON-${proposal.serviceType.substring(0, 3).toUpperCase()}`;
-              classificacao = this.chartOfAccountsRepository.create({
-                companyId: proposal.companyId,
-                name: nomeClassificacao,
-                type: 'RECEITA',
-                status: 'ATIVA',
-                code: code
+              const allClassifications = await this.chartOfAccountsRepository.find({
+                where: {
+                  companyId: proposal.companyId,
+                  type: 'RECEITA'
+                }
               });
-              classificacao = await this.chartOfAccountsRepository.save(classificacao);
+              
+              // Procurar por nome similar
+              classificacao = allClassifications.find(c => 
+                c.name.toLowerCase().includes('honorários') && 
+                c.name.toLowerCase().includes(nomeTipoServico.toLowerCase())
+              ) || null;
             }
             
-            chartOfAccountsId = classificacao.id;
+            // NÃO criar automaticamente - apenas usar se encontrado
+            if (classificacao) {
+              chartOfAccountsId = classificacao.id;
+            } else {
+              console.warn(`⚠️  Classificação "${nomeClassificacao}" não encontrada. Crie manualmente no Plano de Contas.`);
+            }
           }
           
           // Calcular valor: horas * valorPorHora

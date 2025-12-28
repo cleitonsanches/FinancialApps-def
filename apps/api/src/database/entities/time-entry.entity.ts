@@ -58,6 +58,9 @@ export class TimeEntry {
   @Column({ name: 'descricao', type: 'text', nullable: true })
   descricao?: string;
 
+  @Column({ name: 'status', type: 'varchar', length: 20, default: 'PENDENTE' })
+  status?: string; // PENDENTE, APROVADA, REPROVADA
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

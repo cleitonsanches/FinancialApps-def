@@ -17,8 +17,11 @@ import { ensureProposalValidadeFields } from './database/ensure-proposal-validad
 import { ensureProjectTaskTipoFields } from './database/ensure-project-task-tipo-fields';
 import { ensureTimeEntriesTable } from './database/ensure-time-entries-table';
 import { ensureTimeEntriesVinculos } from './database/ensure-time-entries-vinculos';
+import { ensureTimeEntryStatus } from './database/ensure-time-entry-status';
 import { ensureProjectTaskVinculos } from './database/ensure-project-task-vinculos';
 import { ensureProjectTaskExigirHoras } from './database/ensure-project-task-exigir-horas';
+import { ensureAccountsPayableTable } from './database/ensure-accounts-payable-table';
+import { ensureReimbursementsTable } from './database/ensure-reimbursements-table';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -34,6 +37,8 @@ import { ContactsModule } from './modules/contacts/contacts.module';
 import { ServiceTypesModule } from './modules/service-types/service-types.module';
 import { SubscriptionProductsModule } from './modules/subscription-products/subscription-products.module';
 import { ProposalAditivosModule } from './modules/proposal-aditivos/proposal-aditivos.module';
+import { AccountsPayableModule } from './modules/accounts-payable/accounts-payable.module';
+import { ReimbursementsModule } from './modules/reimbursements/reimbursements.module';
 
 @Module({
   imports: [
@@ -60,6 +65,8 @@ import { ProposalAditivosModule } from './modules/proposal-aditivos/proposal-adi
     ServiceTypesModule,
     SubscriptionProductsModule,
     ProposalAditivosModule,
+    AccountsPayableModule,
+    ReimbursementsModule,
   ],
 })
 export class AppModule implements OnModuleInit {
@@ -95,10 +102,16 @@ export class AppModule implements OnModuleInit {
     await ensureTimeEntriesTable(this.dataSource);
     // Garantir que os campos de vínculos (proposal_id, client_id) existem na tabela time_entries
     await ensureTimeEntriesVinculos(this.dataSource);
+    // Garantir que o campo status existe na tabela time_entries
+    await ensureTimeEntryStatus(this.dataSource);
     // Garantir que os campos de vínculos (proposal_id, client_id) existem na tabela project_tasks
     await ensureProjectTaskVinculos(this.dataSource);
     // Garantir que o campo exigir_lancamento_horas existe na tabela project_tasks
     await ensureProjectTaskExigirHoras(this.dataSource);
+    // Garantir que a tabela accounts_payable existe
+    await ensureAccountsPayableTable(this.dataSource);
+    // Garantir que a tabela reimbursements existe
+    await ensureReimbursementsTable(this.dataSource);
   }
 }
 

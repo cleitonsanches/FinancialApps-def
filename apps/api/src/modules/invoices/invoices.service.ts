@@ -58,7 +58,8 @@ export class InvoicesService {
   }
 
   /**
-   * Busca ou cria automaticamente a classificação de honorários para um tipo de serviço
+   * Busca a classificação de honorários para um tipo de serviço
+   * NOTA: Não cria automaticamente - as classificações devem ser criadas manualmente
    */
   private async obterOuCriarClassificacaoHonorarios(
     serviceType: string,
@@ -76,12 +77,14 @@ export class InvoicesService {
       'MANUTENCOES': 'Manutenções',
       'MIGRACAO_DADOS': 'Migração de Dados',
       'TREINAMENTO': 'Treinamento',
+      'TREINAMENTOS': 'Treinamento', // Variação comum
+      'CONTRATO_FIXO': 'Contrato Fixo',
     };
 
     const nomeTipoServico = serviceTypeNames[serviceType] || serviceType;
     const nomeClassificacao = `Honorários - ${nomeTipoServico}`;
     
-    // Buscar se já existe
+    // Buscar se já existe (busca flexível por nome que começa com "Honorários -")
     let classificacao = await this.chartOfAccountsRepository.findOne({
       where: {
         companyId,
@@ -90,18 +93,26 @@ export class InvoicesService {
       }
     });
     
-    // Se não existe, criar
+    // Se não encontrou pelo nome exato, tentar busca mais flexível
     if (!classificacao) {
-      const code = `HON-${serviceType.substring(0, 3).toUpperCase()}`;
-      classificacao = this.chartOfAccountsRepository.create({
-        companyId,
-        name: nomeClassificacao,
-        type: 'RECEITA',
-        status: 'ATIVA',
-        code: code
+      // Buscar por qualquer nome que contenha o tipo de serviço
+      const allClassifications = await this.chartOfAccountsRepository.find({
+        where: {
+          companyId,
+          type: 'RECEITA'
+        }
       });
-      classificacao = await this.chartOfAccountsRepository.save(classificacao);
-      console.log(`✅ Classificação "${nomeClassificacao}" criada automaticamente`);
+      
+      // Procurar por nome similar
+      classificacao = allClassifications.find(c => 
+        c.name.toLowerCase().includes('honorários') && 
+        c.name.toLowerCase().includes(nomeTipoServico.toLowerCase())
+      ) || null;
+    }
+    
+    // NÃO criar automaticamente - apenas retornar se encontrado
+    if (!classificacao) {
+      console.warn(`⚠️  Classificação "${nomeClassificacao}" não encontrada. Crie manualmente no Plano de Contas.`);
     }
     
     return classificacao;
