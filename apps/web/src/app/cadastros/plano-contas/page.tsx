@@ -10,7 +10,9 @@ export default function PlanoContasPage() {
   const router = useRouter()
   const [chartAccounts, setChartAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('')
+  const [nameFilter, setNameFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -21,10 +23,25 @@ export default function PlanoContasPage() {
     loadChartAccounts()
   }, [router])
 
+  const getCompanyIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.companyId || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
+    }
+  }
+
   const loadChartAccounts = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/chart-of-accounts')
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/chart-of-accounts?companyId=${companyId}` : '/chart-of-accounts'
+      const response = await api.get(url)
       setChartAccounts(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar plano de contas:', error)
@@ -52,13 +69,44 @@ export default function PlanoContasPage() {
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
 
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      ATIVA: 'Ativa',
+      INATIVA: 'Inativa',
+    }
+    return labels[status] || status
+  }
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      ATIVA: 'bg-green-100 text-green-800',
+      INATIVA: 'bg-red-100 text-red-800',
+    }
+    return colors[status] || 'bg-gray-100 text-gray-800'
+  }
+
   const filteredAccounts = chartAccounts.filter((account) => {
-    if (!filter) return true
-    const searchTerm = filter.toLowerCase()
-    return (
-      account.code?.toLowerCase().includes(searchTerm) ||
-      account.name?.toLowerCase().includes(searchTerm)
-    )
+    // Filtro por nome
+    if (nameFilter) {
+      const searchTerm = nameFilter.toLowerCase()
+      const matchesName = (
+        account.code?.toLowerCase().includes(searchTerm) ||
+        account.name?.toLowerCase().includes(searchTerm)
+      )
+      if (!matchesName) return false
+    }
+
+    // Filtro por tipo
+    if (typeFilter && account.type !== typeFilter) {
+      return false
+    }
+
+    // Filtro por status
+    if (statusFilter && account.status !== statusFilter) {
+      return false
+    }
+
+    return true
   })
 
   if (loading) {
@@ -95,15 +143,45 @@ export default function PlanoContasPage() {
           </div>
         </div>
 
-        {/* Filtro */}
+        {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <input
-            type="text"
-            placeholder="Buscar por código ou nome..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+              <input
+                type="text"
+                placeholder="Buscar por código ou nome..."
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              >
+                <option value="">Todos os Tipos</option>
+                <option value="RECEITA">Receita</option>
+                <option value="DESPESA">Despesa</option>
+                <option value="REEMBOLSO">Reembolso</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              >
+                <option value="">Todos os Status</option>
+                <option value="ATIVA">Ativa</option>
+                <option value="INATIVA">Inativa</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Lista */}
@@ -111,7 +189,7 @@ export default function PlanoContasPage() {
           {filteredAccounts.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-gray-600 mb-4">
-                {filter ? 'Nenhuma conta encontrada com o filtro aplicado' : 'Nenhuma conta cadastrada'}
+                {(nameFilter || typeFilter || statusFilter) ? 'Nenhuma conta encontrada com o filtro aplicado' : 'Nenhuma conta cadastrada'}
               </p>
               {!filter && (
                 <Link
@@ -130,6 +208,7 @@ export default function PlanoContasPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Centro de Custo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
@@ -149,6 +228,11 @@ export default function PlanoContasPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {account.centerCost || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(account.status || 'ATIVA')}`}>
+                        {getStatusLabel(account.status || 'ATIVA')}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <Link

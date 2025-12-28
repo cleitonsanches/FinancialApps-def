@@ -101,6 +101,23 @@ export default function ContasReceberPage() {
     return 0
   }
 
+  const handleDelete = async (invoiceId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevenir que o clique abra os detalhes
+    
+    if (!confirm('Tem certeza que deseja excluir esta conta a receber?')) {
+      return
+    }
+
+    try {
+      await api.delete(`/invoices/${invoiceId}`)
+      alert('Conta a receber excluída com sucesso!')
+      loadInvoices()
+    } catch (error: any) {
+      console.error('Erro ao excluir conta a receber:', error)
+      alert(error.response?.data?.message || 'Erro ao excluir conta a receber')
+    }
+  }
+
   const filteredInvoices = invoices.filter((invoice) => {
     // Filtro de texto
     if (filter) {
@@ -230,25 +247,43 @@ export default function ContasReceberPage() {
         </div>
 
         {/* Totalizadores por Status */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900">Totalizadores por Status</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <div className="text-sm font-medium text-blue-800 mb-1">Provisionada</div>
-              <div className="text-2xl font-bold text-blue-900">
-                R$ {totalizadores.PROVISIONADA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Provisionada</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  R$ {totalizadores.PROVISIONADA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-blue-100 rounded-full p-3">
+                <span className="text-blue-600 text-2xl">📋</span>
               </div>
             </div>
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-              <div className="text-sm font-medium text-purple-800 mb-1">Faturada</div>
-              <div className="text-2xl font-bold text-purple-900">
-                R$ {totalizadores.FATURADA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Faturada</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  R$ {totalizadores.FATURADA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-purple-100 rounded-full p-3">
+                <span className="text-purple-600 text-2xl">📄</span>
               </div>
             </div>
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <div className="text-sm font-medium text-green-800 mb-1">Recebida</div>
-              <div className="text-2xl font-bold text-green-900">
-                R$ {totalizadores.RECEBIDA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </div>
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Recebida</p>
+                <p className="text-2xl font-bold text-green-600">
+                  R$ {totalizadores.RECEBIDA.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-green-100 rounded-full p-3">
+                <span className="text-green-600 text-2xl">✅</span>
               </div>
             </div>
           </div>
@@ -324,13 +359,24 @@ export default function ContasReceberPage() {
                           {getStatusLabel(invoice.status)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Link
-                          href={`/contas-receber/${invoice.id}`}
-                          className="text-primary-600 hover:text-primary-900"
-                        >
-                          Ver Detalhes
-                        </Link>
+                      <td 
+                        className="px-6 py-4 whitespace-nowrap text-sm font-medium"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex gap-3">
+                          <Link
+                            href={`/contas-receber/${invoice.id}`}
+                            className="text-primary-600 hover:text-primary-900"
+                          >
+                            Ver Detalhes
+                          </Link>
+                          <button
+                            onClick={(e) => handleDelete(invoice.id, e)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Excluir
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

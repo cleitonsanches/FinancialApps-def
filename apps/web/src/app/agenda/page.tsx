@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
+import { parseHoursToDecimal, formatHoursFromDecimal } from '@/utils/hourFormatter'
 
 // Componente de Visualização em Calendário
 function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
@@ -50,16 +52,17 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
     const dateStr = `${year}-${month}-${day}`
     
     return tasks.filter((task: any) => {
-      // Usar dataFimPrevista (prazo) para o calendário também
-      if (!task.dataFimPrevista) return false
+      // Usar dataConclusao ou dataFimPrevista (prazo) para o calendário, ou dataInicio como fallback
+      const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+      if (!dateToUse) return false
       
       // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
       let taskDate: string
-      if (typeof task.dataFimPrevista === 'string') {
-        taskDate = task.dataFimPrevista.split('T')[0]
+      if (typeof dateToUse === 'string') {
+        taskDate = dateToUse.split('T')[0]
       } else {
         // Se for Date, converter para string local
-        const dateObj = task.dataFimPrevista as Date
+        const dateObj = dateToUse as Date
         const taskYear = dateObj.getFullYear()
         const taskMonth = String(dateObj.getMonth() + 1).padStart(2, '0')
         const taskDay = String(dateObj.getDate()).padStart(2, '0')
@@ -245,16 +248,31 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
                     {day.getDate()}
                   </div>
                   <div className="space-y-1">
-                    {dayTasks.slice(0, 2).map((task: any) => (
-                      <div
-                        key={task.id}
-                        className={`text-xs p-1 rounded cursor-pointer hover:shadow truncate ${getTaskStatusColor(task.status)}`}
-                        onClick={() => onTaskClick(task)}
-                        title={task.name}
-                      >
-                        {task.name}
-                      </div>
-                    ))}
+                    {dayTasks.slice(0, 2).map((task: any) => {
+                      const isEvento = task.tipo === 'EVENTO'
+                      const isAtividade = task.tipo === 'ATIVIDADE' || !task.tipo
+                      const icon = isEvento ? '🕐' : '☑'
+                      const timeDisplay = isEvento && task.horaInicio && task.horaFim && !task.diaInteiro
+                        ? ` ${task.horaInicio}-${task.horaFim}`
+                        : ''
+                      
+                      return (
+                        <div
+                          key={task.id}
+                          className={`text-xs p-1 rounded cursor-pointer hover:shadow truncate flex items-center gap-1 ${
+                            isEvento 
+                              ? 'bg-blue-50 text-blue-800 border border-blue-200' 
+                              : getTaskStatusColor(task.status)
+                          }`}
+                          onClick={() => onTaskClick(task)}
+                          title={`${task.name}${timeDisplay}`}
+                        >
+                          <span>{icon}</span>
+                          <span className="truncate">{task.name}</span>
+                          {timeDisplay && <span className="text-xs opacity-75">{timeDisplay}</span>}
+                        </div>
+                      )
+                    })}
                     {dayTasks.length > 2 && (
                       <div className="text-xs text-gray-500">
                         +{dayTasks.length - 2}
@@ -272,6 +290,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
 }
 
 export default function AgendaPage() {
+  const router = useRouter()
   const [tasks, setTasks] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -279,14 +298,33 @@ export default function AgendaPage() {
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
-  const [filterStatus, setFilterStatus] = useState<string>('')
+  // Estado inicial: excluir CANCELADA e CONCLUIDA (incluir PENDENTE, EM_PROGRESSO, BLOQUEADA)
+  const [filterStatus, setFilterStatus] = useState<string[]>(['PENDENTE', 'EM_PROGRESSO', 'BLOQUEADA'])
+  const [filterTipo, setFilterTipo] = useState<string>('')
+  const [filterProject, setFilterProject] = useState<string>('')
+  const [filterClient, setFilterClient] = useState<string>('')
+
+  const handleClearFilters = () => {
+    setFilterTipo('')
+    setFilterStatus(['PENDENTE', 'EM_PROGRESSO', 'BLOQUEADA'])
+    setFilterProject('')
+    setFilterClient('')
+    setStartDate('')
+    setEndDate('')
+  }
   const [tasksWithHours, setTasksWithHours] = useState<Record<string, any[]>>({})
+  const [clients, setClients] = useState<any[]>([])
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   
   // Modals
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false)
   const [showRegisterHoursModal, setShowRegisterHoursModal] = useState(false)
   const [showEditTaskModal, setShowEditTaskModal] = useState(false)
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<any>(null)
+  const [desiredStatus, setDesiredStatus] = useState<string | null>(null) // Status que o usuário deseja aplicar após lançar horas
+  const [projects, setProjects] = useState<any[]>([])
+  const [currentUser, setCurrentUser] = useState<any>(null)
   
   // Form states
   const [updateTaskData, setUpdateTaskData] = useState({
@@ -298,18 +336,117 @@ export default function AgendaPage() {
     dataInicio: '',
     dataFimPrevista: '',
     usuarioResponsavelId: '',
+    tipo: 'ATIVIDADE',
+    horaInicio: '',
+    horaFim: '',
+    semPrazoDefinido: false,
+    diaInteiro: false,
   })
   const [newTimeEntry, setNewTimeEntry] = useState({
+    projectId: '',
+    proposalId: '',
+    clientId: '',
     taskId: '',
     horas: '',
     data: new Date().toISOString().split('T')[0],
     descricao: '',
   })
+  const [negotiations, setNegotiations] = useState<any[]>([])
+  const [newTask, setNewTask] = useState({
+    projectId: '',
+    proposalId: '',
+    clientId: '',
+    name: '',
+    description: '',
+    horasEstimadas: '',
+    dataInicio: '',
+    dataFimPrevista: '',
+    status: 'PENDENTE',
+    usuarioResponsavelId: '',
+    usuarioExecutorId: '',
+    tipo: 'ATIVIDADE',
+    horaInicio: '',
+    horaFim: '',
+    semPrazoDefinido: false,
+    diaInteiro: false,
+    exigirLancamentoHoras: false,
+  })
+  const [selectedProposal, setSelectedProposal] = useState<any>(null)
+  const [selectedProject, setSelectedProject] = useState<any>(null)
 
   useEffect(() => {
     loadTasks()
     loadUsers()
+    loadProjects()
+    loadCurrentUser()
+    loadClients()
   }, [])
+
+  // Fechar dropdown de status ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (showStatusDropdown && !target.closest('.status-dropdown-container')) {
+        setShowStatusDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showStatusDropdown])
+  
+  const loadClients = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/clients?companyId=${companyId}` : '/clients'
+      const response = await api.get(url)
+      setClients(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error)
+    }
+  }
+  
+  const loadProjects = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/projects?companyId=${companyId}` : '/projects'
+      const response = await api.get(url)
+      setProjects(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar projetos:', error)
+    }
+  }
+  
+  const loadCurrentUser = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const userId = payload.id
+      
+      if (userId) {
+        const response = await api.get(`/users/${userId}`)
+        setCurrentUser(response.data)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar usuário atual:', error)
+    }
+  }
+  
+  const getCompanyIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.companyId || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
+    }
+  }
 
   const loadUsers = async () => {
     try {
@@ -333,11 +470,39 @@ export default function AgendaPage() {
       setLoading(true)
       const response = await api.get('/projects/tasks/all')
       const tasksData = response.data || []
-      setTasks(tasksData)
       
-      // Carregar horas lançadas para cada tarefa
+      // Carregar horas lançadas e negociações para cada tarefa
       const hoursMap: Record<string, any[]> = {}
+      const proposalsMap: Record<string, any> = {}
+      
       for (const task of tasksData) {
+        // Se a tarefa tem proposalId direto, buscar a negociação
+        if (task.proposalId && !task.proposal) {
+          try {
+            const proposalResponse = await api.get(`/proposals/${task.proposalId}`)
+            proposalsMap[task.id] = proposalResponse.data
+          } catch (error) {
+            console.warn(`Erro ao buscar negociação ${task.proposalId} para tarefa ${task.id}:`, error)
+          }
+        }
+        
+        // Se a tarefa tem projeto com proposalId, buscar a negociação
+        if (task.project?.proposalId && !task.project?.proposal) {
+          try {
+            const proposalResponse = await api.get(`/proposals/${task.project.proposalId}`)
+            if (!proposalsMap[task.id]) {
+              proposalsMap[task.id] = proposalResponse.data
+            }
+            // Também adicionar ao projeto
+            if (task.project) {
+              task.project.proposal = proposalResponse.data
+            }
+          } catch (error) {
+            console.warn(`Erro ao buscar negociação ${task.project.proposalId} para projeto ${task.project.id}:`, error)
+          }
+        }
+        
+        // Carregar horas lançadas
         if (task.project?.id) {
           try {
             const timeEntriesResponse = await api.get(`/projects/${task.project.id}/time-entries`)
@@ -351,14 +516,110 @@ export default function AgendaPage() {
             // Ignorar erros ao buscar horas
             console.warn(`Erro ao buscar horas para tarefa ${task.id}:`, error)
           }
+        } else if (task.proposalId || task.clientId) {
+          // Para tarefas standalone, buscar time entries via query params
+          try {
+            const params = new URLSearchParams()
+            if (task.proposalId) params.append('proposalId', task.proposalId)
+            if (task.clientId) params.append('clientId', task.clientId)
+            const timeEntriesResponse = await api.get(`/projects/time-entries?${params.toString()}`)
+            const timeEntries = timeEntriesResponse.data || []
+            const taskTimeEntries = timeEntries.filter((te: any) => te.taskId === task.id)
+            if (taskTimeEntries.length > 0) {
+              hoursMap[task.id] = taskTimeEntries
+            }
+          } catch (error) {
+            console.warn(`Erro ao buscar horas para tarefa standalone ${task.id}:`, error)
+          }
         }
       }
+      
+      // Adicionar proposals ao objeto de tarefas
+      const tasksWithProposals = tasksData.map((task: any) => {
+        if (proposalsMap[task.id]) {
+          task.proposal = proposalsMap[task.id]
+        }
+        return task
+      })
+      
+      setTasks(tasksWithProposals)
       setTasksWithHours(hoursMap)
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error)
       alert('Erro ao carregar tarefas da agenda')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateTask = async () => {
+    if (!newTask.name) {
+      alert('Preencha o nome da tarefa')
+      return
+    }
+    
+    // Validar que pelo menos um vínculo foi selecionado
+    if (!newTask.projectId && !newTask.proposalId && !newTask.clientId) {
+      alert('Selecione pelo menos um vínculo: Projeto, Negociação ou Cliente')
+      return
+    }
+    
+    try {
+      // Se tiver projectId, usar a rota antiga para compatibilidade
+      if (newTask.projectId) {
+        await api.post(`/projects/${newTask.projectId}/tasks`, {
+          ...newTask,
+          horasEstimadas: newTask.horasEstimadas ? parseHoursToDecimal(newTask.horasEstimadas) : null,
+          tipo: newTask.tipo || 'ATIVIDADE',
+          horaInicio: newTask.tipo === 'EVENTO' && !newTask.diaInteiro ? newTask.horaInicio : null,
+          horaFim: newTask.tipo === 'EVENTO' && !newTask.diaInteiro ? newTask.horaFim : null,
+          semPrazoDefinido: newTask.tipo === 'ATIVIDADE' ? newTask.semPrazoDefinido : false,
+          diaInteiro: newTask.tipo === 'EVENTO' ? newTask.diaInteiro : false,
+          usuarioResponsavelId: newTask.usuarioResponsavelId || currentUser?.id || '',
+          usuarioExecutorId: newTask.usuarioExecutorId || currentUser?.id || '',
+          exigirLancamentoHoras: newTask.exigirLancamentoHoras || false,
+        })
+      } else {
+        // Usar a nova rota standalone
+        await api.post('/projects/tasks', {
+          ...newTask,
+          horasEstimadas: newTask.horasEstimadas ? parseHoursToDecimal(newTask.horasEstimadas) : null,
+          tipo: newTask.tipo || 'ATIVIDADE',
+          horaInicio: newTask.tipo === 'EVENTO' && !newTask.diaInteiro ? newTask.horaInicio : null,
+          horaFim: newTask.tipo === 'EVENTO' && !newTask.diaInteiro ? newTask.horaFim : null,
+          semPrazoDefinido: newTask.tipo === 'ATIVIDADE' ? newTask.semPrazoDefinido : false,
+          diaInteiro: newTask.tipo === 'EVENTO' ? newTask.diaInteiro : false,
+          usuarioResponsavelId: newTask.usuarioResponsavelId || currentUser?.id || '',
+          usuarioExecutorId: newTask.usuarioExecutorId || currentUser?.id || '',
+          exigirLancamentoHoras: newTask.exigirLancamentoHoras || false,
+        })
+      }
+      
+      alert('Tarefa criada com sucesso!')
+      setShowCreateTaskModal(false)
+      setNewTask({
+        projectId: '',
+        proposalId: '',
+        clientId: '',
+        name: '',
+        description: '',
+        horasEstimadas: '',
+        dataInicio: '',
+        dataFimPrevista: '',
+        status: 'PENDENTE',
+        usuarioResponsavelId: currentUser?.id || '',
+        usuarioExecutorId: currentUser?.id || '',
+        tipo: 'ATIVIDADE',
+        horaInicio: '',
+        horaFim: '',
+        semPrazoDefinido: false,
+        diaInteiro: false,
+        exigirLancamentoHoras: false,
+      })
+      loadTasks()
+    } catch (error: any) {
+      console.error('Erro ao criar tarefa:', error)
+      alert(error.response?.data?.message || 'Erro ao criar tarefa')
     }
   }
 
@@ -413,24 +674,50 @@ export default function AgendaPage() {
 
   // Filtrar tarefas
   const filteredTasks = tasks.filter((task) => {
-    if (filterStatus && task.status !== filterStatus) return false
+    if (filterTipo) {
+      const taskTipo = task.tipo || 'ATIVIDADE' // Default para ATIVIDADE se não tiver tipo
+      if (taskTipo !== filterTipo) return false
+    }
+    if (filterStatus.length > 0 && !filterStatus.includes(task.status)) return false
+    if (filterProject && task.project?.id !== filterProject) return false
+    if (filterClient) {
+      // Se um projeto está selecionado, verificar se o cliente do projeto corresponde
+      if (filterProject) {
+        const selectedProject = projects.find(p => p.id === filterProject)
+        if (selectedProject?.clientId !== filterClient) return false
+      } else {
+        // Se nenhum projeto está selecionado, verificar se o cliente da tarefa corresponde
+        if (task.project?.clientId !== filterClient) return false
+      }
+    }
     if (startDate || endDate) {
-      // Filtrar pela data de término (prazo) da tarefa
+      // Filtrar pela data de término (prazo) da tarefa ou data de início como fallback
       // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
       let taskDate: string | null = null
-      if (task.dataFimPrevista) {
-        if (typeof task.dataFimPrevista === 'string') {
-          taskDate = task.dataFimPrevista.split('T')[0]
-        } else {
+      
+      // Tentar usar dataConclusao primeiro, depois dataFimPrevista, depois dataInicio
+      const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+      
+      if (dateToUse) {
+        if (typeof dateToUse === 'string') {
+          // Extrair apenas a parte da data (YYYY-MM-DD)
+          taskDate = dateToUse.split('T')[0].split(' ')[0]
+        } else if (dateToUse instanceof Date) {
           // Se for Date, converter para string local
-          const date = task.dataFimPrevista as Date
-          const year = date.getFullYear()
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-          const day = String(date.getDate()).padStart(2, '0')
+          const year = dateToUse.getFullYear()
+          const month = String(dateToUse.getMonth() + 1).padStart(2, '0')
+          const day = String(dateToUse.getDate()).padStart(2, '0')
           taskDate = `${year}-${month}-${day}`
         }
       }
-      if (!taskDate) return false
+      
+      // Se não houver data na tarefa e houver filtro de data ativo, ocultar a tarefa
+      if (!taskDate) {
+        // Se há filtro de data, ocultar tarefas sem data
+        return false
+      }
+      
+      // Aplicar filtros de data (comparação de strings YYYY-MM-DD funciona corretamente)
       if (startDate && taskDate < startDate) return false
       if (endDate && taskDate > endDate) return false
     }
@@ -441,12 +728,13 @@ export default function AgendaPage() {
   const tasksByDate = filteredTasks.reduce((acc: any, task: any) => {
     // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
     let date: string = 'sem-data'
-    if (task.dataFimPrevista) {
-      if (typeof task.dataFimPrevista === 'string') {
-        date = task.dataFimPrevista.split('T')[0]
+    const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+    if (dateToUse) {
+      if (typeof dateToUse === 'string') {
+        date = dateToUse.split('T')[0]
       } else {
         // Se for Date, converter para string local
-        const dateObj = task.dataFimPrevista as Date
+        const dateObj = dateToUse as Date
         const year = dateObj.getFullYear()
         const month = String(dateObj.getMonth() + 1).padStart(2, '0')
         const day = String(dateObj.getDate()).padStart(2, '0')
@@ -487,7 +775,7 @@ export default function AgendaPage() {
             <NavigationLinks />
           </div>
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Agenda de Tarefas</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Atividades</h1>
             <div className="flex gap-2">
               <button
                 onClick={() => setViewMode('list')}
@@ -549,25 +837,128 @@ export default function AgendaPage() {
 
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Filtrar por Status
+                Filtrar por Tipo
               </label>
               <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                value={filterTipo}
+                onChange={(e) => setFilterTipo(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Todos</option>
-                <option value="PENDENTE">Pendente</option>
-                <option value="EM_PROGRESSO">Em Progresso</option>
-                <option value="CONCLUIDA">Concluída</option>
-                <option value="BLOQUEADA">Bloqueada</option>
-                <option value="CANCELADA">Cancelada</option>
+                <option value="ATIVIDADE">Atividades</option>
+                <option value="EVENTO">Eventos</option>
+              </select>
+            </div>
+            <div className="relative status-dropdown-container">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Status
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-left flex items-center justify-between hover:bg-gray-50"
+                >
+                  <span className="text-sm text-gray-700">
+                    {filterStatus.length === 0 
+                      ? 'Nenhum selecionado'
+                      : filterStatus.length === 5
+                      ? 'Todos selecionados'
+                      : `${filterStatus.length} selecionado(s)`}
+                  </span>
+                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showStatusDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {[
+                      { value: 'PENDENTE', label: 'Pendente' },
+                      { value: 'EM_PROGRESSO', label: 'Em Progresso' },
+                      { value: 'CONCLUIDA', label: 'Concluída' },
+                      { value: 'BLOQUEADA', label: 'Bloqueada' },
+                      { value: 'CANCELADA', label: 'Cancelada' },
+                    ].map((status) => (
+                      <label key={status.value} className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={filterStatus.includes(status.value)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFilterStatus([...filterStatus, status.value])
+                            } else {
+                              setFilterStatus(filterStatus.filter(s => s !== status.value))
+                            }
+                          }}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-700">{status.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Projeto
+              </label>
+              <select
+                value={filterProject}
+                onChange={(e) => {
+                  setFilterProject(e.target.value)
+                  // Limpar filtro de cliente quando mudar projeto
+                  setFilterClient('')
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="">Todos os projetos</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Cliente
+              </label>
+              <select
+                value={filterClient}
+                onChange={(e) => setFilterClient(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="">Todos os clientes</option>
+                {filterProject ? (
+                  // Se um projeto está selecionado, mostrar apenas o cliente desse projeto
+                  (() => {
+                    const selectedProject = projects.find(p => p.id === filterProject)
+                    if (selectedProject?.clientId) {
+                      return (
+                        <option key={selectedProject.clientId} value={selectedProject.clientId}>
+                          {selectedProject.client?.name || 
+                           selectedProject.client?.razaoSocial || 
+                           'Cliente do projeto'}
+                        </option>
+                      )
+                    }
+                    return null
+                  })()
+                ) : (
+                  // Se nenhum projeto está selecionado, mostrar todos os clientes
+                  clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name || client.razaoSocial || client.email}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Filtrar por Período (Prazo)
               </label>
@@ -605,10 +996,25 @@ export default function AgendaPage() {
                 )}
               </div>
             </div>
-            <div className="flex items-end justify-end md:justify-start">
-              <span className="text-sm text-gray-600 font-medium">
-                {filteredTasks.length} tarefa(s) encontrada(s)
-              </span>
+          </div>
+          {/* Contador e botão em linha separada */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <span className="text-sm text-gray-600 font-medium">
+              {filteredTasks.length} Atividade(s) encontrada(s)
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+              >
+                Limpar Filtros
+              </button>
+              <button
+                onClick={() => setShowCreateTaskModal(true)}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
+              >
+                + Nova Tarefa/Atividade
+              </button>
             </div>
           </div>
         </div>
@@ -618,7 +1024,7 @@ export default function AgendaPage() {
           <div className="space-y-4">
             {sortedDates.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                <p className="text-gray-600">Nenhuma tarefa encontrada</p>
+                <p className="text-gray-600">Nenhuma atividade encontrada</p>
               </div>
             ) : (
               sortedDates.map((date) => (
@@ -627,18 +1033,40 @@ export default function AgendaPage() {
                     {date === 'sem-data' ? 'Sem Data Definida' : formatDate(date)}
                   </h2>
                   <div className="space-y-3">
-                    {tasksByDate[date].map((task: any) => (
-                      <div
-                        key={task.id}
-                        className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
-                      >
-                        <div className="flex justify-between items-start">
+                    {tasksByDate[date].map((task: any) => {
+                      const isEvento = task.tipo === 'EVENTO'
+                      const isAtividade = task.tipo === 'ATIVIDADE' || !task.tipo
+                      const icon = isEvento ? '🕐' : '☑'
+                      const tipoLabel = isEvento ? 'Evento' : 'Atividade'
+                      const timeDisplay = isEvento && task.horaInicio && task.horaFim && !task.diaInteiro
+                        ? ` ${task.horaInicio} - ${task.horaFim}`
+                        : task.diaInteiro ? ' (Dia inteiro)' : ''
+                      
+                      return (
+                        <div
+                          key={task.id}
+                          className={`border rounded-lg p-4 hover:bg-gray-50 ${
+                            isEvento 
+                              ? 'border-blue-200 bg-blue-50' 
+                              : 'border-gray-200'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
+                              <span className="text-lg">{icon}</span>
                               <h3 className="text-lg font-semibold text-gray-900">{task.name}</h3>
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
+                                {tipoLabel}
+                              </span>
                               <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getTaskStatusColor(task.status)}`}>
                                 {getTaskStatusLabel(task.status)}
                               </span>
+                              {timeDisplay && (
+                                <span className="text-xs text-gray-600 font-medium">
+                                  {timeDisplay}
+                                </span>
+                              )}
                             </div>
                             <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-2">
                               <div>
@@ -683,6 +1111,22 @@ export default function AgendaPage() {
                                 </div>
                               )}
                             </div>
+                            {(task.dataInicio || task.dataFimPrevista || task.dataConclusao) && (
+                              <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-2 mt-2 pt-2 border-t border-gray-200">
+                                {task.dataInicio && (
+                                  <div>
+                                    <span className="font-semibold">Data de Início:</span>{' '}
+                                    {formatDate(task.dataInicio)}
+                                  </div>
+                                )}
+                                {(task.dataFimPrevista || task.dataConclusao) && (
+                                  <div>
+                                    <span className="font-semibold">Data de Conclusão:</span>{' '}
+                                    {formatDate(task.dataConclusao || task.dataFimPrevista)}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
                               <h4 className="font-semibold text-sm text-gray-900 mb-2">
                                 Descrição da tarefa
@@ -695,22 +1139,51 @@ export default function AgendaPage() {
                                   ⏱️ Detalhamento de Horas Lançadas
                                 </h4>
                                 <div className="space-y-1">
-                                  {tasksWithHours[task.id].map((timeEntry: any) => (
-                                    <div key={timeEntry.id} className="text-sm text-blue-800">
-                                      <span className="font-medium">
-                                        {formatDate(timeEntry.data)}
-                                      </span>
-                                      {' - '}
-                                      <span className="font-semibold">{timeEntry.horas}h</span>
-                                      {timeEntry.descricao && (
-                                        <span className="text-blue-600"> - {timeEntry.descricao}</span>
-                                      )}
-                                    </div>
-                                  ))}
+                                  {tasksWithHours[task.id].map((timeEntry: any) => {
+                                    // Buscar o valorPorHora da negociação vinculada
+                                    const proposal = task.proposal || task.project?.proposal
+                                    const valorPorHora = proposal?.valorPorHora || 0
+                                    const horas = parseFloat(timeEntry.horas || 0)
+                                    const valorFaturamento = horas * valorPorHora
+                                    
+                                    return (
+                                      <div key={timeEntry.id} className="text-sm text-blue-800">
+                                        <span className="font-medium">
+                                          {formatDate(timeEntry.data)}
+                                        </span>
+                                        {' - '}
+                                        <span className="font-semibold">{timeEntry.horas}h</span>
+                                        {valorPorHora > 0 && (
+                                          <span className="text-green-700 font-semibold ml-2">
+                                            (R$ {valorFaturamento.toFixed(2).replace('.', ',')})
+                                          </span>
+                                        )}
+                                        {timeEntry.descricao && (
+                                          <span className="text-blue-600"> - {timeEntry.descricao}</span>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
                                   <div className="mt-2 pt-2 border-t border-blue-300">
-                                    <span className="font-semibold text-blue-900">
-                                      Total: {tasksWithHours[task.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0).toFixed(2)}h
-                                    </span>
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-semibold text-blue-900">
+                                        Total: {tasksWithHours[task.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0).toFixed(2)}h
+                                      </span>
+                                      {(() => {
+                                        const proposal = task.proposal || task.project?.proposal
+                                        const valorPorHora = proposal?.valorPorHora || 0
+                                        if (valorPorHora > 0) {
+                                          const totalHoras = tasksWithHours[task.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0)
+                                          const totalFaturamento = totalHoras * valorPorHora
+                                          return (
+                                            <span className="font-semibold text-green-700">
+                                              Total a Faturar: R$ {totalFaturamento.toFixed(2).replace('.', ',')}
+                                            </span>
+                                          )
+                                        }
+                                        return null
+                                      })()}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -738,7 +1211,13 @@ export default function AgendaPage() {
                                 setEditTaskData({
                                   description: task.description || '',
                                   dataInicio: formatDateForInput(task.dataInicio),
-                                  dataFimPrevista: formatDateForInput(task.dataFimPrevista),
+                                  dataFimPrevista: formatDateForInput(task.dataConclusao || task.dataFimPrevista),
+                                  usuarioResponsavelId: task.usuarioResponsavelId || '',
+                                  tipo: task.tipo || 'ATIVIDADE',
+                                  horaInicio: task.horaInicio || '',
+                                  horaFim: task.horaFim || '',
+                                  semPrazoDefinido: task.semPrazoDefinido || false,
+                                  diaInteiro: task.diaInteiro || false,
                                 })
                                 setShowEditTaskModal(true)
                               }}
@@ -777,7 +1256,8 @@ export default function AgendaPage() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               ))
@@ -894,7 +1374,14 @@ export default function AgendaPage() {
                         }
                       }
                       // Não enviar percentual se for 0 ou vazio (evita erro de coluna inexistente)
-                      await api.patch(`/projects/tasks/${selectedTask.id}`, updatePayload)
+                      
+                      // Usar a rota PATCH /projects/tasks/:taskId se não houver projectId, ou PUT se houver
+                      if (selectedTask.project?.id) {
+                        await api.put(`/projects/${selectedTask.project.id}/tasks/${selectedTask.id}`, updatePayload)
+                      } else {
+                        // Usar a rota que não requer projectId
+                        await api.patch(`/projects/tasks/${selectedTask.id}`, updatePayload)
+                      }
                       alert('Status atualizado com sucesso!')
                       setShowUpdateStatusModal(false)
                       setSelectedTask(null)
@@ -902,7 +1389,31 @@ export default function AgendaPage() {
                       loadTasks()
                     } catch (error: any) {
                       console.error('Erro ao atualizar status:', error)
-                      alert(error.response?.data?.message || 'Erro ao atualizar status da tarefa')
+                      const errorMessage = error.response?.data?.message || error.message || 'Erro ao atualizar status da tarefa'
+                      
+                      // Se o erro for sobre exigir lançamento de horas, abrir modal de cadastro de horas
+                      if (errorMessage.includes('exige lançamento de horas') || errorMessage.includes('registre as horas')) {
+                        setShowUpdateStatusModal(false)
+                        // Guardar o status desejado (CONCLUIDA) para aplicar após lançar as horas
+                        setDesiredStatus(updateTaskData.status)
+                        // Manter a tarefa selecionada para o modal de horas
+                        // Abrir modal de cadastro de horas
+                        setNewTimeEntry({
+                          projectId: selectedTask.project?.id || '',
+                          proposalId: selectedTask.proposalId || '',
+                          clientId: selectedTask.clientId || '',
+                          taskId: selectedTask.id,
+                          horas: '',
+                          data: new Date().toISOString().split('T')[0],
+                          descricao: '',
+                        })
+                        setShowRegisterHoursModal(true)
+                        // Não fechar selectedTask para que o modal possa usar os dados da tarefa
+                      } else {
+                        alert(errorMessage)
+                        setSelectedTask(null)
+                        setDesiredStatus(null)
+                      }
                     }
                   }}
                   className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -1007,11 +1518,11 @@ export default function AgendaPage() {
                       if (editTaskData.usuarioResponsavelId !== undefined) {
                         updatePayload.usuarioResponsavelId = editTaskData.usuarioResponsavelId || null
                       }
-                      await api.patch(`/projects/tasks/${selectedTask.id}`, updatePayload)
+                      await api.put(`/projects/${selectedTask.project?.id}/tasks/${selectedTask.id}`, updatePayload)
                       alert('Tarefa atualizada com sucesso!')
                       setShowEditTaskModal(false)
                       setSelectedTask(null)
-                      setEditTaskData({ description: '', dataInicio: '', dataFimPrevista: '', usuarioResponsavelId: '' })
+                      setEditTaskData({ description: '', dataInicio: '', dataFimPrevista: '', usuarioResponsavelId: '', tipo: 'ATIVIDADE', horaInicio: '', horaFim: '', semPrazoDefinido: false, diaInteiro: false })
                       loadTasks()
                     } catch (error: any) {
                       console.error('Erro ao atualizar tarefa:', error)
@@ -1026,7 +1537,389 @@ export default function AgendaPage() {
                   onClick={() => {
                     setShowEditTaskModal(false)
                     setSelectedTask(null)
-                    setEditTaskData({ description: '', dataInicio: '', dataFimPrevista: '', usuarioResponsavelId: '' })
+                    setEditTaskData({ description: '', dataInicio: '', dataFimPrevista: '', usuarioResponsavelId: '', tipo: 'ATIVIDADE', horaInicio: '', horaFim: '', semPrazoDefinido: false, diaInteiro: false })
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Criar Tarefa */}
+        {showCreateTaskModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Nova Tarefa/Atividade</h2>
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-blue-800 font-medium mb-2">Vínculo (selecione pelo menos um):</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Projeto</label>
+                      <select
+                        value={newTask.projectId}
+                        onChange={async (e) => {
+                          const projectId = e.target.value
+                          let exigirHoras = false
+                          
+                          // Se selecionou um projeto, verificar se está vinculado a uma negociação "Por Horas"
+                          if (projectId) {
+                            try {
+                              const project = projects.find(p => p.id === projectId)
+                              if (project && project.proposalId) {
+                                const proposal = negotiations.find(n => n.id === project.proposalId)
+                                if (proposal && proposal.tipoContratacao === 'HORAS') {
+                                  exigirHoras = true
+                                }
+                              }
+                            } catch (error) {
+                              console.error('Erro ao verificar projeto:', error)
+                            }
+                          }
+                          
+                          setNewTask({ 
+                            ...newTask, 
+                            projectId,
+                            exigirLancamentoHoras: exigirHoras,
+                            // Limpar outros vínculos quando selecionar projeto
+                            proposalId: projectId ? '' : newTask.proposalId,
+                            clientId: projectId ? '' : newTask.clientId,
+                          })
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">Selecione o projeto...</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Negociação</label>
+                      <select
+                        value={newTask.proposalId}
+                        onChange={async (e) => {
+                          const proposalId = e.target.value
+                          let exigirHoras = false
+                          
+                          // Se selecionou uma negociação, verificar se é "Por Horas"
+                          if (proposalId) {
+                            try {
+                              const proposal = negotiations.find(n => n.id === proposalId)
+                              if (proposal && proposal.tipoContratacao === 'HORAS') {
+                                exigirHoras = true
+                              }
+                            } catch (error) {
+                              console.error('Erro ao verificar tipo de contratação:', error)
+                            }
+                          }
+                          
+                          setNewTask({ 
+                            ...newTask, 
+                            proposalId,
+                            exigirLancamentoHoras: exigirHoras,
+                            // Limpar outros vínculos quando selecionar negociação
+                            projectId: proposalId ? '' : newTask.projectId,
+                            clientId: proposalId ? '' : newTask.clientId,
+                          })
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">Selecione a negociação...</option>
+                        {negotiations.map((negotiation) => (
+                          <option key={negotiation.id} value={negotiation.id}>
+                            {negotiation.numero ? `${negotiation.numero} - ` : ''}{negotiation.titulo || negotiation.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
+                      <select
+                        value={newTask.clientId}
+                        onChange={(e) => {
+                          const clientId = e.target.value
+                          setNewTask({ 
+                            ...newTask, 
+                            clientId,
+                            // Limpar outros vínculos quando selecionar cliente
+                            projectId: clientId ? '' : newTask.projectId,
+                            proposalId: clientId ? '' : newTask.proposalId,
+                          })
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">Selecione o cliente...</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.name || client.razaoSocial || client.email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {!newTask.projectId && !newTask.proposalId && !newTask.clientId && (
+                    <p className="text-xs text-red-600 mt-2">⚠️ Selecione pelo menos um vínculo</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nome *</label>
+                  <input
+                    type="text"
+                    value={newTask.name}
+                    onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Registro *</label>
+                  <select
+                    value={newTask.tipo}
+                    onChange={(e) => {
+                      const newTipo = e.target.value
+                      setNewTask({ 
+                        ...newTask, 
+                        tipo: newTipo,
+                        horaInicio: newTipo === 'EVENTO' ? newTask.horaInicio : '',
+                        horaFim: newTipo === 'EVENTO' ? newTask.horaFim : '',
+                        semPrazoDefinido: newTipo === 'ATIVIDADE' ? newTask.semPrazoDefinido : false,
+                        diaInteiro: newTipo === 'EVENTO' ? newTask.diaInteiro : false,
+                      })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="ATIVIDADE">Atividade</option>
+                    <option value="EVENTO">Evento</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                  <textarea
+                    value={newTask.description}
+                    onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Horas Estimadas</label>
+                    <input
+                      type="text"
+                      value={newTask.horasEstimadas}
+                      onChange={(e) => setNewTask({ ...newTask, horasEstimadas: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Ex: 40h, 1h30min, 50 horas"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Formato: 40h, 1h30min, 50 horas, etc.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <select
+                      value={newTask.status}
+                      onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="PENDENTE">Pendente</option>
+                      <option value="EM_ANDAMENTO">Em Andamento</option>
+                      <option value="CONCLUIDA">Concluída</option>
+                      <option value="BLOQUEADA">Bloqueada</option>
+                      <option value="CANCELADA">Cancelada</option>
+                    </select>
+                  </div>
+                </div>
+                {newTask.tipo === 'ATIVIDADE' ? (
+                  <>
+                    <div className="flex items-center gap-6 mb-2">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="semPrazoDefinido"
+                          checked={newTask.semPrazoDefinido}
+                          onChange={(e) => setNewTask({ ...newTask, semPrazoDefinido: e.target.checked })}
+                          className="mr-2"
+                        />
+                        <label htmlFor="semPrazoDefinido" className="text-sm text-gray-700">
+                          Sem prazo definido
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="exigirLancamentoHoras"
+                          checked={newTask.exigirLancamentoHoras}
+                          onChange={(e) => setNewTask({ ...newTask, exigirLancamentoHoras: e.target.checked })}
+                          className="mr-2"
+                        />
+                        <label htmlFor="exigirLancamentoHoras" className="text-sm text-gray-700">
+                          Exigir lançamento de horas ao concluir
+                        </label>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
+                        <input
+                          type="date"
+                          value={newTask.dataInicio}
+                          onChange={(e) => setNewTask({ ...newTask, dataInicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      {!newTask.semPrazoDefinido && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Data de Conclusão</label>
+                          <input
+                            type="date"
+                            value={newTask.dataFimPrevista}
+                            onChange={(e) => setNewTask({ ...newTask, dataFimPrevista: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-6 mb-2">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="diaInteiro"
+                          checked={newTask.diaInteiro}
+                          onChange={(e) => setNewTask({ ...newTask, diaInteiro: e.target.checked })}
+                          className="mr-2"
+                        />
+                        <label htmlFor="diaInteiro" className="text-sm text-gray-700">
+                          Dia inteiro
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="exigirLancamentoHorasEvento"
+                          checked={newTask.exigirLancamentoHoras}
+                          onChange={(e) => setNewTask({ ...newTask, exigirLancamentoHoras: e.target.checked })}
+                          className="mr-2"
+                        />
+                        <label htmlFor="exigirLancamentoHorasEvento" className="text-sm text-gray-700">
+                          Exigir lançamento de horas ao concluir
+                        </label>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Data de Início</label>
+                        <input
+                          type="date"
+                          value={newTask.dataInicio}
+                          onChange={(e) => setNewTask({ ...newTask, dataInicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Data de Término</label>
+                        <input
+                          type="date"
+                          value={newTask.dataFimPrevista}
+                          onChange={(e) => setNewTask({ ...newTask, dataFimPrevista: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    {!newTask.diaInteiro && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Hora de Início</label>
+                          <input
+                            type="time"
+                            value={newTask.horaInicio}
+                            onChange={(e) => setNewTask({ ...newTask, horaInicio: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Hora de Término</label>
+                          <input
+                            type="time"
+                            value={newTask.horaFim}
+                            onChange={(e) => setNewTask({ ...newTask, horaFim: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Responsável</label>
+                    <select
+                      value={newTask.usuarioResponsavelId}
+                      onChange={(e) => setNewTask({ ...newTask, usuarioResponsavelId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Selecione um usuário...</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name || user.email}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Executor</label>
+                    <select
+                      value={newTask.usuarioExecutorId}
+                      onChange={(e) => setNewTask({ ...newTask, usuarioExecutorId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Selecione um usuário...</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name || user.email}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={handleCreateTask}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Criar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCreateTaskModal(false)
+                    setNewTask({
+                      projectId: '',
+                      proposalId: '',
+                      clientId: '',
+                      name: '',
+                      description: '',
+                      horasEstimadas: '',
+                      dataInicio: '',
+                      dataFimPrevista: '',
+                      status: 'PENDENTE',
+                      usuarioResponsavelId: currentUser?.id || '',
+                      usuarioExecutorId: currentUser?.id || '',
+                      tipo: 'ATIVIDADE',
+                      horaInicio: '',
+                      horaFim: '',
+                      semPrazoDefinido: false,
+                      diaInteiro: false,
+                    })
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
@@ -1072,12 +1965,15 @@ export default function AgendaPage() {
                     Horas *
                   </label>
                   <input
-                    type="number"
-                    step="0.5"
+                    type="text"
                     value={newTimeEntry.horas}
                     onChange={(e) => setNewTimeEntry({ ...newTimeEntry, horas: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ex: 8h, 1h30min, 4 horas, 2.5h"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Formato: 8h, 1h30min, 4 horas, 2.5h (aceita horas absolutas ou decimais)
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1099,12 +1995,94 @@ export default function AgendaPage() {
                       return
                     }
                     try {
-                      await api.post(`/projects/${selectedTask.project?.id}/time-entries`, {
-                        taskId: selectedTask.id,
-                        horas: parseFloat(newTimeEntry.horas),
-                        data: newTimeEntry.data,
-                        descricao: newTimeEntry.descricao,
-                      })
+                      const horasDecimal = parseHoursToDecimal(newTimeEntry.horas)
+                      if (horasDecimal === null) {
+                        alert('Formato de horas inválido. Use: 8h, 1h30min, 4 horas, etc.')
+                        return
+                      }
+                      
+                      // Usar a rota correta dependendo se há projectId ou não
+                      if (selectedTask.project?.id) {
+                        await api.post(`/projects/${selectedTask.project.id}/time-entries`, {
+                          taskId: selectedTask.id,
+                          horas: horasDecimal,
+                          data: newTimeEntry.data,
+                          descricao: newTimeEntry.descricao,
+                        })
+                        
+                        // Se havia um status desejado (ex: CONCLUIDA), aplicar esse status
+                        // Caso contrário, se a tarefa está Pendente, alterar para Em Progresso
+                        if (desiredStatus) {
+                          try {
+                            await api.put(`/projects/${selectedTask.project.id}/tasks/${selectedTask.id}`, {
+                              status: desiredStatus
+                            })
+                            setDesiredStatus(null) // Limpar o status desejado após aplicar
+                          } catch (error) {
+                            console.error('Erro ao atualizar status da tarefa:', error)
+                            // Se falhar, tentar pelo menos mudar para EM_PROGRESSO se estava PENDENTE
+                            if (selectedTask && selectedTask.status === 'PENDENTE') {
+                              try {
+                                await api.put(`/projects/${selectedTask.project.id}/tasks/${selectedTask.id}`, {
+                                  status: 'EM_PROGRESSO'
+                                })
+                              } catch (error2) {
+                                console.error('Erro ao atualizar status da tarefa:', error2)
+                              }
+                            }
+                          }
+                        } else if (selectedTask && selectedTask.status === 'PENDENTE') {
+                          try {
+                            await api.put(`/projects/${selectedTask.project.id}/tasks/${selectedTask.id}`, {
+                              status: 'EM_PROGRESSO'
+                            })
+                          } catch (error) {
+                            console.error('Erro ao atualizar status da tarefa:', error)
+                          }
+                        }
+                      } else {
+                        // Usar a rota standalone para tarefas sem projeto
+                        await api.post(`/projects/time-entries`, {
+                          taskId: selectedTask.id,
+                          horas: horasDecimal,
+                          data: newTimeEntry.data,
+                          descricao: newTimeEntry.descricao,
+                          proposalId: selectedTask.proposalId || null,
+                          clientId: selectedTask.clientId || null,
+                        })
+                        
+                        // Se havia um status desejado (ex: CONCLUIDA), aplicar esse status
+                        // Caso contrário, se a tarefa está Pendente, alterar para Em Progresso
+                        if (desiredStatus) {
+                          try {
+                            await api.patch(`/projects/tasks/${selectedTask.id}`, {
+                              status: desiredStatus
+                            })
+                            setDesiredStatus(null) // Limpar o status desejado após aplicar
+                          } catch (error) {
+                            console.error('Erro ao atualizar status da tarefa:', error)
+                            // Se falhar, tentar pelo menos mudar para EM_PROGRESSO se estava PENDENTE
+                            if (selectedTask && selectedTask.status === 'PENDENTE') {
+                              try {
+                                await api.patch(`/projects/tasks/${selectedTask.id}`, {
+                                  status: 'EM_PROGRESSO'
+                                })
+                              } catch (error2) {
+                                console.error('Erro ao atualizar status da tarefa:', error2)
+                              }
+                            }
+                          }
+                        } else if (selectedTask && selectedTask.status === 'PENDENTE') {
+                          try {
+                            await api.patch(`/projects/tasks/${selectedTask.id}`, {
+                              status: 'EM_PROGRESSO'
+                            })
+                          } catch (error) {
+                            console.error('Erro ao atualizar status da tarefa:', error)
+                          }
+                        }
+                      }
+                      
                       alert('Horas registradas com sucesso!')
                       setShowRegisterHoursModal(false)
                       setSelectedTask(null)

@@ -19,6 +19,20 @@ type FieldType =
   | 'sistema_destino'
   | 'data_entrega_homologacao'
   | 'data_entrega_producao'
+  | 'data_inicio_analise'
+  | 'data_programada_homologacao'
+  | 'data_programada_producao'
+  | 'tipo_produto_assinado'
+  | 'quantidade_usuarios'
+  | 'valor_unitario_usuario'
+  | 'data_inicio_assinatura'
+  | 'vencimento_assinatura'
+  | 'descricao_manutencao'
+  | 'valor_mensal_manutencao'
+  | 'data_inicio_manutencao'
+  | 'vencimento_manutencao'
+  | 'valor_mensal_fixo'
+  | 'data_fim_contrato'
 
 interface TemplateField {
   key: FieldType
@@ -31,15 +45,34 @@ interface TemplateField {
 const AVAILABLE_FIELDS: Omit<TemplateField, 'order' | 'selected'>[] = [
   { key: 'valor_proposta', label: 'Valor da proposta', type: 'number' },
   { key: 'tipo_contratacao', label: 'Tipo de contratação', type: 'select' },
-  { key: 'horas_estimadas', label: 'Horas estimadas', type: 'time' },
+  { key: 'horas_estimadas', label: 'Horas estimadas', type: 'text' },
   { key: 'inicio', label: 'Início', type: 'date' },
   { key: 'previsao_conclusao', label: 'Previsão de conclusão', type: 'date' },
   { key: 'inicio_faturamento', label: 'Início de faturamento', type: 'date' },
   { key: 'vencimento', label: 'Vencimento', type: 'date' },
+  // Campos para Migração de Dados
   { key: 'sistema_origem', label: 'Sistema de origem', type: 'text' },
   { key: 'sistema_destino', label: 'Sistema de destino', type: 'text' },
   { key: 'data_entrega_homologacao', label: 'Data para entrega da homologação', type: 'date' },
   { key: 'data_entrega_producao', label: 'Data para entrega da produção', type: 'date' },
+  // Campos para Análise de Dados
+  { key: 'data_inicio_analise', label: 'Data de início (Análise)', type: 'date' },
+  { key: 'data_programada_homologacao', label: 'Data programada para homologação', type: 'date' },
+  { key: 'data_programada_producao', label: 'Data programada para produção', type: 'date' },
+  // Campos para Assinaturas
+  { key: 'tipo_produto_assinado', label: 'Tipo de produto assinado', type: 'text' },
+  { key: 'quantidade_usuarios', label: 'Quantidade de usuários', type: 'number' },
+  { key: 'valor_unitario_usuario', label: 'Valor unitário por usuário', type: 'number' },
+  { key: 'data_inicio_assinatura', label: 'Data de início da assinatura', type: 'date' },
+  { key: 'vencimento_assinatura', label: 'Vencimento da assinatura', type: 'date' },
+  // Campos para Manutenções
+  { key: 'descricao_manutencao', label: 'Descrição da manutenção', type: 'text' },
+  { key: 'valor_mensal_manutencao', label: 'Valor mensal da manutenção', type: 'number' },
+  { key: 'data_inicio_manutencao', label: 'Data de início da manutenção', type: 'date' },
+  { key: 'vencimento_manutencao', label: 'Vencimento da manutenção', type: 'date' },
+  // Campos para Contrato Fixo
+  { key: 'valor_mensal_fixo', label: 'Valor mensal fixo', type: 'number' },
+  { key: 'data_fim_contrato', label: 'Data de fim do contrato', type: 'date' },
 ]
 
 const SERVICE_TYPES: ServiceType[] = [

@@ -53,6 +53,14 @@ export default function NavigationLinks() {
         Projetos
       </Link>
       
+      {/* Horas Trabalhadas */}
+      <Link
+        href="/horas-trabalhadas"
+        className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+      >
+        Horas Trabalhadas
+      </Link>
+      
       {/* Negociações */}
       <Link
         href="/negociacoes"

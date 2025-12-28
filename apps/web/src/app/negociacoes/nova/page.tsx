@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
+import ServiceTypeFieldsWrapper from '@/components/negotiations/ServiceTypeFields/ServiceTypeFieldsWrapper'
+import { formatCurrency, getValorAsNumber, calcularVencimento12Meses } from '@/utils/negotiationCalculations'
+import { parseHoursToDecimal, formatHoursFromDecimal } from '@/utils/hourFormatter'
 
 export default function NovaNegociacaoPage() {
   const router = useRouter()
@@ -46,6 +49,27 @@ export default function NovaNegociacaoPage() {
     dataVencimento: '',
     quantidadeParcelas: '',
     parcelas: [] as Array<{ numero: number; valor: string; dataFaturamento: string; dataVencimento: string }>,
+    // Campos para Análise de Dados
+    dataInicioAnalise: '',
+    dataProgramadaHomologacao: '',
+    dataProgramadaProducao: '',
+    // Campos para Assinaturas
+    tipoProdutoAssinado: '',
+    quantidadeUsuarios: '',
+    valorUnitarioUsuario: '',
+    dataInicioAssinatura: '',
+    vencimentoAssinatura: '',
+    // Campos para Manutenções
+    descricaoManutencao: '',
+    valorMensalManutencao: '',
+    dataInicioManutencao: '',
+    vencimentoManutencao: '',
+    // Campos para Contrato Fixo
+    valorMensalFixo: '',
+    dataFimContrato: '',
+    // Campos de validade
+    dataValidade: '',
+    dataLimiteAceite: '',
   })
 
   useEffect(() => {
@@ -192,7 +216,7 @@ export default function NovaNegociacaoPage() {
         alert('Preencha a Data do Vencimento')
         return
       }
-      if (formData.formaFaturamento === 'PARCELADO') {
+      if (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') {
         if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
           alert('Informe a quantidade de parcelas')
           return
@@ -246,6 +270,14 @@ export default function NovaNegociacaoPage() {
       console.log('Debug - payload a ser enviado:', payload)
 
 
+      // Campos de validade (sempre enviar se preenchidos)
+      if (formData.dataValidade) {
+        payload.dataValidade = formData.dataValidade
+      }
+      if (formData.dataLimiteAceite) {
+        payload.dataLimiteAceite = formData.dataLimiteAceite
+      }
+
       // Campos específicos para Migração de Dados
       if (formData.serviceType === 'MIGRACAO_DADOS') {
         payload.sistemaOrigem = formData.sistemaOrigem
@@ -260,7 +292,7 @@ export default function NovaNegociacaoPage() {
         payload.dataInicioTrabalho = formData.dataInicioTrabalho
         payload.dataFaturamento = formData.dataFaturamento
         payload.dataVencimento = formData.dataVencimento
-        if (formData.formaFaturamento === 'PARCELADO') {
+        if (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') {
           if (formData.parcelas.length > 0) {
             // Se tem parcelas preenchidas, usar essas
             payload.parcelas = formData.parcelas.map(p => ({
@@ -350,7 +382,7 @@ export default function NovaNegociacaoPage() {
       }
 
       // Incluir parcelas se existirem
-      if (formData.formaFaturamento === 'PARCELADO') {
+      if (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') {
         if (formData.parcelas.length > 0) {
           // Se tem parcelas preenchidas, usar essas
           payload.parcelas = formData.parcelas.map((p: any) => ({
@@ -522,27 +554,7 @@ export default function NovaNegociacaoPage() {
     }
   }
 
-  const formatCurrency = (value: string) => {
-    // Remove tudo que não é número
-    const numbers = value.replace(/\D/g, '')
-    if (numbers === '') return ''
-    
-    // Converte para número e divide por 100 para ter centavos
-    const number = parseFloat(numbers) / 100
-    // Formata como moeda brasileira
-    return number.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
-
-  const getValorAsNumber = (valorString: string): number | null => {
-    if (!valorString) return null
-    // Remove pontos e substitui vírgula por ponto
-    const cleaned = valorString.replace(/\./g, '').replace(',', '.')
-    const number = parseFloat(cleaned)
-    return isNaN(number) ? null : number
-  }
+  // formatCurrency e getValorAsNumber agora são importados de @/utils/negotiationCalculations
 
   const handleQuantidadeParcelasChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const quantidade = parseInt(e.target.value) || 0
@@ -704,6 +716,39 @@ export default function NovaNegociacaoPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Campos de Validade da Proposta */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+            
+            <div>
+              <label htmlFor="dataValidade" className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Validade da Proposta
+              </label>
+              <input
+                type="date"
+                id="dataValidade"
+                value={formData.dataValidade}
+                onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+            </div>
+
+            <div>
+              <label htmlFor="dataLimiteAceite" className="block text-sm font-medium text-gray-700 mb-2">
+                Data Limite para Aceite
+              </label>
+              <input
+                type="date"
+                id="dataLimiteAceite"
+                value={formData.dataLimiteAceite}
+                onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+            </div>
           </div>
 
           {/* Campos específicos para Migração de Dados */}
@@ -869,7 +914,7 @@ export default function NovaNegociacaoPage() {
                     onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     required={isMigracaoDados && formData.formaFaturamento === 'ONESHOT'}
-                    disabled={formData.formaFaturamento === 'PARCELADO'}
+                    disabled={formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL'}
                   />
                 </div>
               </div>
@@ -887,7 +932,7 @@ export default function NovaNegociacaoPage() {
                     value={formData.quantidadeParcelas}
                     onChange={handleQuantidadeParcelasChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    required={formData.formaFaturamento === 'PARCELADO'}
+                    required={formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL'}
                   />
 
                   {/* Lista de Parcelas */}
@@ -941,6 +986,15 @@ export default function NovaNegociacaoPage() {
               )}
             </div>
           )}
+
+          {/* Campos específicos por tipo de serviço */}
+          <ServiceTypeFieldsWrapper
+            serviceType={formData.serviceType}
+            formData={formData}
+            onChange={(field, value) => {
+              setFormData((prev) => ({ ...prev, [field]: value }))
+            }}
+          />
 
           {/* Opção de Template (após criar) */}
           {savedNegotiationId && useTemplate === null && (
@@ -1146,7 +1200,7 @@ export default function NovaNegociacaoPage() {
                           parcelas: [],
                           quantidadeParcelas: '',
                           // Limpar forma de faturamento se for Por Horas
-                          formaFaturamento: newTipo === 'HORAS' ? 'ONESHOT' : formData.formaFaturamento
+                          formaFaturamento: newTipo === 'HORAS' ? 'ONESHOT' : (newTipo === 'FIXO_RECORRENTE' ? 'MENSAL' : formData.formaFaturamento)
                         })
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
@@ -1170,7 +1224,7 @@ export default function NovaNegociacaoPage() {
                         onChange={(e) => {
                           setFormData({ 
                             ...formData, 
-                            formaFaturamento: e.target.value as 'ONESHOT' | 'PARCELADO',
+                            formaFaturamento: e.target.value as 'ONESHOT' | 'PARCELADO' | 'MENSAL',
                             parcelas: [],
                             quantidadeParcelas: ''
                           })
@@ -1179,6 +1233,9 @@ export default function NovaNegociacaoPage() {
                       >
                         <option value="ONESHOT">OneShot</option>
                         <option value="PARCELADO">Parcelado</option>
+                        {formData.tipoContratacao === 'FIXO_RECORRENTE' && (
+                          <option value="MENSAL">Mensal</option>
+                        )}
                       </select>
                     </div>
                   )}
@@ -1189,12 +1246,16 @@ export default function NovaNegociacaoPage() {
                       Horas Estimadas
                     </label>
                     <input
-                      type="time"
+                      type="text"
                       id="horasEstimadas"
                       value={formData.horasEstimadas}
                       onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Ex: 40h, 1h30min, 50 horas"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Formato: 40h, 1h30min, 50 horas, etc.
+                    </p>
                   </div>
 
                   {/* Início */}
@@ -1342,7 +1403,7 @@ export default function NovaNegociacaoPage() {
                 )}
 
                 {/* Campos para Parcelado */}
-                {formData.tipoContratacao && formData.tipoContratacao !== 'HORAS' && formData.formaFaturamento === 'PARCELADO' && (
+                {formData.tipoContratacao && formData.tipoContratacao !== 'HORAS' && (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') && (
                   <div className="mt-6 space-y-4">
                     <div>
                       <label htmlFor="quantidadeParcelas" className="block text-sm font-medium text-gray-700 mb-2">

@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
+import { parseHoursToDecimal, formatHoursFromDecimal } from '@/utils/hourFormatter'
+import { getValorAsNumber, formatCurrency } from '@/utils/negotiationCalculations'
 
 export default function EditarNegociacaoPage() {
   const params = useParams()
@@ -14,6 +16,8 @@ export default function EditarNegociacaoPage() {
   const [loadingData, setLoadingData] = useState(true)
   const [clients, setClients] = useState<any[]>([])
   const [serviceTypes, setServiceTypes] = useState<any[]>([])
+  const [originalNegotiation, setOriginalNegotiation] = useState<any>(null)
+  const [relatedInvoices, setRelatedInvoices] = useState<any[]>([])
   
   const [formData, setFormData] = useState({
     clientId: '',
@@ -38,6 +42,9 @@ export default function EditarNegociacaoPage() {
     dataVencimento: '',
     quantidadeParcelas: '',
     parcelas: [] as Array<{ numero: number; valor: string; dataFaturamento: string; dataVencimento: string }>,
+    // Campos de validade
+    dataValidade: '',
+    dataLimiteAceite: '',
   })
 
   useEffect(() => {
@@ -138,6 +145,19 @@ export default function EditarNegociacaoPage() {
       console.log('loadNegotiation - Parcelas finais:', parcelasArray)
       console.log('loadNegotiation - Quantidade de parcelas:', parcelasArray.length)
 
+      // Salvar negociação original para comparação
+      setOriginalNegotiation(negotiation)
+      
+      // Se status for FECHADA, carregar invoices relacionadas
+      if (negotiation.status === 'FECHADA') {
+        try {
+          const invoicesResponse = await api.get(`/invoices/by-proposal/${negotiationId}`)
+          setRelatedInvoices(invoicesResponse.data || [])
+        } catch (error) {
+          console.error('Erro ao carregar invoices relacionadas:', error)
+        }
+      }
+
       // Preencher formulário com dados da negociação
       setFormData({
         clientId: negotiation.clientId || '',
@@ -151,7 +171,7 @@ export default function EditarNegociacaoPage() {
         previsaoConclusao: formatDate(negotiation.previsaoConclusao),
         inicioFaturamento: formatDate(negotiation.inicioFaturamento),
         vencimento: formatDate(negotiation.vencimento),
-        formaFaturamento: negotiation.formaFaturamento || negotiation.tipoFaturamento || 'ONESHOT',
+        formaFaturamento: negotiation.formaFaturamento || (negotiation.tipoContratacao === 'FIXO_RECORRENTE' ? 'MENSAL' : 'ONESHOT'),
         // Campos específicos para Migração de Dados
         sistemaOrigem: negotiation.sistemaOrigem || '',
         sistemaDestino: negotiation.sistemaDestino || '',
@@ -167,6 +187,9 @@ export default function EditarNegociacaoPage() {
           dataFaturamento: formatDate(p.dataFaturamento),
           dataVencimento: formatDate(p.dataVencimento),
         })),
+        // Campos de validade
+        dataValidade: formatDate(negotiation.dataValidade),
+        dataLimiteAceite: formatDate(negotiation.dataLimiteAceite),
       })
       
       console.log('loadNegotiation - formData.parcelas após setFormData:', parcelasArray.map((p: any) => ({
@@ -228,16 +251,60 @@ export default function EditarNegociacaoPage() {
         dataInicioTrabalho: formData.dataInicioTrabalho,
         dataFaturamento: formData.dataFaturamento,
         dataVencimento: formData.dataVencimento,
+        // Campos de validade
+        dataValidade: formData.dataValidade || null,
+        dataLimiteAceite: formData.dataLimiteAceite || null,
       }
 
       // Incluir parcelas se existirem
-      if (formData.formaFaturamento === 'PARCELADO' && formData.parcelas && formData.parcelas.length > 0) {
+      if ((formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') && formData.parcelas && formData.parcelas.length > 0) {
         payload.parcelas = formData.parcelas.map((p: any) => ({
           numero: p.numero,
           valor: getValorAsNumber(p.valor) || 0,
           dataFaturamento: p.dataFaturamento,
           dataVencimento: p.dataVencimento,
         }))
+      }
+
+      // Se a negociação está FECHADA e há mudanças que afetam parcelas, verificar e cancelar parcelas provisionadas
+      if (originalNegotiation?.status === 'FECHADA') {
+        const formaFaturamentoMudou = originalNegotiation.formaFaturamento !== formData.formaFaturamento
+        const valorMudou = originalNegotiation.valorProposta !== getValorAsNumber(formData.valorProposta)
+        
+        if (formaFaturamentoMudou || valorMudou) {
+          // Verificar se há invoices provisionadas
+          const provisionadas = relatedInvoices.filter((inv: any) => inv.status === 'PROVISIONADA')
+          
+          if (provisionadas.length > 0) {
+            const confirmar = confirm(
+              `Esta negociação possui ${provisionadas.length} parcela(s) provisionada(s) em Contas a Receber. ` +
+              `Ao alterar a forma de faturamento ou valor, essas parcelas serão canceladas. Deseja continuar?`
+            )
+            
+            if (!confirmar) {
+              setLoading(false)
+              return
+            }
+            
+            // Cancelar parcelas provisionadas
+            for (const invoice of provisionadas) {
+              try {
+                await api.put(`/invoices/update-status/${invoice.id}`, { status: 'CANCELADA' })
+              } catch (error) {
+                console.error(`Erro ao cancelar invoice ${invoice.id}:`, error)
+              }
+            }
+            
+            // Verificar se há invoices faturadas
+            const faturadas = relatedInvoices.filter((inv: any) => inv.status === 'FATURADA')
+            if (faturadas.length > 0) {
+              alert(
+                `Atenção: Esta negociação possui ${faturadas.length} parcela(s) faturada(s) que não serão canceladas automaticamente. ` +
+                `Você precisará cancelá-las manualmente se necessário.`
+              )
+            }
+          }
+        }
       }
 
       await api.put(`/negotiations/${negotiationId}`, payload)
@@ -442,6 +509,39 @@ export default function EditarNegociacaoPage() {
             </select>
           </div>
 
+          {/* Campos de Validade da Proposta */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+            
+            <div>
+              <label htmlFor="dataValidade" className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Validade da Proposta
+              </label>
+              <input
+                type="date"
+                id="dataValidade"
+                value={formData.dataValidade}
+                onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+            </div>
+
+            <div>
+              <label htmlFor="dataLimiteAceite" className="block text-sm font-medium text-gray-700 mb-2">
+                Data Limite para Aceite
+              </label>
+              <input
+                type="date"
+                id="dataLimiteAceite"
+                value={formData.dataLimiteAceite}
+                onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+            </div>
+          </div>
+
           {/* Seção de Informações Financeiras */}
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações Financeiras</h3>
@@ -506,7 +606,9 @@ export default function EditarNegociacaoPage() {
                         tipoContratacao: newTipo,
                         parcelas: [],
                         quantidadeParcelas: '',
-                        formaFaturamento: 'ONESHOT'
+                        formaFaturamento: 'ONESHOT',
+                        // Se for Fixo Recorrente, definir formaFaturamento como Mensal
+                        formaFaturamento: newTipo === 'FIXO_RECORRENTE' ? 'MENSAL' : formData.formaFaturamento
                       })
                     } else {
                       // Manter parcelas existentes se a forma de faturamento for PARCELADO
@@ -535,7 +637,7 @@ export default function EditarNegociacaoPage() {
                     id="formaFaturamento"
                     value={formData.formaFaturamento}
                     onChange={(e) => {
-                      const novaForma = e.target.value as 'ONESHOT' | 'PARCELADO'
+                      const novaForma = e.target.value as 'ONESHOT' | 'PARCELADO' | 'MENSAL'
                       // Se mudar para ONESHOT, limpar parcelas. Se mudar para PARCELADO e já tiver parcelas, manter
                       if (novaForma === 'ONESHOT') {
                         setFormData({ 
@@ -556,9 +658,13 @@ export default function EditarNegociacaoPage() {
                   >
                     <option value="ONESHOT">OneShot</option>
                     <option value="PARCELADO">Parcelado</option>
+                    {formData.tipoContratacao === 'FIXO_RECORRENTE' && (
+                      <option value="MENSAL">Mensal</option>
+                    )}
                   </select>
                 </div>
               )}
+
 
               {/* Horas Estimadas */}
               <div>
@@ -566,12 +672,16 @@ export default function EditarNegociacaoPage() {
                   Horas Estimadas
                 </label>
                 <input
-                  type="time"
+                  type="text"
                   id="horasEstimadas"
                   value={formData.horasEstimadas}
                   onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Ex: 40h, 1h30min, 50 horas"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Formato: 40h, 1h30min, 50 horas, etc.
+                </p>
               </div>
 
               {/* Início */}
@@ -653,7 +763,7 @@ export default function EditarNegociacaoPage() {
             )}
 
             {/* Campos para Parcelado */}
-            {formData.tipoContratacao && formData.tipoContratacao !== 'HORAS' && formData.formaFaturamento === 'PARCELADO' && (
+            {formData.tipoContratacao && formData.tipoContratacao !== 'HORAS' && (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') && (
               <div className="mt-6 space-y-4">
                 <div>
                   <label htmlFor="quantidadeParcelas" className="block text-sm font-medium text-gray-700 mb-2">
@@ -836,7 +946,7 @@ export default function EditarNegociacaoPage() {
                     onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     required={isMigracaoDados && formData.formaFaturamento === 'ONESHOT'}
-                    disabled={formData.formaFaturamento === 'PARCELADO'}
+                    disabled={formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL'}
                   />
                 </div>
               </div>

@@ -1,20 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
+import AditivosSection from '@/components/negotiations/AditivosSection'
+import { calcularVencimento12Meses } from '@/utils/negotiationCalculations'
 
 export default function NegotiationDetailsPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const negotiationId = params.id as string
 
   const [negotiation, setNegotiation] = useState<any>(null)
+  const [linkedNegotiation, setLinkedNegotiation] = useState<any>(null)
   const [projects, setProjects] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [projectTemplates, setProjectTemplates] = useState<any[]>([])
+  const [serviceTypes, setServiceTypes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Estados dos modais
@@ -33,6 +38,13 @@ export default function NegotiationDetailsPage() {
   const [recebidaInvoices, setRecebidaInvoices] = useState<any[]>([])
   const [adjustedInvoices, setAdjustedInvoices] = useState<any[]>([])
   const [invoicesByParcela, setInvoicesByParcela] = useState<Record<number, any>>({})
+  const [showManutencaoModal, setShowManutencaoModal] = useState(false)
+  const [manutencaoData, setManutencaoData] = useState({
+    descricaoManutencao: '',
+    valorMensalManutencao: '',
+    dataInicioManutencao: '',
+    vencimentoManutencao: '',
+  })
   
   // Dados temporários
   const [calculatedParcels, setCalculatedParcels] = useState<any[]>([])
@@ -57,6 +69,19 @@ export default function NegotiationDetailsPage() {
     loadUsers()
     loadCurrentUser()
   }, [negotiationId, router])
+
+  // Verificar se há parâmetro de mudança de status na URL
+  useEffect(() => {
+    const changeStatus = searchParams.get('changeStatus')
+    if (changeStatus && negotiation) {
+      // Aguardar um pouco para garantir que a negociação foi carregada
+      setTimeout(() => {
+        handleStatusChange(changeStatus)
+        // Remover o parâmetro da URL
+        router.replace(`/negociacoes/${negotiationId}`, { scroll: false })
+      }, 500)
+    }
+  }, [searchParams, negotiation])
 
   useEffect(() => {
     if (negotiation && (negotiation.status === 'FECHADA' || negotiation.status === 'DECLINADA' || negotiation.status === 'CANCELADA')) {
@@ -93,6 +118,11 @@ export default function NegotiationDetailsPage() {
       console.log('Valor Proposta:', response.data.valorProposta)
       console.log('Valor Total:', response.data.valorTotal)
       setNegotiation(response.data)
+      
+      // Carregar negociação vinculada se existir
+      if (response.data.propostaManutencaoId) {
+        await loadLinkedNegotiation()
+      }
     } catch (error: any) {
       console.error('Erro ao carregar negociação:', error)
       if (error.response?.status === 404) {
@@ -103,6 +133,20 @@ export default function NegotiationDetailsPage() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadLinkedNegotiation = async () => {
+    try {
+      if (negotiation?.propostaManutencaoId) {
+        const response = await api.get(`/negotiations/${negotiation.propostaManutencaoId}`)
+        setLinkedNegotiation(response.data)
+      } else {
+        setLinkedNegotiation(null)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar negociação vinculada:', error)
+      setLinkedNegotiation(null)
     }
   }
 
@@ -231,7 +275,31 @@ export default function NegotiationDetailsPage() {
     return labels[status] || status
   }
 
+  const loadServiceTypes = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const companyId = payload.companyId
+      
+      if (companyId) {
+        const response = await api.get(`/service-types?companyId=${companyId}`)
+        setServiceTypes(response.data || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar tipos de serviço:', error)
+    }
+  }
+
   const getServiceTypeLabel = (serviceType: string) => {
+    if (!serviceType) return '-'
+    // Buscar na lista de tipos de serviço carregados
+    const serviceTypeObj = serviceTypes.find(st => st.code === serviceType || st.name === serviceType)
+    if (serviceTypeObj) {
+      return serviceTypeObj.name
+    }
+    // Fallback para mapeamento estático se não encontrar
     const labels: Record<string, string> = {
       AUTOMACOES: 'Automações',
       CONSULTORIA: 'Consultoria',
@@ -241,6 +309,7 @@ export default function NegotiationDetailsPage() {
       ASSINATURAS: 'Assinaturas',
       MANUTENCOES: 'Manutenções',
       DESENVOLVIMENTOS: 'Desenvolvimentos',
+      CONTRATO_FIXO: 'Contrato Fixo',
     }
     return labels[serviceType] || serviceType
   }
@@ -370,16 +439,31 @@ export default function NegotiationDetailsPage() {
     if (negotiation.status === 'FECHADA' && !skipValidation) {
       const invoices = await loadRelatedInvoices()
       
+      // Sempre exibir informações sobre parcelas
+      let mensagemParcelas = `Esta negociação possui as seguintes parcelas em Contas a Receber:\n\n`
+      mensagemParcelas += `- Provisionadas: ${invoices.provisionadas.length}\n`
+      mensagemParcelas += `- Faturadas: ${invoices.faturadas.length}\n`
+      mensagemParcelas += `- Recebidas/Conciliadas: ${invoices.recebidas.length}\n\n`
+      
       // 1. Verificar Provisionadas
       if (invoices.provisionadas.length > 0) {
         const confirmCancel = confirm(
-          `Existem ${invoices.provisionadas.length} conta(s) a receber em status PROVISIONADA.\n\n` +
-          `Deseja cancelar essas parcelas?`
+          mensagemParcelas +
+          `As ${invoices.provisionadas.length} parcela(s) PROVISIONADA(s) serão canceladas.\n\n` +
+          `Deseja continuar?`
         )
         
-        if (confirmCancel) {
-          const ids = invoices.provisionadas.map((inv: any) => inv.id)
-          await api.put('/invoices/update-multiple-status', { ids, status: 'CANCELADA' })
+        if (!confirmCancel) {
+          return
+        }
+        
+        // Cancelar provisionadas
+        const ids = invoices.provisionadas.map((inv: any) => inv.id)
+        await api.put('/invoices/update-multiple-status', { ids, status: 'CANCELADA' })
+      } else {
+        // Mesmo sem provisionadas, informar sobre outras parcelas
+        if (invoices.faturadas.length > 0 || invoices.recebidas.length > 0) {
+          alert(mensagemParcelas + `As parcelas Faturadas e Recebidas serão mantidas no sistema.`)
         }
       }
 
@@ -390,17 +474,11 @@ export default function NegotiationDetailsPage() {
       }
 
       // 3. Verificar Recebidas (junto com a lógica de faturadas se houver)
-      if (invoices.recebidas.length > 0) {
+      if (invoices.recebidas.length > 0 && invoices.provisionadas.length === 0) {
         alert(
-          `ATENÇÃO: Existem ${invoices.recebidas.length} conta(s) a receber em status RECEBIDA.\n\n` +
-          `Essas parcelas serão mantidas no sistema, mas as parcelas PROVISIONADAS serão canceladas.`
+          mensagemParcelas +
+          `As parcelas RECEBIDAS serão mantidas no sistema.`
         )
-      }
-
-      // Cancelar provisionadas se houver (e não foram canceladas acima)
-      if (invoices.provisionadas.length > 0) {
-        const ids = invoices.provisionadas.map((inv: any) => inv.id)
-        await api.put('/invoices/update-multiple-status', { ids, status: 'CANCELADA' })
       }
     }
 
@@ -509,6 +587,15 @@ export default function NegotiationDetailsPage() {
 
   const handleConfirmCloseNegotiation = () => {
     setShowCloseNegotiationModal(false)
+    
+    // Se for tipo "Por hora", não criar parcelas e mostrar mensagem informativa
+    if (negotiation.tipoContratacao === 'HORAS') {
+      alert('Negociação com Tipo de Contratação "Por hora" não gera parcelas automaticamente.\n\nAs Contas a Receber serão criadas automaticamente quando houver horas lançadas para esta negociação.')
+      
+      // Pular direto para a criação do projeto
+      setShowProjectChoiceModal(true)
+      return
+    }
     
     // Função auxiliar para converter valor para número
     const getValorAsNumber = (valor: any): number => {
@@ -683,7 +770,25 @@ export default function NegotiationDetailsPage() {
       await api.put(`/negotiations/${negotiationId}`, { status: 'FECHADA' })
       await loadNegotiation()
       await loadProjects()
-      alert('Projeto criado manualmente com sucesso! Você pode adicionar tarefas na aba de Projetos.')
+      
+      // Verificar se deve perguntar sobre manutenção vinculada
+      const serviceTypesComManutencao = ['DESENVOLVIMENTOS', 'AUTOMACOES', 'ANALISE_DADOS']
+      if (serviceTypesComManutencao.includes(negotiation.serviceType)) {
+        // Calcular valor sugerido (10% do valor da proposta)
+        const valorSugerido = (negotiation.valorProposta || negotiation.valorTotal || 0) * 0.1
+        const dataInicioSugerida = negotiation.previsaoConclusao || negotiation.dataInicio || new Date().toISOString().split('T')[0]
+        const vencimentoSugerido = calcularVencimento12Meses(dataInicioSugerida)
+        
+        setManutencaoData({
+          descricaoManutencao: `Manutenção vinculada à negociação ${negotiation.numero || negotiationId}`,
+          valorMensalManutencao: valorSugerido.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          dataInicioManutencao: dataInicioSugerida,
+          vencimentoManutencao: vencimentoSugerido,
+        })
+        setShowManutencaoModal(true)
+      } else {
+        alert('Projeto criado manualmente com sucesso! Você pode adicionar tarefas na aba de Projetos.')
+      }
     } catch (error: any) {
       console.error('Erro ao criar projeto manualmente:', error)
       alert(error.response?.data?.message || 'Erro ao criar projeto manualmente')
@@ -695,11 +800,60 @@ export default function NegotiationDetailsPage() {
     try {
       await api.put(`/negotiations/${negotiationId}`, { status: 'FECHADA' })
       await loadNegotiation()
-      alert('Negociação fechada com sucesso!')
+      
+      // Verificar se deve perguntar sobre manutenção vinculada
+      const serviceTypesComManutencao = ['DESENVOLVIMENTOS', 'AUTOMACOES', 'ANALISE_DADOS']
+      if (serviceTypesComManutencao.includes(negotiation.serviceType)) {
+        // Calcular valor sugerido (10% do valor da proposta)
+        const valorSugerido = (negotiation.valorProposta || negotiation.valorTotal || 0) * 0.1
+        const dataInicioSugerida = negotiation.previsaoConclusao || negotiation.dataInicio || new Date().toISOString().split('T')[0]
+        const vencimentoSugerido = calcularVencimento12Meses(dataInicioSugerida)
+        
+        setManutencaoData({
+          descricaoManutencao: `Manutenção vinculada à negociação ${negotiation.numero || negotiationId}`,
+          valorMensalManutencao: valorSugerido.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          dataInicioManutencao: dataInicioSugerida,
+          vencimentoManutencao: vencimentoSugerido,
+        })
+        setShowManutencaoModal(true)
+      } else {
+        alert('Negociação fechada com sucesso!')
+      }
     } catch (error: any) {
       console.error('Erro ao fechar negociação:', error)
       alert('Erro ao fechar negociação')
     }
+  }
+
+  const handleCreateManutencao = async () => {
+    try {
+      const getValorAsNumber = (valorString: string): number => {
+        if (!valorString) return 0
+        const cleaned = valorString.replace(/\./g, '').replace(',', '.')
+        return parseFloat(cleaned) || 0
+      }
+
+      const valorMensal = getValorAsNumber(manutencaoData.valorMensalManutencao)
+      
+      await api.post(`/proposals/${negotiationId}/criar-manutencao-vinculada`, {
+        valorMensalManutencao: valorMensal,
+        dataInicioManutencao: manutencaoData.dataInicioManutencao,
+        vencimentoManutencao: manutencaoData.vencimentoManutencao,
+        descricaoManutencao: manutencaoData.descricaoManutencao,
+      })
+
+      setShowManutencaoModal(false)
+      await loadNegotiation()
+      alert('Proposta de manutenção vinculada criada com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao criar manutenção vinculada:', error)
+      alert(error.response?.data?.message || 'Erro ao criar manutenção vinculada')
+    }
+  }
+
+  const handleSkipManutencao = () => {
+    setShowManutencaoModal(false)
+    alert('Negociação fechada com sucesso!')
   }
 
   const handleSelectProjectTemplate = async () => {
@@ -795,13 +949,51 @@ export default function NegotiationDetailsPage() {
   }
 
   const handleUpdateTask = (taskId: string, field: string, value: any) => {
-    setTasksToCreate(tasksToCreate.map(task => 
-      task.id === taskId ? { ...task, [field]: value } : task
-    ))
+    const updatedTasks = tasksToCreate.map(task => {
+      if (task.id === taskId) {
+        const updatedTask = { ...task, [field]: value }
+        
+        // Se alterou data de início, ajustar data de conclusão se necessário
+        if (field === 'dataInicio' && updatedTask.dataConclusao) {
+          const inicioDate = new Date(updatedTask.dataInicio)
+          const conclusaoDate = new Date(updatedTask.dataConclusao)
+          if (conclusaoDate < inicioDate) {
+            // Se conclusão ficou antes do início, ajustar para o mesmo dia
+            updatedTask.dataConclusao = updatedTask.dataInicio
+          }
+        }
+        
+        // Se alterou data de conclusão, validar que não é antes do início
+        if (field === 'dataConclusao' && updatedTask.dataInicio) {
+          const inicioDate = new Date(updatedTask.dataInicio)
+          const conclusaoDate = new Date(updatedTask.dataConclusao)
+          if (conclusaoDate < inicioDate) {
+            // Se conclusão é antes do início, ajustar para o mesmo dia do início
+            updatedTask.dataConclusao = updatedTask.dataInicio
+            alert('A data de conclusão não pode ser anterior à data de início. Ajustada automaticamente.')
+          }
+        }
+        
+        // Se alterou data de conclusão de uma tarefa, recalcular tarefas dependentes
+        if (field === 'dataConclusao' && updatedTask.templateTaskId) {
+          // Encontrar tarefas que dependem desta
+          const dependentTasks = tasksToCreate.filter(t => 
+            t.templateTaskId && t.id !== taskId
+          )
+          
+          // Buscar no template quais tarefas dependem desta
+          // Por enquanto, vamos recalcular baseado na ordem sequencial
+          // (melhorias futuras podem usar tarefaAnteriorId do template)
+        }
+        
+        return updatedTask
+      }
+      return task
+    })
+    
+    setTasksToCreate(updatedTasks)
     // Também atualizar calculatedTasks para manter sincronizado
-    setCalculatedTasks(calculatedTasks.map(task => 
-      task.id === taskId ? { ...task, [field]: value } : task
-    ))
+    setCalculatedTasks(updatedTasks)
   }
 
   const handleAddNewTask = () => {
@@ -868,6 +1060,9 @@ export default function NegotiationDetailsPage() {
       const projectResponse = await api.post('/projects', projectData)
       const createdProject = projectResponse.data
 
+      // Se a negociação for "Por Horas", marcar todas as tarefas como exigir lançamento de horas
+      const exigirLancamentoHoras = negotiation.tipoContratacao === 'HORAS';
+      
       // Criar tarefas com os ajustes feitos pelo usuário
       for (const task of tasksToCreate) {
         const taskData: any = {
@@ -877,6 +1072,7 @@ export default function NegotiationDetailsPage() {
           dataConclusao: task.dataConclusao,
           status: 'PENDENTE',
           ordem: task.ordem,
+          exigirLancamentoHoras: exigirLancamentoHoras,
         }
         
         if (task.usuarioResponsavelId) {
@@ -1085,6 +1281,19 @@ export default function NegotiationDetailsPage() {
                   <p className="font-medium">{getServiceTypeLabel(negotiation.serviceType)}</p>
                 </div>
               )}
+              {negotiation.dataValidade && (
+                <div>
+                  <span className="text-sm text-gray-500">Data de Validade:</span>
+                  <p className="font-medium">{formatDate(negotiation.dataValidade)}</p>
+                </div>
+              )}
+              {negotiation.dataLimiteAceite && (
+                <div>
+                  <span className="text-sm text-gray-500">Data Limite para Aceite:</span>
+                  <p className="font-medium">{formatDate(negotiation.dataLimiteAceite)}</p>
+                  <p className="text-xs text-gray-400">Início dos trabalhos condicionado ao aceite até esta data</p>
+                </div>
+              )}
               {negotiation.valorProposta && (
                 <div>
                   <span className="text-sm text-gray-500">Valor da Proposta:</span>
@@ -1284,6 +1493,26 @@ export default function NegotiationDetailsPage() {
             }
           }
           
+          // Se não tem parcelas mas é ONESHOT, criar uma parcela única
+          if (!parcelasArray && negotiation?.formaFaturamento === 'ONESHOT') {
+            const valorProposta = negotiation.valorProposta || negotiation.valorTotal || 0
+            if (valorProposta > 0) {
+              const dataFaturamento = negotiation.inicioFaturamento || negotiation.dataFaturamento || negotiation.dataInicio || new Date().toISOString().split('T')[0]
+              const dataVencimento = negotiation.vencimento || negotiation.dataVencimento || (() => {
+                const data = new Date(dataFaturamento)
+                data.setDate(data.getDate() + 30)
+                return data.toISOString().split('T')[0]
+              })()
+              
+              parcelasArray = [{
+                numero: 1,
+                valor: valorProposta,
+                dataFaturamento: dataFaturamento,
+                dataVencimento: dataVencimento,
+              }]
+            }
+          }
+          
           const getInvoiceStatus = (parcelaNum: number) => {
             const invoice = invoicesByParcela[parcelaNum]
             return invoice?.status || null
@@ -1388,6 +1617,48 @@ export default function NegotiationDetailsPage() {
           ) : null
         })()}
 
+        {/* Negociações Vinculadas */}
+        {(negotiation?.propostaManutencaoId || negotiation?.temManutencaoVinculada) && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Negociações Vinculadas</h2>
+            </div>
+            {linkedNegotiation ? (
+              <div className="border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {linkedNegotiation.numero || linkedNegotiation.id} - {linkedNegotiation.title || linkedNegotiation.titulo}
+                      </h3>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(linkedNegotiation.status)}`}>
+                        {getStatusLabel(linkedNegotiation.status)}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <p><strong>Tipo de Serviço:</strong> {getServiceTypeLabel(linkedNegotiation.serviceType)}</p>
+                      {linkedNegotiation.valorProposta && (
+                        <p><strong>Valor:</strong> {formatCurrency(linkedNegotiation.valorProposta)}</p>
+                      )}
+                      {linkedNegotiation.descricaoManutencao && (
+                        <p><strong>Descrição:</strong> {linkedNegotiation.descricaoManutencao}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/negociacoes/${linkedNegotiation.id}`}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
+                  >
+                    Ver Detalhes
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-600 text-center py-4">Carregando negociação vinculada...</p>
+            )}
+          </div>
+        )}
+
         {/* Projetos Vinculados - Só mostrar se status for FECHADA, DECLINADA ou CANCELADA */}
         {shouldShowLinkedItems && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -1449,6 +1720,19 @@ export default function NegotiationDetailsPage() {
           </div>
         )}
 
+        {/* Seção de Aditivos - Só mostrar se atender aos critérios */}
+        {negotiation && (
+          <div className="mt-6">
+            <AditivosSection
+              proposalId={negotiation.id}
+              status={negotiation.status}
+              valorProposta={negotiation.valorProposta}
+              serviceType={negotiation.serviceType}
+              tipoContratacao={negotiation.tipoContratacao}
+            />
+          </div>
+        )}
+
         {/* Modal de Confirmação de Fechamento */}
         {showCloseNegotiationModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1456,6 +1740,9 @@ export default function NegotiationDetailsPage() {
               <h2 className="text-2xl font-bold mb-4">Confirmar Fechamento da Negociação</h2>
               <div className="space-y-2 mb-6">
                 <p><strong>Cliente:</strong> {negotiation.client?.razaoSocial || negotiation.client?.name || '-'}</p>
+                {negotiation.serviceType && (
+                  <p><strong>Tipo de Serviço:</strong> {getServiceTypeLabel(negotiation.serviceType)}</p>
+                )}
                 <p><strong>Valor da Proposta:</strong> {formatCurrency(negotiation.valorProposta || negotiation.valorTotal || 0)}</p>
                 {negotiation.tipoContratacao && (
                   <p><strong>Tipo de Contratação:</strong> {negotiation.tipoContratacao}</p>
@@ -1805,7 +2092,7 @@ export default function NegotiationDetailsPage() {
                             value={task.horasEstimadas || ''}
                             onChange={(e) => handleUpdateTask(task.id, 'horasEstimadas', e.target.value)}
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                            placeholder="Ex: 8:00"
+                            placeholder="Ex: 8h, 1h30min, 40 horas"
                           />
                         </td>
                         <td className="px-4 py-3">
@@ -1997,6 +2284,114 @@ export default function NegotiationDetailsPage() {
                   className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
                   Confirmar Ajustes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Criação de Manutenção Vinculada */}
+        {showManutencaoModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">Criar Proposta de Manutenção Vinculada</h2>
+              <p className="mb-6 text-gray-600">
+                Deseja criar uma proposta de manutenção vinculada a esta negociação? 
+                Após a entrega, esses tipos de serviços geralmente têm manutenções mensais.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descrição da Manutenção
+                  </label>
+                  <textarea
+                    value={manutencaoData.descricaoManutencao}
+                    onChange={(e) => setManutencaoData({ ...manutencaoData, descricaoManutencao: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Descreva os serviços de manutenção..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Valor Mensal (Valor da Proposta)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                    <input
+                      type="text"
+                      value={manutencaoData.valorMensalManutencao}
+                      onChange={(e) => {
+                        const formatted = e.target.value.replace(/\D/g, '')
+                        if (formatted) {
+                          const number = parseFloat(formatted) / 100
+                          setManutencaoData({
+                            ...manutencaoData,
+                            valorMensalManutencao: number.toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })
+                          })
+                        } else {
+                          setManutencaoData({ ...manutencaoData, valorMensalManutencao: '' })
+                        }
+                      }}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="0,00"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Sugestão: 10% do valor da proposta principal</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data de Início da Assinatura
+                    </label>
+                    <input
+                      type="date"
+                      value={manutencaoData.dataInicioManutencao}
+                      onChange={(e) => {
+                        const vencimento = calcularVencimento12Meses(e.target.value)
+                        setManutencaoData({
+                          ...manutencaoData,
+                          dataInicioManutencao: e.target.value,
+                          vencimentoManutencao: vencimento,
+                        })
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vencimento (12 meses após início)
+                    </label>
+                    <input
+                      type="date"
+                      value={manutencaoData.vencimentoManutencao}
+                      onChange={(e) => setManutencaoData({ ...manutencaoData, vencimentoManutencao: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Ajustável manualmente</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={handleCreateManutencao}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Criar Manutenção
+                </button>
+                <button
+                  onClick={handleSkipManutencao}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Não Criar
                 </button>
               </div>
             </div>

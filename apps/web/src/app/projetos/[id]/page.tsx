@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
+import { parseHoursToDecimal, formatHoursFromDecimal } from '@/utils/hourFormatter'
 
 type TabType = 'tasks' | 'kanban' | 'gantt' | 'hours' | 'reports'
 
@@ -29,6 +30,8 @@ export default function ProjectDetailsPage() {
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false)
   const [selectedTaskForHours, setSelectedTaskForHours] = useState<string | null>(null)
   const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<any>(null)
+  const [editingTimeEntry, setEditingTimeEntry] = useState<any>(null)
+  const [desiredStatus, setDesiredStatus] = useState<string | null>(null) // Status que o usuário deseja aplicar após lançar horas
   
   // Form states
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
@@ -40,6 +43,12 @@ export default function ProjectDetailsPage() {
     dataFimPrevista: '',
     status: 'PENDENTE',
     usuarioResponsavelId: '',
+    tipo: 'ATIVIDADE',
+    horaInicio: '',
+    horaFim: '',
+    semPrazoDefinido: false,
+    diaInteiro: false,
+    exigirLancamentoHoras: false,
   })
   const [newTimeEntry, setNewTimeEntry] = useState({
     taskId: '',
@@ -67,6 +76,14 @@ export default function ProjectDetailsPage() {
       setLoading(true)
       const response = await api.get(`/projects/${projectId}`)
       setProject(response.data)
+      
+      // Se o projeto está vinculado a uma negociação "Por Horas", pré-selecionar exigir lançamento de horas
+      if (response.data?.proposal?.tipoContratacao === 'HORAS') {
+        setNewTask(prev => ({
+          ...prev,
+          exigirLancamentoHoras: true
+        }))
+      }
     } catch (error: any) {
       console.error('Erro ao carregar projeto:', error)
       if (error.response?.status === 404) {
@@ -168,7 +185,13 @@ export default function ProjectDetailsPage() {
     try {
       await api.post(`/projects/${projectId}/tasks`, {
         ...newTask,
-        horasEstimadas: newTask.horasEstimadas ? parseFloat(newTask.horasEstimadas) : null,
+        horasEstimadas: newTask.horasEstimadas ? parseHoursToDecimal(newTask.horasEstimadas) : null,
+        tipo: newTask.tipo || 'ATIVIDADE',
+        horaInicio: newTask.tipo === 'EVENTO' && !newTask.diaInteiro ? newTask.horaInicio : null,
+        horaFim: newTask.tipo === 'EVENTO' && !newTask.diaInteiro ? newTask.horaFim : null,
+        semPrazoDefinido: newTask.tipo === 'ATIVIDADE' ? newTask.semPrazoDefinido : false,
+        diaInteiro: newTask.tipo === 'EVENTO' ? newTask.diaInteiro : false,
+        exigirLancamentoHoras: newTask.exigirLancamentoHoras || false,
       })
       alert('Tarefa criada com sucesso!')
       setShowCreateTaskModal(false)
@@ -180,6 +203,11 @@ export default function ProjectDetailsPage() {
         dataFimPrevista: '',
         status: 'PENDENTE',
         usuarioResponsavelId: currentUser?.id || '',
+        tipo: 'ATIVIDADE',
+        horaInicio: '',
+        horaFim: '',
+        semPrazoDefinido: false,
+        diaInteiro: false,
       })
       loadTasks()
       loadProject()
@@ -196,13 +224,65 @@ export default function ProjectDetailsPage() {
     }
 
     try {
-      await api.post(`/projects/${projectId}/time-entries`, {
-        ...newTimeEntry,
-        horas: parseFloat(newTimeEntry.horas),
-      })
-      alert('Horas registradas com sucesso!')
+      const horasDecimal = parseHoursToDecimal(newTimeEntry.horas)
+      if (horasDecimal === null) {
+        alert('Formato de horas inválido. Use: 8h, 1h30min, 4 horas, etc.')
+        return
+      }
+      
+      if (editingTimeEntry) {
+        // Editar time entry existente
+        await api.patch(`/projects/${projectId}/time-entries/${editingTimeEntry.id}`, {
+          ...newTimeEntry,
+          horas: horasDecimal,
+        })
+        alert('Horas atualizadas com sucesso!')
+      } else {
+        // Criar novo time entry
+        await api.post(`/projects/${projectId}/time-entries`, {
+          ...newTimeEntry,
+          horas: horasDecimal,
+        })
+        
+        // Se havia um status desejado (ex: CONCLUIDA), aplicar esse status
+        // Caso contrário, se a tarefa está Pendente, alterar para Em Progresso
+        const task = tasks.find(t => t.id === newTimeEntry.taskId)
+        if (desiredStatus && task) {
+          try {
+            await api.put(`/projects/${projectId}/tasks/${task.id}`, {
+              status: desiredStatus
+            })
+            setDesiredStatus(null) // Limpar o status desejado após aplicar
+          } catch (error) {
+            console.error('Erro ao atualizar status da tarefa:', error)
+            // Se falhar, tentar pelo menos mudar para EM_PROGRESSO se estava PENDENTE
+            if (task.status === 'PENDENTE') {
+              try {
+                await api.put(`/projects/${projectId}/tasks/${task.id}`, {
+                  status: 'EM_PROGRESSO'
+                })
+              } catch (error2) {
+                console.error('Erro ao atualizar status da tarefa:', error2)
+              }
+            }
+          }
+        } else if (task && task.status === 'PENDENTE') {
+          try {
+            await api.put(`/projects/${projectId}/tasks/${task.id}`, {
+              status: 'EM_PROGRESSO'
+            })
+          } catch (error) {
+            console.error('Erro ao atualizar status da tarefa:', error)
+          }
+        }
+        
+        alert('Horas registradas com sucesso!')
+      }
+      
       setShowRegisterHoursModal(false)
       setSelectedTaskForHours(null)
+      setEditingTimeEntry(null)
+      setDesiredStatus(null) // Limpar o status desejado
       setNewTimeEntry({
         taskId: selectedTaskForHours || '',
         horas: '',
@@ -213,8 +293,8 @@ export default function ProjectDetailsPage() {
       loadTasks()
       loadProject()
     } catch (error: any) {
-      console.error('Erro ao registrar horas:', error)
-      alert(error.response?.data?.message || 'Erro ao registrar horas')
+      console.error('Erro ao registrar/editar horas:', error)
+      alert(error.response?.data?.message || 'Erro ao registrar/editar horas')
     }
   }
 
@@ -506,6 +586,7 @@ export default function ProjectDetailsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data Fim Prevista</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Horas Estimadas</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Horas Trab.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Executor</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                   </tr>
                 </thead>
@@ -516,7 +597,14 @@ export default function ProjectDetailsPage() {
                       .reduce((sum, e) => sum + (parseFloat(e.horas) || 0), 0)
                     
                     return (
-                      <tr key={task.id} className="hover:bg-gray-50">
+                      <tr 
+                        key={task.id} 
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => {
+                          setSelectedTaskForDetails(task)
+                          setShowTaskDetailsModal(true)
+                        }}
+                      >
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900">{task.name}</div>
                           {task.description && (
@@ -540,10 +628,14 @@ export default function ProjectDetailsPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {taskHours.toFixed(2)}h
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {task.usuarioExecutor?.name || task.usuarioExecutor?.email || '-'}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex gap-2">
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setSelectedTaskForDetails(task)
                                 setShowTaskDetailsModal(true)
                               }}
@@ -552,7 +644,8 @@ export default function ProjectDetailsPage() {
                               Ver Detalhes
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setSelectedTaskForHours(task.id)
                                 setNewTimeEntry({
                                   taskId: task.id,
@@ -605,22 +698,53 @@ export default function ProjectDetailsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {timeEntries.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(entry.data)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {entry.task?.name || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {entry.horas}h
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {entry.descricao || '-'}
-                      </td>
-                    </tr>
-                  ))}
+                  {timeEntries.map((entry) => {
+                    const task = tasks.find(t => t.id === entry.taskId)
+                    return (
+                      <React.Fragment key={entry.id}>
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(entry.data)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            <div>
+                              <div className="font-medium">{entry.task?.name || '-'}</div>
+                              {task && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {task.dataInicio && `Início: ${formatDate(task.dataInicio)}`}
+                                  {task.dataInicio && task.dataFimPrevista && ' | '}
+                                  {task.dataFimPrevista && `Conclusão: ${formatDate(task.dataFimPrevista)}`}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatHoursFromDecimal(entry.horas) || `${entry.horas}h`}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {entry.descricao || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => {
+                                setEditingTimeEntry(entry)
+                                setNewTimeEntry({
+                                  taskId: entry.taskId || '',
+                                  horas: formatHoursFromDecimal(entry.horas) || entry.horas.toString(),
+                                  data: entry.data ? (typeof entry.data === 'string' ? entry.data.split('T')[0] : new Date(entry.data).toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
+                                  descricao: entry.descricao || '',
+                                })
+                                setShowRegisterHoursModal(true)
+                              }}
+                              className="text-primary-600 hover:text-primary-900"
+                            >
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             )}
@@ -692,6 +816,28 @@ export default function ProjectDetailsPage() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Registro *</label>
+                  <select
+                    value={newTask.tipo}
+                    onChange={(e) => {
+                      const newTipo = e.target.value
+                      setNewTask({ 
+                        ...newTask, 
+                        tipo: newTipo,
+                        // Limpar campos quando mudar tipo
+                        horaInicio: newTipo === 'EVENTO' ? newTask.horaInicio : '',
+                        horaFim: newTipo === 'EVENTO' ? newTask.horaFim : '',
+                        semPrazoDefinido: newTipo === 'ATIVIDADE' ? newTask.semPrazoDefinido : false,
+                        diaInteiro: newTipo === 'EVENTO' ? newTask.diaInteiro : false,
+                      })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="ATIVIDADE">Atividade</option>
+                    <option value="EVENTO">Evento</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
                   <textarea
                     value={newTask.description}
@@ -704,12 +850,15 @@ export default function ProjectDetailsPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Horas Estimadas</label>
                     <input
-                      type="number"
-                      step="0.5"
+                      type="text"
                       value={newTask.horasEstimadas}
                       onChange={(e) => setNewTask({ ...newTask, horasEstimadas: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Ex: 40h, 1h30min, 50 horas"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Formato: 40h, 1h30min, 50 horas, etc.
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -726,26 +875,102 @@ export default function ProjectDetailsPage() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
-                    <input
-                      type="date"
-                      value={newTask.dataInicio}
-                      onChange={(e) => setNewTask({ ...newTask, dataInicio: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Data Fim Prevista</label>
-                    <input
-                      type="date"
-                      value={newTask.dataFimPrevista}
-                      onChange={(e) => setNewTask({ ...newTask, dataFimPrevista: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                </div>
+                {/* Campos condicionais baseados no tipo */}
+                {newTask.tipo === 'ATIVIDADE' ? (
+                  <>
+                    <div className="flex items-center mb-2">
+                      <input
+                        type="checkbox"
+                        id="semPrazoDefinido"
+                        checked={newTask.semPrazoDefinido}
+                        onChange={(e) => setNewTask({ ...newTask, semPrazoDefinido: e.target.checked })}
+                        className="mr-2"
+                      />
+                      <label htmlFor="semPrazoDefinido" className="text-sm text-gray-700">
+                        Sem prazo definido
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
+                        <input
+                          type="date"
+                          value={newTask.dataInicio}
+                          onChange={(e) => setNewTask({ ...newTask, dataInicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      {!newTask.semPrazoDefinido && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Data de Conclusão</label>
+                          <input
+                            type="date"
+                            value={newTask.dataFimPrevista}
+                            onChange={(e) => setNewTask({ ...newTask, dataFimPrevista: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center mb-2">
+                      <input
+                        type="checkbox"
+                        id="diaInteiro"
+                        checked={newTask.diaInteiro}
+                        onChange={(e) => setNewTask({ ...newTask, diaInteiro: e.target.checked })}
+                        className="mr-2"
+                      />
+                      <label htmlFor="diaInteiro" className="text-sm text-gray-700">
+                        Dia inteiro
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Data de Início</label>
+                        <input
+                          type="date"
+                          value={newTask.dataInicio}
+                          onChange={(e) => setNewTask({ ...newTask, dataInicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Data de Término</label>
+                        <input
+                          type="date"
+                          value={newTask.dataFimPrevista}
+                          onChange={(e) => setNewTask({ ...newTask, dataFimPrevista: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    {!newTask.diaInteiro && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Hora de Início</label>
+                          <input
+                            type="time"
+                            value={newTask.horaInicio}
+                            onChange={(e) => setNewTask({ ...newTask, horaInicio: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Hora de Término</label>
+                          <input
+                            type="time"
+                            value={newTask.horaFim}
+                            onChange={(e) => setNewTask({ ...newTask, horaFim: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Envolvidos</label>
                   <select
@@ -768,6 +993,18 @@ export default function ProjectDetailsPage() {
                     <p className="text-xs text-red-600 mt-1">Nenhum usuário encontrado. Verifique se há usuários cadastrados.</p>
                   )}
                 </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="exigirLancamentoHoras"
+                    checked={newTask.exigirLancamentoHoras}
+                    onChange={(e) => setNewTask({ ...newTask, exigirLancamentoHoras: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <label htmlFor="exigirLancamentoHoras" className="text-sm text-gray-700">
+                    Exigir lançamento de horas ao concluir
+                  </label>
+                </div>
               </div>
               <div className="flex gap-2 mt-4">
                 <button
@@ -786,6 +1023,13 @@ export default function ProjectDetailsPage() {
                       dataInicio: '',
                       dataFimPrevista: '',
                       status: 'PENDENTE',
+                      usuarioResponsavelId: currentUser?.id || '',
+                      tipo: 'ATIVIDADE',
+                      horaInicio: '',
+                      horaFim: '',
+                      semPrazoDefinido: false,
+                      diaInteiro: false,
+                      exigirLancamentoHoras: project?.proposal?.tipoContratacao === 'HORAS' || false,
                     })
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
@@ -801,7 +1045,9 @@ export default function ProjectDetailsPage() {
         {showRegisterHoursModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Registrar Horas</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                {editingTimeEntry ? 'Editar Lançamento de Horas' : 'Registrar Horas'}
+              </h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Tarefa *</label>
@@ -831,12 +1077,18 @@ export default function ProjectDetailsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Horas *</label>
                   <input
-                    type="number"
-                    step="0.5"
+                    type="text"
                     value={newTimeEntry.horas}
-                    onChange={(e) => setNewTimeEntry({ ...newTimeEntry, horas: e.target.value })}
+                    onChange={(e) => {
+                      // Permitir apenas entrada de texto para horas absolutas
+                      setNewTimeEntry({ ...newTimeEntry, horas: e.target.value })
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ex: 8h, 1h30min, 4 horas, 2.5h"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Formato: 8h, 1h30min, 4 horas, 2.5h (aceita horas absolutas ou decimais)
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
@@ -853,12 +1105,13 @@ export default function ProjectDetailsPage() {
                   onClick={handleRegisterHours}
                   className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
-                  Registrar
+                  {editingTimeEntry ? 'Salvar Alterações' : 'Registrar'}
                 </button>
                 <button
                   onClick={() => {
                     setShowRegisterHoursModal(false)
                     setSelectedTaskForHours(null)
+                    setEditingTimeEntry(null)
                     setNewTimeEntry({
                       taskId: '',
                       horas: '',
@@ -976,6 +1229,61 @@ export default function ProjectDetailsPage() {
                   }
                   return null
                 })()}
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  value={selectedTaskForDetails.status}
+                  onChange={async (e) => {
+                    const newStatus = e.target.value
+                    try {
+                      await api.put(`/projects/${projectId}/tasks/${selectedTaskForDetails.id}`, {
+                        status: newStatus
+                      })
+                      await loadTasks()
+                      setSelectedTaskForDetails({ ...selectedTaskForDetails, status: newStatus })
+                      alert('Status atualizado com sucesso!')
+                    } catch (error: any) {
+                      console.error('Erro ao atualizar status:', error)
+                      const errorMessage = error.response?.data?.message || error.message || 'Erro ao atualizar status'
+                      
+                      // Se o erro for sobre exigir lançamento de horas, abrir modal de cadastro de horas
+                      if (errorMessage.includes('exige lançamento de horas') || errorMessage.includes('registre as horas')) {
+                        // Guardar o status desejado (CONCLUIDA) para aplicar após lançar as horas
+                        setDesiredStatus(newStatus)
+                        // Reverter o status no select
+                        setSelectedTaskForDetails({ ...selectedTaskForDetails })
+                        // Abrir modal de cadastro de horas
+                        setNewTimeEntry({
+                          taskId: selectedTaskForDetails.id,
+                          horas: '',
+                          data: new Date().toISOString().split('T')[0],
+                          descricao: '',
+                        })
+                        setSelectedTaskForHours(selectedTaskForDetails.id)
+                        setShowRegisterHoursModal(true)
+                      } else {
+                        alert(errorMessage)
+                        // Reverter o status no select em caso de outro erro
+                        setSelectedTaskForDetails({ ...selectedTaskForDetails })
+                        setDesiredStatus(null)
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="PENDENTE">Pendente</option>
+                  <option value="EM_PROGRESSO">Em Progresso</option>
+                  <option value="CONCLUIDA">Concluída</option>
+                  <option value="BLOQUEADA">Bloqueada</option>
+                  <option value="CANCELADA">Cancelada</option>
+                </select>
+                {selectedTaskForDetails.exigirLancamentoHoras && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    ⚠️ Esta tarefa exige lançamento de horas antes de ser concluída.
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2 mt-6">

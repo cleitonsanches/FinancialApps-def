@@ -11,6 +11,7 @@ export default function NegociacoesPage() {
   const [negotiations, setNegotiations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
+  const [serviceTypes, setServiceTypes] = useState<any[]>([])
   const loadingRef = useRef(false)
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export default function NegociacoesPage() {
       return
     }
     loadNegotiations()
+    loadServiceTypes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -81,12 +83,34 @@ export default function NegociacoesPage() {
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       RASCUNHO: 'Rascunho',
+      ENVIADA: 'Enviada',
+      RE_ENVIADA: 'Re-enviada',
+      REVISADA: 'Revisada',
       EM_NEGOCIACAO: 'Em Negociação',
       FECHADA: 'Fechada',
       CANCELADA: 'Cancelada',
       DECLINADA: 'Declinada',
     }
     return labels[status] || status
+  }
+
+  const handleStatusChange = async (negotiationId: string, newStatus: string, currentStatus: string) => {
+    // Se for FECHADA, CANCELADA ou DECLINADA, redirecionar para página de detalhes
+    // onde os modais e lógicas já estão implementados
+    if (newStatus === 'FECHADA' || newStatus === 'CANCELADA' || newStatus === 'DECLINADA') {
+      router.push(`/negociacoes/${negotiationId}?changeStatus=${newStatus}`)
+      return
+    }
+
+    // Para outros status (ENVIADA, RE_ENVIADA, REVISADA), apenas atualizar via API
+    try {
+      await api.put(`/negotiations/${negotiationId}`, { status: newStatus })
+      alert('Status alterado com sucesso!')
+      loadNegotiations()
+    } catch (error: any) {
+      console.error('Erro ao alterar status:', error)
+      alert(error.response?.data?.message || 'Erro ao alterar status')
+    }
   }
 
   const handleDelete = async (negotiationId: string) => {
@@ -104,7 +128,31 @@ export default function NegociacoesPage() {
     }
   }
 
+  const loadServiceTypes = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const companyId = payload.companyId
+      
+      if (companyId) {
+        const response = await api.get(`/service-types?companyId=${companyId}`)
+        setServiceTypes(response.data || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar tipos de serviço:', error)
+    }
+  }
+
   const getServiceTypeLabel = (serviceType: string) => {
+    if (!serviceType) return '-'
+    // Buscar na lista de tipos de serviço carregados
+    const serviceTypeObj = serviceTypes.find(st => st.code === serviceType || st.name === serviceType)
+    if (serviceTypeObj) {
+      return serviceTypeObj.name
+    }
+    // Fallback para mapeamento estático se não encontrar
     const labels: Record<string, string> = {
       AUTOMACOES: 'Automações',
       CONSULTORIA: 'Consultoria',
@@ -114,6 +162,7 @@ export default function NegociacoesPage() {
       ASSINATURAS: 'Assinaturas',
       MANUTENCOES: 'Manutenções',
       DESENVOLVIMENTOS: 'Desenvolvimentos',
+      CONTRATO_FIXO: 'Contrato Fixo',
     }
     return labels[serviceType] || serviceType
   }
@@ -242,9 +291,25 @@ export default function NegociacoesPage() {
                       className="px-6 py-4 whitespace-nowrap"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(negotiation.status)}`}>
-                        {getStatusLabel(negotiation.status)}
-                      </span>
+                      <select
+                        value={negotiation.status}
+                        onChange={(e) => handleStatusChange(negotiation.id, e.target.value, negotiation.status)}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer ${getStatusColor(negotiation.status)}`}
+                        style={{ 
+                          appearance: 'auto',
+                          background: 'transparent',
+                          paddingRight: '20px'
+                        }}
+                      >
+                        <option value="RASCUNHO">Rascunho</option>
+                        <option value="ENVIADA">Enviada</option>
+                        <option value="RE_ENVIADA">Re-enviada</option>
+                        <option value="REVISADA">Revisada</option>
+                        <option value="FECHADA">Fechada</option>
+                        <option value="CANCELADA">Cancelada</option>
+                        <option value="DECLINADA">Declinada</option>
+                      </select>
                     </td>
                     <td 
                       className="px-6 py-4 whitespace-nowrap text-sm font-medium"

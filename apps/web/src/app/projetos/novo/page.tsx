@@ -11,6 +11,7 @@ export default function NovoProjetoPage() {
   const [loading, setLoading] = useState(false)
   const [clients, setClients] = useState<any[]>([])
   const [templates, setTemplates] = useState<any[]>([])
+  const [negotiations, setNegotiations] = useState<any[]>([])
   
   const [formData, setFormData] = useState({
     name: '',
@@ -20,6 +21,7 @@ export default function NovoProjetoPage() {
     dataInicio: '',
     dataFim: '',
     templateId: '',
+    proposalId: '',
   })
 
   useEffect(() => {
@@ -30,6 +32,7 @@ export default function NovoProjetoPage() {
     }
     loadClients()
     loadTemplates()
+    loadNegotiations()
   }, [router])
 
   const loadClients = async () => {
@@ -50,6 +53,33 @@ export default function NovoProjetoPage() {
     }
   }
 
+  const getCompanyIdFromToken = (): string | null => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return null
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.companyId || null
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error)
+      return null
+    }
+  }
+
+  const loadNegotiations = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      // Carregar apenas negociações com status FECHADA
+      const url = companyId 
+        ? `/negotiations?companyId=${companyId}&status=FECHADA` 
+        : '/negotiations?status=FECHADA'
+      const response = await api.get(url)
+      setNegotiations(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar negociações:', error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -60,9 +90,18 @@ export default function NovoProjetoPage() {
 
     try {
       setLoading(true)
+      const companyId = getCompanyIdFromToken()
+      
+      if (!companyId) {
+        alert('Erro: Não foi possível identificar a empresa. Faça login novamente.')
+        router.push('/auth/login')
+        return
+      }
+
       const payload: any = {
         name: formData.name,
         status: formData.status,
+        companyId: companyId,
       }
 
       if (formData.description) {
@@ -79,6 +118,9 @@ export default function NovoProjetoPage() {
       }
       if (formData.templateId) {
         payload.templateId = formData.templateId
+      }
+      if (formData.proposalId) {
+        payload.proposalId = formData.proposalId
       }
 
       const response = await api.post('/projects', payload)
@@ -136,6 +178,48 @@ export default function NovoProjetoPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 rows={4}
               />
+            </div>
+
+            {/* Negociação */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Vincular a Negociação (opcional)
+              </label>
+              <select
+                value={formData.proposalId}
+                onChange={(e) => {
+                  const selectedNegotiationId = e.target.value
+                  setFormData({ ...formData, proposalId: selectedNegotiationId })
+                  
+                  // Preencher automaticamente cliente e data se selecionar uma negociação
+                  if (selectedNegotiationId) {
+                    const selectedNegotiation = negotiations.find(n => n.id === selectedNegotiationId)
+                    if (selectedNegotiation) {
+                      setFormData(prev => ({
+                        ...prev,
+                        proposalId: selectedNegotiationId,
+                        clientId: selectedNegotiation.clientId || prev.clientId,
+                        dataInicio: selectedNegotiation.dataInicio 
+                          ? new Date(selectedNegotiation.dataInicio).toISOString().split('T')[0]
+                          : prev.dataInicio,
+                      }))
+                    }
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              >
+                <option value="">Selecione uma negociação (opcional)...</option>
+                {negotiations.map((negotiation) => (
+                  <option key={negotiation.id} value={negotiation.id}>
+                    {negotiation.numero ? `${negotiation.numero} - ` : ''}
+                    {negotiation.title || negotiation.titulo || 'Sem título'} 
+                    {negotiation.client?.razaoSocial ? ` - ${negotiation.client.razaoSocial}` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Apenas negociações com status FECHADA são exibidas. Ao selecionar, o cliente e data de início serão preenchidos automaticamente.
+              </p>
             </div>
 
             {/* Cliente */}
