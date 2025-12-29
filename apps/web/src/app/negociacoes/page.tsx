@@ -12,6 +12,7 @@ export default function NegociacoesPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [serviceTypes, setServiceTypes] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<'RASCUNHO' | 'ENVIADA' | 'CANCELADA' | 'DECLINADA' | 'FECHADA'>('RASCUNHO')
   const loadingRef = useRef(false)
 
   useEffect(() => {
@@ -168,16 +169,36 @@ export default function NegociacoesPage() {
   }
 
 
+  const handleClearFilters = () => {
+    setFilter('')
+  }
+
   const filteredNegotiations = negotiations.filter((negotiation) => {
-    if (!filter) return true
-    const searchTerm = filter.toLowerCase()
-    return (
-      negotiation.numero?.toLowerCase().includes(searchTerm) ||
-      negotiation.title?.toLowerCase().includes(searchTerm) ||
-      negotiation.titulo?.toLowerCase().includes(searchTerm) ||
-      negotiation.client?.razaoSocial?.toLowerCase().includes(searchTerm) ||
-      negotiation.client?.name?.toLowerCase().includes(searchTerm)
-    )
+    // Filtro por aba (status)
+    if (activeTab === 'ENVIADA') {
+      // Agrupar ENVIADA, RE_ENVIADA e REVISADA
+      if (!['ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(negotiation.status)) {
+        return false
+      }
+    } else {
+      if (negotiation.status !== activeTab) {
+        return false
+      }
+    }
+
+    // Filtro de busca
+    if (filter) {
+      const searchTerm = filter.toLowerCase()
+      return (
+        negotiation.numero?.toLowerCase().includes(searchTerm) ||
+        negotiation.title?.toLowerCase().includes(searchTerm) ||
+        negotiation.titulo?.toLowerCase().includes(searchTerm) ||
+        negotiation.client?.razaoSocial?.toLowerCase().includes(searchTerm) ||
+        negotiation.client?.name?.toLowerCase().includes(searchTerm)
+      )
+    }
+
+    return true
   })
 
   if (loading) {
@@ -203,26 +224,98 @@ export default function NegociacoesPage() {
             </button>
             <NavigationLinks />
           </div>
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Negociações</h1>
-            <Link
-              href="/negociacoes/nova"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              + Nova Negociação
-            </Link>
+          <h1 className="text-3xl font-bold text-gray-900">Negociações</h1>
+        </div>
+
+        {/* Abas de Status */}
+        <div className="bg-white rounded-lg shadow-md mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('RASCUNHO')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'RASCUNHO'
+                    ? 'border-gray-500 text-gray-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Rascunho
+              </button>
+              <button
+                onClick={() => setActiveTab('ENVIADA')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'ENVIADA'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Enviada/Re-enviada/Revisada
+              </button>
+              <button
+                onClick={() => setActiveTab('CANCELADA')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'CANCELADA'
+                    ? 'border-red-500 text-red-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Cancelada
+              </button>
+              <button
+                onClick={() => setActiveTab('DECLINADA')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'DECLINADA'
+                    ? 'border-orange-500 text-orange-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Declinada
+              </button>
+              <button
+                onClick={() => setActiveTab('FECHADA')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'FECHADA'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Fechada
+              </button>
+            </nav>
           </div>
         </div>
 
-        {/* Filtro */}
+        {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <input
-            type="text"
-            placeholder="Buscar por número, título ou cliente..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-          />
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Buscar por número, título ou cliente..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+            />
+          </div>
+          {/* Contador e botões em linha separada */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <span className="text-sm text-gray-600 font-medium">
+              {filteredNegotiations.length} negociação(ões) encontrada(s)
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+              >
+                Limpar Filtros
+              </button>
+              <Link
+                href="/negociacoes/nova"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
+              >
+                + Nova Negociação
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Lista de Negociações */}
@@ -230,7 +323,12 @@ export default function NegociacoesPage() {
           {filteredNegotiations.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-gray-600 mb-4">
-                {filter ? 'Nenhuma negociação encontrada com o filtro aplicado' : 'Nenhuma negociação cadastrada'}
+                {filter 
+                  ? 'Nenhuma negociação encontrada com o filtro aplicado' 
+                  : `Nenhuma negociação ${activeTab === 'RASCUNHO' ? 'em rascunho' : 
+                      activeTab === 'ENVIADA' ? 'enviada/re-enviada/revisada' :
+                      activeTab === 'CANCELADA' ? 'cancelada' :
+                      activeTab === 'DECLINADA' ? 'declinada' : 'fechada'} cadastrada`}
               </p>
               {!filter && (
                 <Link

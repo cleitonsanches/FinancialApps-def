@@ -15,6 +15,10 @@ export class AccountsPayableService {
     if (companyId) {
       where.companyId = companyId;
     }
+    
+    // Atualizar status automaticamente antes de retornar
+    await this.updateStatusAutomatically(companyId);
+    
     return this.accountPayableRepository.find({
       where,
       relations: ['supplier', 'chartOfAccounts', 'bankAccount', 'destinatarioFaturaReembolso'],
@@ -22,10 +26,54 @@ export class AccountsPayableService {
     });
   }
 
+  /**
+   * Atualiza automaticamente o status das contas a pagar:
+   * - 3 dias antes do vencimento: PROVISIONADA -> AGUARDANDO_PAGAMENTO
+   */
+  async updateStatusAutomatically(companyId?: string): Promise<void> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Data de 3 dias a partir de hoje
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(today.getDate() + 3);
+    threeDaysFromNow.setHours(23, 59, 59, 999);
+    
+    const where: any = {
+      status: 'PROVISIONADA',
+    };
+    if (companyId) {
+      where.companyId = companyId;
+    }
+    
+    // Buscar contas provisionadas que estão a 3 dias ou menos do vencimento
+    const accountsToUpdate = await this.accountPayableRepository.find({
+      where,
+    });
+    
+    let updatedCount = 0;
+    for (const account of accountsToUpdate) {
+      const dueDate = new Date(account.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      
+      // Se a data de vencimento está entre hoje e 3 dias a partir de hoje
+      if (dueDate >= today && dueDate <= threeDaysFromNow) {
+        await this.accountPayableRepository.update(account.id, {
+          status: 'AGUARDANDO_PAGAMENTO',
+        });
+        updatedCount++;
+      }
+    }
+    
+    if (updatedCount > 0) {
+      console.log(`✅ ${updatedCount} conta(s) a pagar atualizada(s) para AGUARDANDO_PAGAMENTO`);
+    }
+  }
+
   async findOne(id: string): Promise<AccountPayable> {
     const accountPayable = await this.accountPayableRepository.findOne({
       where: { id },
-      relations: ['supplier', 'chartOfAccounts', 'bankAccount', 'destinatarioFaturaReembolso', 'reimbursements'],
+      relations: ['supplier', 'chartOfAccounts', 'bankAccount', 'destinatarioFaturaReembolso'],
     });
     if (!accountPayable) {
       throw new NotFoundException(`Conta a pagar com ID ${id} não encontrada`);

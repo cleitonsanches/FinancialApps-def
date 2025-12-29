@@ -61,6 +61,41 @@ export class TimeEntry {
   @Column({ name: 'status', type: 'varchar', length: 20, default: 'PENDENTE' })
   status?: string; // PENDENTE, APROVADA, REPROVADA
 
+  @Column({ name: 'motivo_reprovacao', type: 'text', nullable: true })
+  motivoReprovacao?: string;
+
+  @Column({ name: 'motivo_aprovacao', type: 'text', nullable: true })
+  motivoAprovacao?: string;
+
+  @Column({ name: 'is_faturavel', type: 'boolean', default: false })
+  isFaturavel?: boolean;
+
+  @Column({ name: 'valor_por_hora', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  valorPorHora?: number;
+
+  @Column({ name: 'aprovado_por', nullable: true })
+  aprovadoPor?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'aprovado_por' })
+  aprovador?: User;
+
+  @Column({ name: 'aprovado_em', type: 'datetime', nullable: true })
+  aprovadoEm?: Date;
+
+  @Column({ name: 'faturamento_desprezado', type: 'boolean', default: false })
+  faturamentoDesprezado?: boolean;
+
+  @Column({ name: 'reprovado_por', nullable: true })
+  reprovadoPor?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'reprovado_por' })
+  reprovador?: User;
+
+  @Column({ name: 'reprovado_em', type: 'datetime', nullable: true })
+  reprovadoEm?: Date;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

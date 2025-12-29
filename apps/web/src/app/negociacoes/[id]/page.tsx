@@ -7,6 +7,7 @@ import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
 import AditivosSection from '@/components/negotiations/AditivosSection'
 import { calcularVencimento12Meses } from '@/utils/negotiationCalculations'
+import { formatHoursFromDecimal } from '@/utils/hourFormatter'
 
 export default function NegotiationDetailsPage() {
   const params = useParams()
@@ -20,6 +21,7 @@ export default function NegotiationDetailsPage() {
   const [tasks, setTasks] = useState<any[]>([])
   const [projectTemplates, setProjectTemplates] = useState<any[]>([])
   const [serviceTypes, setServiceTypes] = useState<any[]>([])
+  const [timeEntries, setTimeEntries] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Estados dos modais
@@ -68,6 +70,7 @@ export default function NegotiationDetailsPage() {
     loadProjectTemplates()
     loadUsers()
     loadCurrentUser()
+    loadTimeEntries()
   }, [negotiationId, router])
 
   // Verificar se há parâmetro de mudança de status na URL
@@ -88,6 +91,12 @@ export default function NegotiationDetailsPage() {
       loadRelatedInvoices()
     }
   }, [negotiation?.id, negotiation?.status])
+
+  useEffect(() => {
+    if (negotiationId && projects.length >= 0) {
+      loadTimeEntries()
+    }
+  }, [negotiationId, projects.length])
 
   // Debug: monitorar mudanças em calculatedParcels
   useEffect(() => {
@@ -166,6 +175,116 @@ export default function NegotiationDetailsPage() {
       setTasks(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error)
+    }
+  }
+
+  const loadTimeEntries = async () => {
+    try {
+      // Buscar todas as horas trabalhadas relacionadas à negociação
+      // Pode ser via proposalId direto ou via projetos vinculados
+      const allTimeEntries: any[] = []
+      
+      // Buscar horas com proposalId direto
+      try {
+        const response = await api.get('/projects/time-entries')
+        const directEntries = (response.data || []).filter(
+          (entry: any) => entry.proposalId === negotiationId
+        )
+        allTimeEntries.push(...directEntries)
+      } catch (error) {
+        console.warn('Erro ao buscar time entries diretos:', error)
+      }
+      
+      // Buscar projetos vinculados se ainda não foram carregados
+      let linkedProjects = projects
+      if (linkedProjects.length === 0) {
+        try {
+          const projectsResponse = await api.get('/projects')
+          linkedProjects = projectsResponse.data.filter((p: any) => p.proposalId === negotiationId)
+        } catch (error) {
+          console.warn('Erro ao buscar projetos para horas:', error)
+        }
+      }
+      
+      // Buscar horas via projetos vinculados
+      if (linkedProjects.length > 0) {
+        const projectPromises = linkedProjects.map(async (project: any) => {
+          try {
+            const response = await api.get(`/projects/${project.id}/time-entries`)
+            return response.data || []
+          } catch (error) {
+            return []
+          }
+        })
+        const projectEntries = await Promise.all(projectPromises)
+        projectEntries.forEach(entries => {
+          entries.forEach((entry: any) => {
+            if (!allTimeEntries.find(e => e.id === entry.id)) {
+              allTimeEntries.push(entry)
+            }
+          })
+        })
+      }
+      
+      // Buscar invoices para verificar status (FATURADA ou RECEBIDA)
+      try {
+        // Tentar obter companyId da negociação ou do token
+        let companyId = negotiation?.companyId
+        if (!companyId) {
+          companyId = getCompanyIdFromToken()
+        }
+        if (companyId) {
+          const invoicesResponse = await api.get(`/invoices?companyId=${companyId}`)
+          const timesheetInvoices = (invoicesResponse.data || []).filter(
+            (invoice: any) => invoice.origem === 'TIMESHEET' && invoice.approvedTimeEntries
+          )
+          
+          // Criar mapa de status da invoice por hora (entryId -> invoice status)
+          const invoiceStatusByTimeEntry: Record<string, string> = {}
+          timesheetInvoices.forEach((invoice: any) => {
+            try {
+              const approvedEntries: string[] = JSON.parse(invoice.approvedTimeEntries)
+              approvedEntries.forEach((entryId: string) => {
+                // Se a invoice tem status RECEBIDA, priorizar esse status
+                if (invoice.status === 'RECEBIDA') {
+                  invoiceStatusByTimeEntry[entryId] = 'RECEBIDA'
+                } else if (invoice.status === 'FATURADA' && !invoiceStatusByTimeEntry[entryId]) {
+                  // Se já não está como RECEBIDA, pode ser FATURADA
+                  invoiceStatusByTimeEntry[entryId] = 'FATURADA'
+                }
+              })
+            } catch (e) {
+              // Ignorar erros de parse
+            }
+          })
+          
+          // Atualizar status das horas aprovadas baseado no status da invoice
+          allTimeEntries.forEach((entry: any) => {
+            if (entry.status === 'APROVADA' && invoiceStatusByTimeEntry[entry.id]) {
+              entry.displayStatus = invoiceStatusByTimeEntry[entry.id]
+            } else {
+              entry.displayStatus = entry.status || 'PENDENTE'
+            }
+          })
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar invoices para verificar status:', error)
+        // Se não conseguir buscar invoices, usar status original
+        allTimeEntries.forEach((entry: any) => {
+          entry.displayStatus = entry.status || 'PENDENTE'
+        })
+      }
+      
+      // Ordenar por data (mais recente primeiro)
+      allTimeEntries.sort((a, b) => {
+        const dateA = new Date(a.data).getTime()
+        const dateB = new Date(b.data).getTime()
+        return dateB - dateA
+      })
+      
+      setTimeEntries(allTimeEntries)
+    } catch (error) {
+      console.error('Erro ao carregar horas trabalhadas:', error)
     }
   }
 
@@ -1716,6 +1835,104 @@ export default function NegotiationDetailsPage() {
                   })}
                 </tbody>
               </table>
+            )}
+          </div>
+        )}
+
+        {/* Horas Trabalhadas - Só mostrar se status for FECHADA, DECLINADA ou CANCELADA */}
+        {shouldShowLinkedItems && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Horas Trabalhadas</h2>
+            </div>
+
+            {timeEntries.length === 0 ? (
+              <p className="text-gray-600 text-center py-8">
+                Nenhuma hora trabalhada registrada para esta negociação
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Data
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Projeto
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tarefa
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Horas
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Usuário
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {timeEntries.map((entry) => (
+                      <tr key={entry.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(entry.data)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {entry.project?.name || entry.projectName || '-'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {entry.task?.name || entry.taskName || '-'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span className="font-semibold">
+                            {formatHoursFromDecimal(entry.horas)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            entry.displayStatus === 'RECEBIDA'
+                              ? 'bg-blue-100 text-blue-800'
+                              : entry.displayStatus === 'FATURADA'
+                              ? 'bg-purple-100 text-purple-800'
+                              : entry.displayStatus === 'APROVADA' 
+                              ? 'bg-green-100 text-green-800'
+                              : entry.displayStatus === 'REPROVADA'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {entry.displayStatus === 'RECEBIDA' ? 'Recebida' :
+                             entry.displayStatus === 'FATURADA' ? 'Faturada' :
+                             entry.displayStatus === 'APROVADA' ? 'Aprovada' : 
+                             entry.displayStatus === 'REPROVADA' ? 'Reprovada' : 'Pendente'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {entry.user?.name || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <Link
+                            href={`/horas-trabalhadas/${entry.id}`}
+                            className="text-primary-600 hover:text-primary-900"
+                          >
+                            Ver Detalhes
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}

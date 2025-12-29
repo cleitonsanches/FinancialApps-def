@@ -6,6 +6,7 @@ import { TimeEntry } from '../../database/entities/time-entry.entity';
 import { Proposal } from '../../database/entities/proposal.entity';
 import { Invoice } from '../../database/entities/invoice.entity';
 import { ChartOfAccounts } from '../../database/entities/chart-of-accounts.entity';
+import { Client } from '../../database/entities/client.entity';
 
 @Injectable()
 export class ProjectsService {
@@ -22,6 +23,8 @@ export class ProjectsService {
     private invoiceRepository: Repository<Invoice>,
     @InjectRepository(ChartOfAccounts)
     private chartOfAccountsRepository: Repository<ChartOfAccounts>,
+    @InjectRepository(Client)
+    private clientRepository: Repository<Client>,
   ) {}
 
   async findAll(companyId?: string): Promise<Project[]> {
@@ -247,7 +250,7 @@ export class ProjectsService {
       // Agora buscar com TypeORM e relações
       const entries = await this.timeEntryRepository.find({
         where: { id: In(ids) },
-        relations: ['task', 'user', 'project', 'project.client', 'project.proposal', 'proposal', 'proposal.client', 'client'],
+        relations: ['task', 'user', 'aprovador', 'reprovador', 'project', 'project.client', 'project.proposal', 'proposal', 'proposal.client', 'client'],
         order: { data: 'DESC' },
       });
       console.log('Service encontrou entries com relações:', entries.length);
@@ -262,7 +265,7 @@ export class ProjectsService {
         try {
           const entries = await this.timeEntryRepository.find({
             where: { id: In(ids) },
-            relations: ['task', 'user', 'project', 'project.client'],
+            relations: ['task', 'user', 'aprovador', 'reprovador', 'project', 'project.client'],
             order: { data: 'DESC' },
           });
           console.log('Service encontrou entries (sem proposal/client):', entries.length);
@@ -272,7 +275,7 @@ export class ProjectsService {
           // Última tentativa: buscar apenas os campos básicos
           return await this.timeEntryRepository.find({
             where: { id: In(ids) },
-            relations: ['task', 'user', 'project'],
+            relations: ['task', 'user', 'aprovador', 'reprovador', 'project'],
             order: { data: 'DESC' },
           });
         }
@@ -283,21 +286,35 @@ export class ProjectsService {
 
   async findTimeEntries(projectId?: string, proposalId?: string, clientId?: string): Promise<TimeEntry[]> {
     console.log('findTimeEntries chamado com:', { projectId, proposalId, clientId });
-    const where: any = {};
-    if (projectId) {
-      where.projectId = projectId;
-    }
-    if (proposalId) {
-      where.proposalId = proposalId;
-    }
-    if (clientId) {
-      where.clientId = clientId;
-    }
-    console.log('Where clause:', where);
+    
     try {
+      // Se nenhum filtro foi fornecido, retornar todas as entries
+      if (!projectId && !proposalId && !clientId) {
+        console.log('Nenhum filtro fornecido, buscando todas as entries');
+        const entries = await this.timeEntryRepository.find({
+          relations: ['task', 'user', 'aprovador', 'reprovador', 'project', 'project.client', 'proposal', 'proposal.client', 'client'],
+          order: { data: 'DESC' },
+        });
+        console.log('findTimeEntries encontrou:', entries.length, 'entries (sem filtro)');
+        return entries;
+      }
+      
+      // Se há filtros, construir where clause
+      const where: any = {};
+      if (projectId) {
+        where.projectId = projectId;
+      }
+      if (proposalId) {
+        where.proposalId = proposalId;
+      }
+      if (clientId) {
+        where.clientId = clientId;
+      }
+      console.log('Where clause:', where);
+      
       const entries = await this.timeEntryRepository.find({
         where,
-        relations: ['task', 'user', 'project', 'project.client', 'proposal', 'proposal.client', 'client'],
+          relations: ['task', 'user', 'aprovador', 'reprovador', 'project', 'project.client', 'proposal', 'proposal.client', 'client'],
         order: { data: 'DESC' },
       });
       console.log('findTimeEntries encontrou:', entries.length, 'entries');
@@ -307,9 +324,31 @@ export class ProjectsService {
       // Se houver erro relacionado a colunas que não existem, tentar sem as novas relações
       if (error.message && (error.message.includes('proposal_id') || error.message.includes('client_id') || error.message.includes('no such column'))) {
         console.warn('Erro ao carregar relações de time entries, tentando sem proposal/client:', error.message);
+        
+        // Tentar sem filtros primeiro
+        if (!projectId && !proposalId && !clientId) {
+          const entries = await this.timeEntryRepository.find({
+            relations: ['task', 'user', 'aprovador', 'reprovador', 'project', 'project.client'],
+            order: { data: 'DESC' },
+          });
+          console.log('findTimeEntries encontrou (sem proposal/client, sem filtro):', entries.length, 'entries');
+          return entries;
+        }
+        
+        const where: any = {};
+        if (projectId) {
+          where.projectId = projectId;
+        }
+        if (proposalId) {
+          where.proposalId = proposalId;
+        }
+        if (clientId) {
+          where.clientId = clientId;
+        }
+        
         const entries = await this.timeEntryRepository.find({
           where,
-          relations: ['task', 'user', 'project', 'project.client'],
+          relations: ['task', 'user', 'aprovador', 'reprovador', 'project', 'project.client'],
           order: { data: 'DESC' },
         });
         console.log('findTimeEntries encontrou (sem proposal/client):', entries.length, 'entries');
@@ -323,6 +362,14 @@ export class ProjectsService {
     // Validar que pelo menos um vínculo existe
     if (!timeEntryData.projectId && !timeEntryData.proposalId && !timeEntryData.clientId) {
       throw new Error('É necessário vincular a um Projeto, Negociação ou Cliente');
+    }
+    
+    // Garantir que isFaturavel seja salvo corretamente (pode vir como string 'true' do frontend)
+    if (timeEntryData.isFaturavel !== undefined) {
+      const isFaturavelValue = timeEntryData.isFaturavel;
+      timeEntryData.isFaturavel = isFaturavelValue === true || 
+                                   (typeof isFaturavelValue === 'string' && isFaturavelValue === 'true') || 
+                                   (typeof isFaturavelValue === 'number' && isFaturavelValue === 1);
     }
     
     const timeEntry = this.timeEntryRepository.create(timeEntryData);
@@ -431,7 +478,7 @@ export class ProjectsService {
     try {
       return await this.timeEntryRepository.findOne({ 
         where: { id: saved.id },
-        relations: ['task', 'user', 'project'],
+        relations: ['task', 'user', 'aprovador', 'reprovador', 'project'],
       }) || saved;
     } catch (error: any) {
       // Se houver erro, retornar o saved sem relações
@@ -439,29 +486,151 @@ export class ProjectsService {
     }
   }
 
-  async updateTimeEntry(entryId: string, timeEntryData: Partial<TimeEntry>): Promise<TimeEntry> {
+  async updateTimeEntry(entryId: string, timeEntryData: Partial<TimeEntry>, userId?: string): Promise<TimeEntry> {
     // Converter data se for string
     if (timeEntryData.data && typeof timeEntryData.data === 'string') {
       timeEntryData.data = new Date(timeEntryData.data);
     }
     
     // Validar que pelo menos um vínculo existe (se estiver sendo atualizado)
-    const existingEntry = await this.timeEntryRepository.findOne({ where: { id: entryId } });
+    const existingEntry = await this.timeEntryRepository.findOne({ 
+      where: { id: entryId },
+      relations: ['project', 'proposal', 'client'],
+    });
+    
     if (existingEntry) {
-      const hasProject = timeEntryData.projectId !== undefined ? timeEntryData.projectId : existingEntry.projectId;
-      const hasProposal = timeEntryData.proposalId !== undefined ? timeEntryData.proposalId : existingEntry.proposalId;
-      const hasClient = timeEntryData.clientId !== undefined ? timeEntryData.clientId : existingEntry.clientId;
+      // Só validar vínculos se estivermos atualizando os campos de vínculo
+      // Se apenas estivermos atualizando status ou outros campos, usar os vínculos existentes
+      const isUpdatingVinculos = timeEntryData.projectId !== undefined || 
+                                  timeEntryData.proposalId !== undefined || 
+                                  timeEntryData.clientId !== undefined;
       
-      if (!hasProject && !hasProposal && !hasClient) {
-        throw new Error('É necessário vincular a um Projeto, Negociação ou Cliente');
+      if (isUpdatingVinculos) {
+        const hasProject = timeEntryData.projectId !== undefined ? timeEntryData.projectId : existingEntry.projectId;
+        const hasProposal = timeEntryData.proposalId !== undefined ? timeEntryData.proposalId : existingEntry.proposalId;
+        const hasClient = timeEntryData.clientId !== undefined ? timeEntryData.clientId : existingEntry.clientId;
+        
+        if (!hasProject && !hasProposal && !hasClient) {
+          throw new Error('É necessário vincular a um Projeto, Negociação ou Cliente');
+        }
+      }
+
+      // Se está mudando para REPROVADA, salvar informações de reprovação
+      if (timeEntryData.status === 'REPROVADA' && existingEntry.status !== 'REPROVADA') {
+        // Se estava APROVADA, remover da invoice
+        if (existingEntry.status === 'APROVADA') {
+          await this.removeTimeEntryFromInvoice(entryId, existingEntry);
+        }
+        // Salvar informações de reprovação (sempre que muda para REPROVADA)
+        timeEntryData.reprovadoEm = new Date();
+        if (userId) {
+          timeEntryData.reprovadoPor = userId;
+        }
+        console.log('Salvando informações de reprovação:', {
+          entryId,
+          reprovadoEm: timeEntryData.reprovadoEm,
+          reprovadoPor: timeEntryData.reprovadoPor,
+          userId
+        });
       }
     }
     
     await this.timeEntryRepository.update({ id: entryId }, timeEntryData);
     return this.timeEntryRepository.findOne({ 
       where: { id: entryId },
-      relations: ['task', 'user', 'project'],
+      relations: ['task', 'user', 'aprovador', 'reprovador', 'project'],
     });
+  }
+
+  private async removeTimeEntryFromInvoice(entryId: string, timeEntry: TimeEntry): Promise<void> {
+    try {
+      // Buscar todas as invoices que contêm esta hora no approvedTimeEntries
+      const allInvoices = await this.invoiceRepository.find({
+        where: {
+          origem: 'TIMESHEET',
+        },
+      });
+
+      // Encontrar a invoice que contém esta hora
+      let invoiceToUpdate: Invoice | null = null;
+      for (const invoice of allInvoices) {
+        if (!invoice.approvedTimeEntries) continue;
+        
+        try {
+          const approvedEntries: string[] = JSON.parse(invoice.approvedTimeEntries);
+          if (approvedEntries.includes(entryId)) {
+            invoiceToUpdate = invoice;
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!invoiceToUpdate) {
+        // Se não encontrou invoice, não há nada a fazer
+        return;
+      }
+
+      // Calcular valor da hora para subtrair
+      let valorPorHora = 0;
+      let proposal: Proposal | null = null;
+
+      // Buscar valor por hora da negociação
+      if (timeEntry.proposalId) {
+        proposal = await this.proposalRepository.findOne({
+          where: { id: timeEntry.proposalId },
+        });
+        if (proposal && proposal.tipoContratacao === 'HORAS') {
+          valorPorHora = parseFloat(String(proposal.valorPorHora || 0));
+        }
+      } else if (timeEntry.projectId) {
+        const project = await this.projectRepository.findOne({
+          where: { id: timeEntry.projectId },
+          relations: ['proposal'],
+        });
+        if (project?.proposalId) {
+          proposal = await this.proposalRepository.findOne({
+            where: { id: project.proposalId },
+          });
+          if (proposal && proposal.tipoContratacao === 'HORAS') {
+            valorPorHora = parseFloat(String(proposal.valorPorHora || 0));
+          }
+        }
+      }
+
+      // Se não é faturável, apenas remover do array
+      if (valorPorHora === 0) {
+        const approvedEntries: string[] = JSON.parse(invoiceToUpdate.approvedTimeEntries || '[]');
+        const updatedEntries = approvedEntries.filter(id => id !== entryId);
+        invoiceToUpdate.approvedTimeEntries = updatedEntries.length > 0 ? JSON.stringify(updatedEntries) : null;
+        await this.invoiceRepository.save(invoiceToUpdate);
+        return;
+      }
+
+      // Calcular valor a subtrair
+      const horas = parseFloat(String(timeEntry.horas || 0));
+      const valorASubtrair = horas * valorPorHora;
+
+      // Remover hora do array
+      const approvedEntries: string[] = JSON.parse(invoiceToUpdate.approvedTimeEntries || '[]');
+      const updatedEntries = approvedEntries.filter(id => id !== entryId);
+
+      // Atualizar invoice
+      const currentValue = parseFloat(String(invoiceToUpdate.grossValue || 0));
+      invoiceToUpdate.grossValue = Math.max(0, currentValue - valorASubtrair);
+      invoiceToUpdate.approvedTimeEntries = updatedEntries.length > 0 ? JSON.stringify(updatedEntries) : null;
+
+      // Se não há mais horas aprovadas e o valor é 0, podemos remover a invoice
+      if (updatedEntries.length === 0 && invoiceToUpdate.grossValue === 0 && invoiceToUpdate.status === 'PROVISIONADA') {
+        await this.invoiceRepository.remove(invoiceToUpdate);
+      } else {
+        await this.invoiceRepository.save(invoiceToUpdate);
+      }
+    } catch (error) {
+      console.error('Erro ao remover hora da invoice:', error);
+      // Não lançar erro para não impedir a reprovação
+    }
   }
 
   async findTaskById(taskId: string): Promise<ProjectTask | null> {
@@ -471,18 +640,43 @@ export class ProjectsService {
     });
   }
 
-  async approveTimeEntry(entryId: string, companyId?: string): Promise<{ timeEntry: TimeEntry; invoice?: Invoice }> {
+  async approveTimeEntry(entryId: string, companyId?: string, motivoAprovacao?: string, valorPorHora?: number, criarInvoice: boolean = true, aprovadoPor?: string): Promise<{ timeEntry: TimeEntry; invoice?: Invoice }> {
+    console.log('=== approveTimeEntry chamado ===');
+    console.log('entryId:', entryId);
+    console.log('companyId recebido:', companyId);
+    console.log('motivoAprovacao:', motivoAprovacao);
+    console.log('valorPorHora recebido:', valorPorHora, 'tipo:', typeof valorPorHora);
+    console.log('criarInvoice:', criarInvoice);
+    
     // Buscar a hora trabalhada
     const timeEntry = await this.timeEntryRepository.findOne({
       where: { id: entryId },
-      relations: ['project', 'proposal', 'client', 'user'],
+      relations: ['project', 'proposal', 'client', 'user', 'aprovador', 'reprovador'],
     });
 
     if (!timeEntry) {
       throw new BadRequestException('Hora trabalhada não encontrada');
     }
+    
+    // Se clientId não estiver salvo diretamente, tentar obter da relação client
+    if (!timeEntry.clientId && timeEntry.client?.id) {
+      timeEntry.clientId = timeEntry.client.id;
+      // Atualizar no banco para manter consistência
+      await this.timeEntryRepository.update({ id: entryId }, { clientId: timeEntry.client.id });
+    }
+    
+    console.log('timeEntry encontrado:', {
+      id: timeEntry.id,
+      projectId: timeEntry.projectId,
+      proposalId: timeEntry.proposalId,
+      clientId: timeEntry.clientId,
+      clientIdFromRelation: timeEntry.client?.id,
+      isFaturavel: timeEntry.isFaturavel,
+      valorPorHora: timeEntry.valorPorHora,
+      status: timeEntry.status
+    });
 
-    // Se não tiver companyId, tentar obter do projeto ou negociação
+    // Se não tiver companyId, tentar obter do projeto, negociação ou cliente
     if (!companyId) {
       if (timeEntry.projectId) {
         const project = await this.projectRepository.findOne({
@@ -504,10 +698,21 @@ export class ProjectsService {
           companyId = proposal.companyId;
         }
       }
+      
+      // Se ainda não tiver, tentar do cliente
+      if (!companyId && timeEntry.clientId) {
+        const client = await this.clientRepository.findOne({
+          where: { id: timeEntry.clientId },
+          select: ['companyId'],
+        });
+        if (client?.companyId) {
+          companyId = client.companyId;
+        }
+      }
     }
 
     if (!companyId) {
-      throw new BadRequestException('Não foi possível determinar a empresa. Verifique se a hora trabalhada está vinculada a um projeto ou negociação.');
+      throw new BadRequestException('Não foi possível determinar a empresa. Verifique se a hora trabalhada está vinculada a um projeto, negociação ou cliente.');
     }
 
     // Verificar se já está aprovada
@@ -516,10 +721,18 @@ export class ProjectsService {
     }
 
     // Determinar se é faturável
-    let isFaturavel = false;
+    // Primeiro verificar se a hora tem isFaturavel marcado explicitamente
+    let isFaturavel = timeEntry.isFaturavel || false;
     let proposal: Proposal | null = null;
     let clientId: string | null = null;
-    let valorPorHora = 0;
+    let valorPorHoraCalculado = 0;
+
+    // Se valorPorHora foi fornecido no request, usar esse valor e salvar na hora
+    if (valorPorHora && valorPorHora > 0) {
+      valorPorHoraCalculado = valorPorHora;
+      // Salvar o valorPorHora na hora trabalhada
+      await this.timeEntryRepository.update({ id: entryId }, { valorPorHora: valorPorHora });
+    }
 
     // Verificar se tem proposalId direto
     if (timeEntry.proposalId) {
@@ -528,7 +741,10 @@ export class ProjectsService {
       });
       if (proposal && proposal.tipoContratacao === 'HORAS') {
         isFaturavel = true;
-        valorPorHora = parseFloat(String(proposal.valorPorHora || 0));
+        // Só usar valor da proposal se não foi fornecido no request
+        if (!valorPorHoraCalculado) {
+          valorPorHoraCalculado = parseFloat(String(proposal.valorPorHora || 0));
+        }
         clientId = proposal.clientId;
       }
     }
@@ -545,7 +761,10 @@ export class ProjectsService {
         });
         if (proposal && proposal.tipoContratacao === 'HORAS') {
           isFaturavel = true;
-          valorPorHora = parseFloat(String(proposal.valorPorHora || 0));
+          // Só usar valor da proposal se não foi fornecido no request
+          if (!valorPorHoraCalculado) {
+            valorPorHoraCalculado = parseFloat(String(proposal.valorPorHora || 0));
+          }
           clientId = proposal.clientId || project.clientId;
         }
       } else if (project?.clientId) {
@@ -553,27 +772,90 @@ export class ProjectsService {
       }
     }
 
-    // Se ainda não tem cliente, usar o clientId direto da hora
-    if (!clientId && timeEntry.clientId) {
-      clientId = timeEntry.clientId;
+    // Se ainda não tem cliente, usar o clientId direto da hora ou da relação client
+    if (!clientId) {
+      if (timeEntry.clientId) {
+        clientId = timeEntry.clientId;
+      } else if (timeEntry.client?.id) {
+        clientId = timeEntry.client.id;
+        // Atualizar no banco para manter consistência
+        await this.timeEntryRepository.update({ id: entryId }, { clientId: timeEntry.client.id });
+      }
     }
 
-    // Atualizar status da hora para APROVADA
-    await this.timeEntryRepository.update({ id: entryId }, { status: 'APROVADA' });
+    // Se a hora tem isFaturavel marcado explicitamente (vinculada apenas a cliente), considerar faturável
+    if (timeEntry.isFaturavel && !isFaturavel) {
+      isFaturavel = true;
+      // Se está vinculada apenas a cliente, garantir que temos o clientId
+      if (!clientId) {
+        if (timeEntry.clientId) {
+          clientId = timeEntry.clientId;
+        } else if (timeEntry.client?.id) {
+          clientId = timeEntry.client.id;
+          // Atualizar no banco para manter consistência
+          await this.timeEntryRepository.update({ id: entryId }, { clientId: timeEntry.client.id });
+        }
+      }
+    }
 
-    // Se não é faturável, apenas retornar
-    if (!isFaturavel) {
+    // Se a hora tem isFaturavel mas não tem valorPorHora ainda, usar o fornecido no request ou o salvo
+    if (isFaturavel && !valorPorHoraCalculado) {
+      if (timeEntry.valorPorHora) {
+        valorPorHoraCalculado = parseFloat(String(timeEntry.valorPorHora));
+      }
+    }
+    
+    console.log('Após determinar faturável:', {
+      isFaturavel,
+      clientId,
+      valorPorHoraCalculado,
+      criarInvoice
+    });
+
+    // Atualizar status da hora para APROVADA e motivo se fornecido
+    const updateData: any = { 
+      status: 'APROVADA',
+      aprovadoEm: new Date(),
+      faturamentoDesprezado: isFaturavel && !criarInvoice // Se é faturável mas não deve criar invoice, marcar como desprezado
+    };
+    if (motivoAprovacao) {
+      updateData.motivoAprovacao = motivoAprovacao;
+    }
+    if (aprovadoPor) {
+      updateData.aprovadoPor = aprovadoPor;
+    }
+    await this.timeEntryRepository.update({ id: entryId }, updateData);
+
+    // Se não é faturável ou se não deve criar invoice, apenas retornar
+    if (!isFaturavel || !criarInvoice) {
       return { timeEntry: await this.timeEntryRepository.findOne({ where: { id: entryId } }) };
     }
 
-    // Se é faturável, criar ou atualizar invoice
+    // Se é faturável e deve criar invoice, criar ou atualizar invoice
     if (!clientId) {
-      throw new BadRequestException('Não foi possível determinar o cliente para criar a conta a receber');
+      console.error('ERRO: clientId não encontrado para hora faturável', {
+        timeEntryId: timeEntry.id,
+        timeEntryClientId: timeEntry.clientId,
+        clientRelationId: timeEntry.client?.id,
+        hasClientRelation: !!timeEntry.client,
+        isFaturavel: isFaturavel,
+        criarInvoice: criarInvoice
+      });
+      throw new BadRequestException('Não foi possível determinar o cliente para criar a conta a receber. A hora trabalhada precisa estar vinculada a um cliente. Por favor, edite a hora trabalhada e vincule-a a um cliente antes de aprovar.');
+    }
+
+    if (!valorPorHoraCalculado || valorPorHoraCalculado <= 0) {
+      console.error('ERRO: valorPorHora não informado ou inválido', {
+        valorPorHoraCalculado,
+        valorPorHoraRecebido: valorPorHora,
+        valorPorHoraSalvo: timeEntry.valorPorHora
+      });
+      throw new BadRequestException('Valor por hora não informado ou inválido. É necessário informar o valor por hora para criar a conta a receber.');
     }
 
     // Calcular valor
     const horas = parseFloat(String(timeEntry.horas || 0));
-    const valor = horas * valorPorHora;
+    const valor = horas * valorPorHoraCalculado;
 
     // Buscar invoice provisionada do mesmo cliente para agrupar
     let invoice = await this.invoiceRepository.findOne({

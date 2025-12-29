@@ -27,7 +27,7 @@ export default function NavigationLinks() {
   }, [showFinanceMenu])
 
   return (
-    <div className="flex gap-2 flex-wrap">
+    <div className="flex gap-2 flex-nowrap items-center">
       {/* Dashboard */}
       <Link
         href="/dashboard"

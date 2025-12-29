@@ -13,7 +13,7 @@ export async function ensureTimeEntriesTable(dataSource: DataSource): Promise<vo
       await queryRunner.query(`
         CREATE TABLE IF NOT EXISTS time_entries (
           id TEXT PRIMARY KEY,
-          project_id TEXT NOT NULL,
+          project_id TEXT,
           task_id TEXT,
           user_id TEXT,
           data TEXT NOT NULL,

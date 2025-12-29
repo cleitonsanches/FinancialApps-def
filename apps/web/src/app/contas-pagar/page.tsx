@@ -14,6 +14,7 @@ export default function ContasPagarPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [activeTotalizer, setActiveTotalizer] = useState<string | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -23,6 +24,16 @@ export default function ContasPagarPage() {
     }
     loadAccountsPayable()
   }, [router])
+
+  // Sincronizar activeTotalizer com statusFilter (apenas quando mudado pelo select)
+  useEffect(() => {
+    if (statusFilter && statusFilter !== activeTotalizer) {
+      setActiveTotalizer(statusFilter)
+    } else if (!statusFilter && activeTotalizer) {
+      setActiveTotalizer(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter])
 
   const getCompanyIdFromToken = (): string | null => {
     try {
@@ -100,8 +111,23 @@ export default function ContasPagarPage() {
     }
 
     // Filtro de status
-    if (statusFilter && accountPayable.status !== statusFilter) {
-      return false
+    if (statusFilter) {
+      if (statusFilter === 'ATRASADAS') {
+        // Lógica especial para atrasadas
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const dueDate = new Date(accountPayable.dueDate)
+        dueDate.setHours(0, 0, 0, 0)
+        const isOverdue = dueDate < today
+        const notPaid = accountPayable.status !== 'PAGA'
+        const notCancelled = accountPayable.status !== 'CANCELADA'
+        
+        if (!(isOverdue && notPaid && notCancelled)) {
+          return false
+        }
+      } else if (accountPayable.status !== statusFilter) {
+        return false
+      }
     }
 
     // Filtro de período (data de vencimento)
@@ -121,14 +147,50 @@ export default function ContasPagarPage() {
     return true
   })
 
+  const handleClearFilters = () => {
+    setFilter('')
+    setStatusFilter('')
+    setDateFrom('')
+    setDateTo('')
+    setActiveTotalizer(null)
+  }
+
+  const handleTotalizerClick = (type: string) => {
+    if (activeTotalizer === type) {
+      // Se já está ativo, desativa
+      setActiveTotalizer(null)
+      setStatusFilter('')
+    } else {
+      // Ativa o filtro
+      setActiveTotalizer(type)
+      if (type === 'ATRASADAS') {
+        // Para atrasadas, não usar statusFilter, mas sim uma lógica especial
+        setStatusFilter('ATRASADAS')
+      } else {
+        setStatusFilter(type)
+      }
+    }
+  }
+
   // Calcular totalizadores por status
   const calculateTotalsByStatus = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     return {
       PROVISIONADA: filteredAccountsPayable
         .filter(ap => ap.status === 'PROVISIONADA')
         .reduce((sum, ap) => sum + parseFloat(ap.totalValue?.toString() || '0'), 0),
       AGUARDANDO_PAGAMENTO: filteredAccountsPayable
         .filter(ap => ap.status === 'AGUARDANDO_PAGAMENTO')
+        .reduce((sum, ap) => sum + parseFloat(ap.totalValue?.toString() || '0'), 0),
+      ATRASADAS: filteredAccountsPayable
+        .filter(ap => {
+          // Contas que já passaram do vencimento e não foram pagas
+          const dueDate = new Date(ap.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
+          return dueDate < today && ap.status !== 'PAGA' && ap.status !== 'CANCELADA';
+        })
         .reduce((sum, ap) => sum + parseFloat(ap.totalValue?.toString() || '0'), 0),
       PAGA: filteredAccountsPayable
         .filter(ap => ap.status === 'PAGA')
@@ -161,66 +223,97 @@ export default function ContasPagarPage() {
             </button>
             <NavigationLinks />
           </div>
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Contas a Pagar</h1>
-            <Link
-              href="/contas-pagar/nova"
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              + Nova Conta a Pagar
-            </Link>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900">Contas a Pagar</h1>
         </div>
 
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end mb-4">
             <div className="lg:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Buscar
+              </label>
               <input
                 type="text"
                 placeholder="Buscar por descrição, fornecedor ou código..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Status
+              </label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Todos os Status</option>
                 <option value="PROVISIONADA">Provisionada</option>
                 <option value="AGUARDANDO_PAGAMENTO">Aguardando Pagamento</option>
+                <option value="ATRASADAS">Atrasadas</option>
                 <option value="PAGA">Paga</option>
                 <option value="CANCELADA">Cancelada</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Data Inicial (Vencimento)</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-              />
+            <div className="md:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por Período (Vencimento)
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">Data Inicial</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">Data Final</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Data Final (Vencimento)</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-              />
+          </div>
+          {/* Contador e botões em linha separada */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <span className="text-sm text-gray-600 font-medium">
+              {filteredAccountsPayable.length} Conta(s) a Pagar encontrada(s)
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+              >
+                Limpar Filtros
+              </button>
+              <Link
+                href="/contas-pagar/nova"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
+              >
+                + Nova Conta a Pagar
+              </Link>
             </div>
           </div>
         </div>
 
         {/* Totalizadores por Status */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'PROVISIONADA' ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('PROVISIONADA')}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Provisionada</p>
@@ -233,7 +326,12 @@ export default function ContasPagarPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'AGUARDANDO_PAGAMENTO' ? 'ring-2 ring-yellow-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('AGUARDANDO_PAGAMENTO')}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Aguardando Pagamento</p>
@@ -246,7 +344,30 @@ export default function ContasPagarPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 border-2 border-red-200 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'ATRASADAS' ? 'ring-2 ring-red-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('ATRASADAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Atrasadas</p>
+                <p className="text-2xl font-bold text-red-600">
+                  R$ {totalizadores.ATRASADAS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-red-100 rounded-full p-3">
+                <span className="text-red-600 text-2xl">⚠️</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'PAGA' ? 'ring-2 ring-green-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('PAGA')}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Paga</p>

@@ -15,6 +15,25 @@ export default function InvoiceDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
   const [approvedTimeEntries, setApprovedTimeEntries] = useState<any[]>([])
+  const [chartOfAccounts, setChartOfAccounts] = useState<any[]>([])
+  const [invoiceHistory, setInvoiceHistory] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  
+  // Modal EDITAR
+  const [showEditarModal, setShowEditarModal] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    grossValue: '',
+    emissionDate: '',
+    dueDate: '',
+    numeroNF: '',
+    tipoEmissao: 'NF' as 'NF' | 'EF',
+    desconto: '',
+    acrescimo: '',
+    chartOfAccountsId: '',
+  })
+  
+  // Modal CANCELAR
+  const [showCancelarModal, setShowCancelarModal] = useState(false)
   
   // Modal FATURADA
   const [showFaturadaModal, setShowFaturadaModal] = useState(false)
@@ -23,7 +42,9 @@ export default function InvoiceDetailsPage() {
     valor: '',
     numeroNF: '',
     tipoEmissao: 'NF' as 'NF' | 'EF', // NF = Nota Fiscal, EF = Emissão Fiscal (sem NF)
+    chartOfAccountsId: '', // Classificação
   })
+  const [selectedTimeEntries, setSelectedTimeEntries] = useState<string[]>([]) // IDs das horas selecionadas
   
   // Modal RECEBIMENTO
   const [showRecebimentoModal, setShowRecebimentoModal] = useState(false)
@@ -60,7 +81,15 @@ export default function InvoiceDetailsPage() {
     }
     loadInvoice()
     loadBankAccounts()
+    loadChartOfAccounts()
+    loadClients()
   }, [invoiceId, router])
+
+  useEffect(() => {
+    if (invoice) {
+      loadInvoiceHistory()
+    }
+  }, [invoice])
 
   const loadInvoice = async () => {
     try {
@@ -75,6 +104,7 @@ export default function InvoiceDetailsPage() {
           valor: response.data.grossValue ? parseFloat(response.data.grossValue.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
           numeroNF: response.data.numeroNF || '',
           tipoEmissao: response.data.tipoEmissao || 'NF',
+          chartOfAccountsId: response.data.chartOfAccountsId || '',
         })
 
         // Carregar horas aprovadas se a invoice tiver origem TIMESHEET
@@ -194,6 +224,51 @@ export default function InvoiceDetailsPage() {
     }
   }
 
+  const loadChartOfAccounts = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const companyId = payload.companyId
+      
+      if (companyId) {
+        const response = await api.get(`/chart-of-accounts?companyId=${companyId}`)
+        // Filtrar apenas classificações de RECEITA
+        const receitas = (response.data || []).filter((acc: any) => acc.type === 'RECEITA')
+        setChartOfAccounts(receitas)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar plano de contas:', error)
+    }
+  }
+
+  const loadClients = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const companyId = payload.companyId
+      
+      if (companyId) {
+        const response = await api.get(`/clients?companyId=${companyId}`)
+        setClients(response.data || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error)
+    }
+  }
+
+  const loadInvoiceHistory = async () => {
+    try {
+      const response = await api.get(`/invoices/${invoiceId}/history`)
+      setInvoiceHistory(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error)
+    }
+  }
+
   const loadParcelasProvisionadas = async () => {
     try {
       if (!invoice?.proposalId) return
@@ -207,14 +282,19 @@ export default function InvoiceDetailsPage() {
     }
   }
 
-  const formatDate = (dateString: string | Date | null | undefined) => {
+  const formatDate = (dateString: string | Date | null | undefined, includeTime: boolean = false) => {
     if (!dateString) return '-'
     const date = typeof dateString === 'string' 
-      ? new Date(dateString + 'T00:00:00') 
+      ? new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00') 
       : new Date(dateString)
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
+    if (includeTime) {
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${day}/${month}/${year} ${hours}:${minutes}`
+    }
     return `${day}/${month}/${year}`
   }
 
@@ -251,9 +331,205 @@ export default function InvoiceDetailsPage() {
     return labels[status] || status
   }
 
+  const getFieldDisplayName = (fieldName: string | null | undefined): string => {
+    if (!fieldName) return '-'
+    
+    const fieldLabels: Record<string, string> = {
+      grossValue: 'Valor Bruto',
+      emissionDate: 'Data de Emissão',
+      dueDate: 'Data de Vencimento',
+      numeroNF: 'Número da NF',
+      tipoEmissao: 'Tipo de Emissão',
+      desconto: 'Desconto',
+      acrescimo: 'Acréscimo',
+      chartOfAccountsId: 'Classificação',
+      status: 'Status',
+      dataRecebimento: 'Data de Recebimento',
+      contaCorrenteId: 'Conta Corrente',
+    }
+    
+    return fieldLabels[fieldName] || fieldName
+  }
+
+  const formatFieldValue = (fieldName: string | null | undefined, value: string | null | undefined): string => {
+    if (!value || value === '-' || value === 'null' || value === 'undefined') return '-'
+    
+    // Formatar valores monetários
+    if (fieldName === 'grossValue' || fieldName === 'desconto' || fieldName === 'acrescimo') {
+      const numValue = parseFloat(value)
+      if (!isNaN(numValue)) {
+        return formatCurrency(numValue)
+      }
+    }
+    
+    // Formatar datas
+    if (fieldName === 'emissionDate' || fieldName === 'dueDate' || fieldName === 'dataRecebimento') {
+      return formatDate(value)
+    }
+    
+    // Traduzir status
+    if (fieldName === 'status') {
+      return getStatusLabel(value)
+    }
+    
+    // Traduzir tipo de emissão
+    if (fieldName === 'tipoEmissao') {
+      return value === 'NF' ? 'Nota Fiscal' : value === 'EF' ? 'Emissão Fiscal (sem NF)' : value
+    }
+    
+    return value
+  }
+
+  const formatCurrencyInput = (value: string): string => {
+    const numbers = value.replace(/\D/g, '')
+    if (!numbers) return ''
+    const number = parseFloat(numbers) / 100
+    return number.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  }
+
+  const getValorAsNumberFromInput = (value: string): number => {
+    if (!value) return 0
+    const numbers = value.replace(/\D/g, '')
+    return parseFloat(numbers) / 100
+  }
+
+  const handleOpenEditarModal = () => {
+    if (!invoice) return
+    
+    setEditFormData({
+      grossValue: invoice.grossValue 
+        ? parseFloat(invoice.grossValue.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
+      emissionDate: invoice.emissionDate 
+        ? new Date(invoice.emissionDate).toISOString().split('T')[0] 
+        : new Date().toISOString().split('T')[0],
+      dueDate: invoice.dueDate 
+        ? new Date(invoice.dueDate).toISOString().split('T')[0] 
+        : '',
+      numeroNF: invoice.numeroNF || '',
+      tipoEmissao: invoice.tipoEmissao || 'NF',
+      desconto: invoice.desconto 
+        ? parseFloat(invoice.desconto.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
+      acrescimo: invoice.acrescimo 
+        ? parseFloat(invoice.acrescimo.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
+      chartOfAccountsId: invoice.chartOfAccountsId || '',
+    })
+    setShowEditarModal(true)
+  }
+
+  const handleSaveEditar = async () => {
+    try {
+      if (!editFormData.dueDate) {
+        alert('Por favor, preencha a data de vencimento.')
+        return
+      }
+
+      if (!editFormData.grossValue) {
+        alert('Por favor, preencha o valor.')
+        return
+      }
+
+      const payload: any = {
+        grossValue: getValorAsNumberFromInput(editFormData.grossValue),
+        emissionDate: editFormData.emissionDate,
+        dueDate: editFormData.dueDate,
+        numeroNF: editFormData.numeroNF || null,
+        tipoEmissao: editFormData.tipoEmissao,
+        desconto: editFormData.desconto ? getValorAsNumberFromInput(editFormData.desconto) : 0,
+        acrescimo: editFormData.acrescimo ? getValorAsNumberFromInput(editFormData.acrescimo) : 0,
+        chartOfAccountsId: editFormData.chartOfAccountsId || null,
+      }
+
+      await api.put(`/invoices/${invoiceId}`, payload)
+
+      setShowEditarModal(false)
+      await loadInvoice()
+      await loadInvoiceHistory()
+      alert('Conta a receber atualizada com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao atualizar conta a receber:', error)
+      alert(error.response?.data?.message || 'Erro ao atualizar conta a receber')
+    }
+  }
+
+  const handleCancelar = () => {
+    setShowCancelarModal(true)
+  }
+
+  const handleConfirmCancelar = async () => {
+    try {
+      await api.put(`/invoices/${invoiceId}`, {
+        status: 'CANCELADA',
+      })
+
+      setShowCancelarModal(false)
+      await loadInvoice()
+      await loadInvoiceHistory()
+      alert('Conta a receber cancelada com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao cancelar conta a receber:', error)
+      alert(error.response?.data?.message || 'Erro ao cancelar conta a receber')
+    }
+  }
+
   const handleMarkAsFaturada = () => {
+    // Inicializar horas selecionadas com todas as horas aprovadas
+    if (approvedTimeEntries.length > 0) {
+      setSelectedTimeEntries(approvedTimeEntries.map((entry: any) => entry.id))
+    } else {
+      setSelectedTimeEntries([])
+    }
+    
+    // Se não tem classificação, limpar o campo para o usuário preencher
+    if (!invoice.chartOfAccountsId) {
+      setFaturadaData({
+        ...faturadaData,
+        chartOfAccountsId: '',
+      })
+    } else {
+      setFaturadaData({
+        ...faturadaData,
+        chartOfAccountsId: invoice.chartOfAccountsId,
+      })
+    }
+    
     setShowFaturadaModal(true)
   }
+
+  // Calcular valor total baseado nas horas selecionadas
+  const calculateValorFromSelectedHours = () => {
+    if (selectedTimeEntries.length === 0) return 0
+    
+    return selectedTimeEntries.reduce((total, entryId) => {
+      const entry = approvedTimeEntries.find((e: any) => e.id === entryId)
+      if (!entry) return total
+      
+      const horas = parseFloat(entry.horas || 0)
+      const valorPorHora = entry.valorPorHora 
+        ? parseFloat(String(entry.valorPorHora))
+        : (entry.proposal?.valorPorHora ? parseFloat(String(entry.proposal.valorPorHora)) : 0)
+      
+      return total + (horas * valorPorHora)
+    }, 0)
+  }
+
+  // Atualizar valor quando horas selecionadas mudarem
+  useEffect(() => {
+    if (showFaturadaModal && approvedTimeEntries.length > 0 && invoice?.origem === 'TIMESHEET') {
+      const novoValor = calculateValorFromSelectedHours()
+      if (novoValor > 0) {
+        setFaturadaData(prev => ({
+          ...prev,
+          valor: novoValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        }))
+      }
+    }
+  }, [selectedTimeEntries, showFaturadaModal, approvedTimeEntries, invoice])
 
   const handleConfirmFaturada = async () => {
     try {
@@ -263,13 +539,32 @@ export default function InvoiceDetailsPage() {
         return
       }
 
-      await api.put(`/invoices/${invoiceId}`, {
+      // Se não tem classificação e é TIMESHEET, exigir classificação
+      if (invoice.origem === 'TIMESHEET' && !invoice.chartOfAccountsId && !faturadaData.chartOfAccountsId) {
+        alert('Por favor, selecione uma classificação')
+        return
+      }
+
+      // Preparar payload
+      const payload: any = {
         status: 'FATURADA',
         numeroNF: faturadaData.tipoEmissao === 'NF' ? faturadaData.numeroNF : null,
         tipoEmissao: faturadaData.tipoEmissao,
         dueDate: faturadaData.dataVencimento,
         grossValue: getValorAsNumber(faturadaData.valor),
-      })
+      }
+
+      // Se tem classificação selecionada, adicionar ao payload
+      if (faturadaData.chartOfAccountsId) {
+        payload.chartOfAccountsId = faturadaData.chartOfAccountsId
+      }
+
+      // Se é TIMESHEET e tem horas selecionadas, enviar lista de horas
+      if (invoice.origem === 'TIMESHEET' && selectedTimeEntries.length > 0) {
+        payload.selectedTimeEntries = selectedTimeEntries
+      }
+
+      await api.put(`/invoices/${invoiceId}`, payload)
 
       setShowFaturadaModal(false)
       loadInvoice()
@@ -343,7 +638,8 @@ export default function InvoiceDetailsPage() {
           dataRecebimento: recebimentoData.dataRecebimento,
           contaCorrenteId: recebimentoData.contaCorrenteId,
         })
-        loadInvoice()
+        await loadInvoice()
+        await loadInvoiceHistory()
         alert('Recebimento registrado com sucesso!')
       }
     } catch (error: any) {
@@ -405,7 +701,8 @@ export default function InvoiceDetailsPage() {
       await api.put(`/invoices/${invoiceId}`, updateData)
 
       setShowValorMenorModal(false)
-      loadInvoice()
+      await loadInvoice()
+      await loadInvoiceHistory()
       
       let mensagem = 'Recebimento registrado com sucesso!'
       if (valorMenorData.opcao === 'desconsiderar') {
@@ -469,7 +766,8 @@ export default function InvoiceDetailsPage() {
       await api.put(`/invoices/${invoiceId}`, updateData)
 
       setShowValorMaiorModal(false)
-      loadInvoice()
+      await loadInvoice()
+      await loadInvoiceHistory()
       
       let mensagem = 'Recebimento registrado com sucesso!'
       if (valorMaiorData.opcao === 'acrescimo') {
@@ -488,6 +786,10 @@ export default function InvoiceDetailsPage() {
 
   const calculateImpostos = () => {
     if (invoice?.status === 'FATURADA') {
+      // Se for Emissão Fiscal (EF), não calcular imposto - valor líquido = valor bruto
+      if (invoice.tipoEmissao === 'EF') {
+        return 0
+      }
       const valorFaturado = parseFloat(invoice.grossValue?.toString() || '0')
       return valorFaturado * 0.06
     }
@@ -527,7 +829,7 @@ export default function InvoiceDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <button
@@ -703,7 +1005,11 @@ export default function InvoiceDetailsPage() {
             {invoice.status === 'FATURADA' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Impostos (6% sobre o valor faturado)</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    {invoice.tipoEmissao === 'EF' 
+                      ? 'Impostos (Emissão Fiscal - sem imposto)' 
+                      : 'Impostos (6% sobre o valor faturado)'}
+                  </label>
                   <p className="mt-1 text-sm text-gray-900 font-semibold">{formatCurrency(impostos)}</p>
                 </div>
               </div>
@@ -737,6 +1043,65 @@ export default function InvoiceDetailsPage() {
             ) : (
               <div className="text-sm text-gray-500">Nenhum imposto cadastrado</div>
             )}
+
+            {/* Histórico de Alterações */}
+            {invoiceHistory.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-xl font-semibold mb-4 text-gray-900">Histórico de Alterações</h2>
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campo</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Anterior</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Novo</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alterado por</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {invoiceHistory.map((history: any) => (
+                        <tr key={history.id}>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {formatDate(history.changedAt, true)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              history.action === 'CANCEL' ? 'bg-red-100 text-red-800' :
+                              history.action === 'EDIT' ? 'bg-blue-100 text-blue-800' :
+                              history.action === 'RECEIVE' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {history.action === 'CANCEL' ? 'Cancelamento' :
+                               history.action === 'EDIT' ? 'Edição' :
+                               history.action === 'RECEIVE' ? 'Recebimento' :
+                               history.action}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {getFieldDisplayName(history.fieldName)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {formatFieldValue(history.fieldName, history.oldValue)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {formatFieldValue(history.fieldName, history.newValue)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {history.changedByUser?.name || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {history.description || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Ações */}
@@ -749,20 +1114,39 @@ export default function InvoiceDetailsPage() {
                 Marcar como FATURADA
               </button>
             )}
-            {invoice.status === 'FATURADA' && invoice.status !== 'RECEBIDA' && (
+            {/* Botões baseados em status e tipo de emissão */}
+            {invoice.status === 'PROVISIONADA' && (
               <button
-                onClick={handleRegistrarRecebimento}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                onClick={handleOpenEditarModal}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
               >
-                Registrar Recebimento
+                Editar
               </button>
             )}
-            <Link
-              href={`/contas-receber/${invoiceId}/editar`}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              Editar
-            </Link>
+            {invoice.status === 'FATURADA' && invoice.status !== 'RECEBIDA' && (
+              <>
+                <button
+                  onClick={handleRegistrarRecebimento}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Registrar Recebimento
+                </button>
+                <button
+                  onClick={handleCancelar}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Cancelar
+                </button>
+                {invoice.tipoEmissao === 'EF' && (
+                  <button
+                    onClick={handleOpenEditarModal}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    Editar
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -770,9 +1154,114 @@ export default function InvoiceDetailsPage() {
       {/* Modal de Confirmação FATURADA */}
       {showFaturadaModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4 text-gray-900">Confirmar como FATURADA</h2>
             <div className="space-y-4">
+              {/* Campo de Classificação (se estiver vazio) */}
+              {invoice.origem === 'TIMESHEET' && !invoice.chartOfAccountsId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Classificação <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={faturadaData.chartOfAccountsId}
+                    onChange={(e) => setFaturadaData({ ...faturadaData, chartOfAccountsId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  >
+                    <option value="">Selecione a classificação</option>
+                    {chartOfAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Lista de Horas (se origem TIMESHEET) */}
+              {invoice.origem === 'TIMESHEET' && approvedTimeEntries.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Horas a Faturar
+                  </label>
+                  <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 max-h-60 overflow-y-auto">
+                    <div className="space-y-2">
+                      {approvedTimeEntries.map((entry: any) => {
+                        const isSelected = selectedTimeEntries.includes(entry.id)
+                        const horas = parseFloat(entry.horas || 0)
+                        const valorPorHora = entry.valorPorHora 
+                          ? parseFloat(String(entry.valorPorHora))
+                          : (entry.proposal?.valorPorHora ? parseFloat(String(entry.proposal.valorPorHora)) : 0)
+                        const valorEntry = horas * valorPorHora
+                        
+                        return (
+                          <label
+                            key={entry.id}
+                            className="flex items-start gap-3 p-2 border border-blue-200 rounded hover:bg-blue-100 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedTimeEntries([...selectedTimeEntries, entry.id])
+                                } else {
+                                  setSelectedTimeEntries(selectedTimeEntries.filter(id => id !== entry.id))
+                                }
+                              }}
+                              className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                            />
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-blue-900">
+                                    {formatDate(entry.data)}
+                                  </p>
+                                  {entry.descricao && (
+                                    <p className="text-xs text-blue-700 mt-1">{entry.descricao}</p>
+                                  )}
+                                  {entry.user && (
+                                    <p className="text-xs text-blue-600 mt-1">
+                                      Usuário: {entry.user.name || entry.user.email}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right ml-4">
+                                  <p className="text-sm font-semibold text-blue-900">
+                                    {horas.toFixed(2)}h
+                                  </p>
+                                  {valorPorHora > 0 && (
+                                    <p className="text-xs text-green-700 mt-1">
+                                      R$ {valorEntry.toFixed(2).replace('.', ',')}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <div className="pt-3 mt-3 border-t border-blue-300">
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm font-semibold text-blue-900">
+                          Total Selecionado:
+                        </p>
+                        <p className="text-sm font-semibold text-blue-900">
+                          {selectedTimeEntries.reduce((sum, entryId) => {
+                            const entry = approvedTimeEntries.find((e: any) => e.id === entryId)
+                            if (!entry) return sum
+                            const horas = parseFloat(entry.horas || 0)
+                            return sum + horas
+                          }, 0).toFixed(2)}h
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Data de Vencimento
@@ -1097,6 +1586,189 @@ export default function InvoiceDetailsPage() {
                 className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição */}
+      {showEditarModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">Editar Conta a Receber</h2>
+            <div className="space-y-4">
+              {/* Valor Bruto */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valor Bruto <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.grossValue}
+                  onChange={(e) => {
+                    const formatted = formatCurrencyInput(e.target.value)
+                    setEditFormData({ ...editFormData, grossValue: formatted })
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="0,00"
+                  required
+                />
+              </div>
+
+              {/* Data de Emissão e Data de Vencimento */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data de Emissão <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.emissionDate}
+                    onChange={(e) => setEditFormData({ ...editFormData, emissionDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data de Vencimento <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.dueDate}
+                    onChange={(e) => setEditFormData({ ...editFormData, dueDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Número da NF e Tipo de Emissão */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Número da NF
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.numeroNF}
+                    onChange={(e) => setEditFormData({ ...editFormData, numeroNF: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Número da Nota Fiscal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo de Emissão
+                  </label>
+                  <select
+                    value={editFormData.tipoEmissao}
+                    onChange={(e) => setEditFormData({ ...editFormData, tipoEmissao: e.target.value as 'NF' | 'EF' })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="NF">Nota Fiscal</option>
+                    <option value="EF">Emissão Fiscal (sem NF)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Desconto e Acréscimo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Desconto
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.desconto}
+                    onChange={(e) => {
+                      const formatted = formatCurrencyInput(e.target.value)
+                      setEditFormData({ ...editFormData, desconto: formatted })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Acréscimo
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.acrescimo}
+                    onChange={(e) => {
+                      const formatted = formatCurrencyInput(e.target.value)
+                      setEditFormData({ ...editFormData, acrescimo: formatted })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="0,00"
+                  />
+                </div>
+              </div>
+
+              {/* Classificação */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Classificação
+                </label>
+                <select
+                  value={editFormData.chartOfAccountsId}
+                  onChange={(e) => setEditFormData({ ...editFormData, chartOfAccountsId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">Selecione a classificação</option>
+                  {chartOfAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-4 mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowEditarModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveEditar}
+                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cancelamento */}
+      {showCancelarModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">Confirmar Cancelamento</h2>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <p className="text-sm font-medium text-yellow-900">
+                ⚠️ Atenção: Ao cancelar esta conta a receber, é necessário cancelar a Nota Fiscal correspondente.
+              </p>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Tem certeza que deseja cancelar esta conta a receber?
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowCancelarModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Não, manter
+              </button>
+              <button
+                onClick={handleConfirmCancelar}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Sim, cancelar
               </button>
             </div>
           </div>

@@ -46,8 +46,14 @@ export class InvoicesController {
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() invoiceData: Partial<Invoice>): Promise<Invoice> {
-    return this.invoicesService.update(id, invoiceData);
+  async update(@Param('id') id: string, @Body() invoiceData: Partial<Invoice>, @Request() req?: any): Promise<Invoice> {
+    const userId = req?.user?.id;
+    return this.invoicesService.update(id, invoiceData, userId);
+  }
+
+  @Get(':id/history')
+  async getHistory(@Param('id') id: string) {
+    return this.invoicesService.getHistory(id);
   }
 
   @Get('by-proposal/:proposalId')

@@ -14,6 +14,7 @@ export default function ContasReceberPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [activeTotalizer, setActiveTotalizer] = useState<string | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -24,6 +25,16 @@ export default function ContasReceberPage() {
     loadInvoices()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Sincronizar activeTotalizer com statusFilter (apenas quando mudado pelo select)
+  useEffect(() => {
+    if (statusFilter && statusFilter !== activeTotalizer) {
+      setActiveTotalizer(statusFilter)
+    } else if (!statusFilter && activeTotalizer) {
+      setActiveTotalizer(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter])
 
   const getCompanyIdFromToken = (): string | null => {
     try {
@@ -91,6 +102,10 @@ export default function ContasReceberPage() {
   const calculateImpostos = (invoice: any) => {
     // Se status for FATURADA, calcular 6% do valor faturado
     if (invoice.status === 'FATURADA') {
+      // Se for Emissão Fiscal (EF), não calcular imposto - valor líquido = valor bruto
+      if (invoice.tipoEmissao === 'EF') {
+        return 0
+      }
       const valorFaturado = parseFloat(invoice.grossValue?.toString() || '0')
       return valorFaturado * 0.06
     }
@@ -106,6 +121,24 @@ export default function ContasReceberPage() {
     setStatusFilter('')
     setDateFrom('')
     setDateTo('')
+    setActiveTotalizer(null)
+  }
+
+  const handleTotalizerClick = (type: string) => {
+    if (activeTotalizer === type) {
+      // Se já está ativo, desativa
+      setActiveTotalizer(null)
+      setStatusFilter('')
+    } else {
+      // Ativa o filtro
+      setActiveTotalizer(type)
+      if (type === 'ATRASADAS') {
+        // Para atrasadas, não usar statusFilter, mas sim uma lógica especial
+        setStatusFilter('ATRASADAS')
+      } else {
+        setStatusFilter(type)
+      }
+    }
   }
 
   const handleDelete = async (invoiceId: string, e: React.MouseEvent) => {
@@ -138,8 +171,23 @@ export default function ContasReceberPage() {
     }
 
     // Filtro de status
-    if (statusFilter && invoice.status !== statusFilter) {
-      return false
+    if (statusFilter) {
+      if (statusFilter === 'ATRASADAS') {
+        // Lógica especial para atrasadas
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const dueDate = new Date(invoice.dueDate)
+        dueDate.setHours(0, 0, 0, 0)
+        const isOverdue = dueDate < today
+        const notReceived = !invoice.dataRecebimento
+        const notCancelled = invoice.status !== 'CANCELADA'
+        
+        if (!(isOverdue && notReceived && notCancelled)) {
+          return false
+        }
+      } else if (invoice.status !== statusFilter) {
+        return false
+      }
     }
 
     // Filtro de período (data de vencimento)
@@ -160,12 +208,31 @@ export default function ContasReceberPage() {
   })
 
   // Calcular totalizadores por status
+  const today = new Date()
+  today.setHours(0, 0, 0, 0) // Zerar horas para comparação apenas de data
+
   const totalizadores = {
     PROVISIONADA: filteredInvoices
       .filter(inv => inv.status === 'PROVISIONADA')
       .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0),
     FATURADA: filteredInvoices
       .filter(inv => inv.status === 'FATURADA')
+      .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0),
+    ATRASADAS: filteredInvoices
+      .filter(inv => {
+        // Data de vencimento anterior a hoje
+        const dueDate = new Date(inv.dueDate)
+        dueDate.setHours(0, 0, 0, 0)
+        const isOverdue = dueDate < today
+        
+        // Não tem data de recebimento registrada
+        const notReceived = !inv.dataRecebimento
+        
+        // Status não é cancelada
+        const notCancelled = inv.status !== 'CANCELADA'
+        
+        return isOverdue && notReceived && notCancelled
+      })
       .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0),
     RECEBIDA: filteredInvoices
       .filter(inv => inv.status === 'RECEBIDA')
@@ -225,6 +292,7 @@ export default function ContasReceberPage() {
                 <option value="">Todos os Status</option>
                 <option value="PROVISIONADA">Provisionada</option>
                 <option value="FATURADA">Faturada</option>
+                <option value="ATRASADAS">Atrasadas</option>
                 <option value="RECEBIDA">Recebida</option>
                 <option value="EMITIDA">Emitida</option>
                 <option value="CANCELADA">Cancelada</option>
@@ -279,8 +347,13 @@ export default function ContasReceberPage() {
         </div>
 
         {/* Totalizadores por Status */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'PROVISIONADA' ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('PROVISIONADA')}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Provisionada</p>
@@ -293,7 +366,12 @@ export default function ContasReceberPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'FATURADA' ? 'ring-2 ring-purple-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('FATURADA')}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Faturada</p>
@@ -306,7 +384,30 @@ export default function ContasReceberPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 border-2 border-red-200 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'ATRASADAS' ? 'ring-2 ring-red-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('ATRASADAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Atrasadas</p>
+                <p className="text-2xl font-bold text-red-600">
+                  R$ {totalizadores.ATRASADAS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-red-100 rounded-full p-3">
+                <span className="text-red-600 text-2xl">⚠️</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'RECEBIDA' ? 'ring-2 ring-green-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('RECEBIDA')}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Recebida</p>

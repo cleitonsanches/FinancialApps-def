@@ -16,7 +16,7 @@ export default function HorasTrabalhadasPage() {
   const [projectFilter, setProjectFilter] = useState('')
   const [clientFilter, setClientFilter] = useState('')
   const [faturavelFilter, setFaturavelFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('PENDENTE') // Padrão: Pendente
+  const [activeTab, setActiveTab] = useState<'PENDENTE' | 'REPROVADA' | 'APROVADA' | 'FATURADA'>('PENDENTE') // Aba padrão: Pendente
   const [projects, setProjects] = useState<any[]>([])
   const [proposals, setProposals] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
@@ -25,7 +25,13 @@ export default function HorasTrabalhadasPage() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [showCreateTimeEntryModal, setShowCreateTimeEntryModal] = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
+  const [showReproveModal, setShowReproveModal] = useState(false)
   const [entryToApprove, setEntryToApprove] = useState<any>(null)
+  const [entryToReprove, setEntryToReprove] = useState<any>(null)
+  const [motivoReprovacao, setMotivoReprovacao] = useState('')
+  const [motivoAprovacao, setMotivoAprovacao] = useState('')
+  const [valorPorHoraAprovacao, setValorPorHoraAprovacao] = useState('')
+  const [criarInvoice, setCriarInvoice] = useState(true) // Por padrão, criar invoice
   const [newTimeEntry, setNewTimeEntry] = useState({
     projectId: '',
     taskId: '',
@@ -35,6 +41,7 @@ export default function HorasTrabalhadasPage() {
     data: new Date().toISOString().split('T')[0],
     horas: '',
     descricao: '',
+    isFaturavel: false, // Campo para tornar faturável quando vinculado apenas a cliente
   })
 
   const handleClearFilters = () => {
@@ -43,7 +50,7 @@ export default function HorasTrabalhadasPage() {
     setFaturavelFilter('')
     setDateFrom('')
     setDateTo('')
-    setStatusFilter('PENDENTE') // Voltar ao padrão: Pendente
+    setActiveTab('PENDENTE') // Voltar ao padrão: Pendente
   }
 
   useEffect(() => {
@@ -126,6 +133,11 @@ export default function HorasTrabalhadasPage() {
       
       // Função para verificar se uma entry é faturável
       const isFaturavel = (entry: any): boolean => {
+        // Primeiro verificar se o campo isFaturavel está marcado explicitamente (vinculado apenas a cliente)
+        if (entry.isFaturavel === true || entry.isFaturavel === 1 || entry.isFaturavel === 'true') {
+          return true
+        }
+        
         // Se tem proposalId direto, verificar se é HORAS
         if (entry.proposalId) {
           const proposal = proposalsMap[entry.proposalId]
@@ -170,8 +182,11 @@ export default function HorasTrabalhadasPage() {
                 proposalTitulo: finalProposal?.titulo || entry.proposal?.titulo || null,
                 clientId: project.clientId || finalProposal?.clientId || entry.clientId,
                 clientName: project.client?.name || project.client?.razaoSocial || finalProposal?.clientName || entry.client?.name || entry.client?.razaoSocial,
-                isFaturavel: isFaturavel({ ...entry, projectId: project.id, proposalId: project.proposalId || entry.proposalId }),
-                valorPorHora: finalProposal?.valorPorHora || entry.proposal?.valorPorHora || 0
+                // Preservar isFaturavel do banco ou calcular se não existir
+                isFaturavel: entry.isFaturavel === true || entry.isFaturavel === 1 || entry.isFaturavel === 'true' 
+                  ? true 
+                  : isFaturavel({ ...entry, projectId: project.id, proposalId: project.proposalId || entry.proposalId }),
+                valorPorHora: entry.valorPorHora || finalProposal?.valorPorHora || entry.proposal?.valorPorHora || 0
               }
             })
             return entries
@@ -186,30 +201,85 @@ export default function HorasTrabalhadasPage() {
       }
       
       // Também buscar time entries standalone (sem projeto, mas com proposalId ou clientId)
+      // Buscar todas as entries e filtrar as que não foram encontradas via projetos
       try {
         const standaloneResponse = await api.get('/projects/time-entries')
-        const standaloneEntries = (standaloneResponse.data || []).filter((entry: any) => 
-          !entry.projectId && (entry.proposalId || entry.clientId)
-        )
+        const allStandaloneEntries = standaloneResponse.data || []
         
-        standaloneEntries.forEach((entry: any) => {
+        // Filtrar apenas as que não têm projectId OU que não foram encontradas na busca por projetos
+        allStandaloneEntries.forEach((entry: any) => {
+          // Se não foi encontrada na busca por projetos, adicionar
           if (!allTimeEntries.find(e => e.id === entry.id)) {
             const proposal = entry.proposalId ? proposalsMap[entry.proposalId] : null
+            
+            // Buscar cliente se não estiver na entry
+            let clientName = entry.client?.name || entry.client?.razaoSocial
+            if (!clientName && entry.clientId) {
+              const client = clients.find(c => c.id === entry.clientId)
+              clientName = client?.name || client?.razaoSocial
+            }
+            
             allTimeEntries.push({
               ...entry,
-              projectName: entry.proposalId ? 'Negociação' : (entry.clientId ? 'Cliente' : '-'),
+              projectName: entry.projectId ? (projectsMap[entry.projectId]?.name || '-') : (entry.proposalId ? 'Negociação' : (entry.clientId ? 'Cliente' : '-')),
+              projectId: entry.projectId || null,
               proposalNumero: proposal?.numero || null,
               proposalTitulo: proposal?.titulo || null,
               clientId: entry.clientId || proposal?.clientId,
-              clientName: entry.client?.name || entry.client?.razaoSocial || proposal?.clientName,
-              isFaturavel: isFaturavel(entry),
-              valorPorHora: proposal?.valorPorHora || 0
+              clientName: clientName || proposal?.clientName,
+              // Preservar isFaturavel do banco ou calcular se não existir
+              isFaturavel: entry.isFaturavel === true || entry.isFaturavel === 1 || entry.isFaturavel === 'true' 
+                ? true 
+                : isFaturavel(entry),
+              valorPorHora: entry.valorPorHora || proposal?.valorPorHora || 0
             })
           }
         })
       } catch (error) {
         // Ignorar erro se não conseguir buscar standalone
         console.warn('Não foi possível buscar time entries standalone:', error)
+      }
+      
+      // Buscar invoices faturadas para identificar horas faturadas
+      try {
+        const invoicesResponse = await api.get(`/invoices?companyId=${companyId}`)
+        const faturadasInvoices = (invoicesResponse.data || []).filter(
+          (invoice: any) => invoice.status === 'FATURADA' && invoice.origem === 'TIMESHEET' && invoice.approvedTimeEntries
+        )
+        
+        // Criar mapa de invoice por hora (entryId -> invoice)
+        const invoiceByTimeEntry: Record<string, any> = {}
+        faturadasInvoices.forEach((invoice: any) => {
+          try {
+            const approvedEntries: string[] = JSON.parse(invoice.approvedTimeEntries)
+            approvedEntries.forEach((entryId: string) => {
+              // Armazenar informações da invoice para cada hora
+              invoiceByTimeEntry[entryId] = {
+                emissionDate: invoice.emissionDate,
+                dueDate: invoice.dueDate,
+                dataRecebimento: invoice.dataRecebimento,
+                invoiceNumber: invoice.invoiceNumber,
+                invoiceId: invoice.id
+              }
+            })
+          } catch (e) {
+            // Ignorar erros de parse
+          }
+        })
+        
+        // Marcar horas como faturadas e adicionar informações da invoice
+        allTimeEntries.forEach((entry: any) => {
+          if (invoiceByTimeEntry[entry.id]) {
+            entry.isFaturada = true
+            entry.invoiceEmissionDate = invoiceByTimeEntry[entry.id].emissionDate
+            entry.invoiceDueDate = invoiceByTimeEntry[entry.id].dueDate
+            entry.invoiceDataRecebimento = invoiceByTimeEntry[entry.id].dataRecebimento
+            entry.invoiceNumber = invoiceByTimeEntry[entry.id].invoiceNumber
+            entry.invoiceId = invoiceByTimeEntry[entry.id].invoiceId
+          }
+        })
+      } catch (error) {
+        console.warn('Não foi possível buscar invoices faturadas:', error)
       }
       
       // Ordenar por data (mais recente primeiro)
@@ -362,14 +432,21 @@ export default function HorasTrabalhadasPage() {
         data: newTimeEntry.data,
         horas: horasDecimal,
         descricao: newTimeEntry.descricao || null,
+        isFaturavel: newTimeEntry.isFaturavel || false,
       }
 
-      // Remover campos null/undefined
+      // Remover campos null/undefined, mas preservar clientId se isFaturavel for true
       Object.keys(payload).forEach(key => {
+        // Não remover clientId se isFaturavel for true (hora vinculada apenas a cliente)
+        if (key === 'clientId' && payload.isFaturavel) {
+          return
+        }
         if (payload[key] === null || payload[key] === '') {
           delete payload[key]
         }
       })
+      
+      console.log('Payload final enviado:', payload)
 
       await api.post('/projects/time-entries', payload)
 
@@ -384,6 +461,7 @@ export default function HorasTrabalhadasPage() {
         data: new Date().toISOString().split('T')[0],
         horas: '',
         descricao: '',
+        isFaturavel: false,
       })
       setTasks([])
       loadTimeEntries()
@@ -395,20 +473,45 @@ export default function HorasTrabalhadasPage() {
 
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '-'
-    const date = typeof dateString === 'string' 
-      ? new Date(dateString + 'T00:00:00') 
-      : new Date(dateString)
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${day}/${month}/${year}`
+    try {
+      let date: Date
+      if (typeof dateString === 'string') {
+        // Se já tem T (datetime), usar diretamente, senão adicionar T00:00:00
+        date = dateString.includes('T') ? new Date(dateString) : new Date(dateString + 'T00:00:00')
+      } else {
+        date = new Date(dateString)
+      }
+      
+      // Verificar se a data é válida
+      if (isNaN(date.getTime())) {
+        return '-'
+      }
+      
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${day}/${month}/${year}`
+    } catch (error) {
+      console.error('Erro ao formatar data:', error, dateString)
+      return '-'
+    }
   }
 
   const filteredTimeEntries = timeEntries.filter((entry) => {
-    // Filtro de status
-    if (statusFilter) {
+    // Filtro de status (baseado na aba ativa)
+    if (activeTab === 'FATURADA') {
+      // Para aba Faturadas, mostrar apenas horas que estão em invoices faturadas
+      if (!entry.isFaturada) {
+        return false
+      }
+    } else {
+      // Para outras abas, usar o status normal
       const entryStatus = entry.status || 'PENDENTE' // Se não tiver status, considerar como PENDENTE
-      if (entryStatus !== statusFilter) {
+      if (entryStatus !== activeTab) {
+        return false
+      }
+      // Se a hora está faturada, não mostrar nas outras abas (exceto Faturadas)
+      if (entry.isFaturada) {
         return false
       }
     }
@@ -462,14 +565,29 @@ export default function HorasTrabalhadasPage() {
     return true
   })
 
-  const handleReprovar = async (entryId: string) => {
-    if (!confirm('Tem certeza que deseja reprovar este lançamento de horas?')) {
+  const handleReprovar = async (entry: any) => {
+    setEntryToReprove(entry)
+    setMotivoReprovacao('')
+    setShowReproveModal(true)
+  }
+
+  const confirmReprovar = async () => {
+    if (!entryToReprove) return
+
+    if (!motivoReprovacao.trim()) {
+      alert('Por favor, informe o motivo da reprovação.')
       return
     }
 
     try {
-      await api.patch(`/projects/time-entries/${entryId}`, { status: 'REPROVADA' })
+      await api.patch(`/projects/time-entries/${entryToReprove.id}`, { 
+        status: 'REPROVADA',
+        motivoReprovacao: motivoReprovacao.trim()
+      })
       alert('Lançamento reprovado com sucesso!')
+      setShowReproveModal(false)
+      setEntryToReprove(null)
+      setMotivoReprovacao('')
       loadTimeEntries()
     } catch (error: any) {
       console.error('Erro ao reprovar lançamento:', error)
@@ -479,17 +597,73 @@ export default function HorasTrabalhadasPage() {
 
   const handleAprovar = async (entry: any) => {
     setEntryToApprove(entry)
+    setMotivoAprovacao('')
+    setValorPorHoraAprovacao('')
+    setCriarInvoice(true) // Por padrão, criar invoice
     setShowApproveModal(true)
   }
 
   const confirmApprove = async () => {
     if (!entryToApprove) return
 
+    // Se a hora estiver reprovada, exigir motivo de aprovação
+    const isReprovada = (entryToApprove.status || 'PENDENTE') === 'REPROVADA'
+    if (isReprovada && !motivoAprovacao.trim()) {
+      alert('Por favor, informe o motivo da aprovação.')
+      return
+    }
+
+    // Verificar se é faturável
+    const isFaturavel = entryToApprove.isFaturavel || entryToApprove.isFaturavel === true
+    
+    // Se for faturável, verificar se precisa de valor por hora
+    if (isFaturavel && criarInvoice) {
+      // Se não tem valorPorHora definido (vinculado apenas a cliente), exigir
+      const temValorPorHora = entryToApprove.valorPorHora && entryToApprove.valorPorHora > 0
+      if (!temValorPorHora && !valorPorHoraAprovacao.trim()) {
+        alert('Por favor, informe o valor por hora para criar a conta a receber.')
+        return
+      }
+      
+      // Validar formato do valor
+      if (valorPorHoraAprovacao.trim()) {
+        const valor = parseFloat(valorPorHoraAprovacao.replace(',', '.'))
+        if (isNaN(valor) || valor <= 0) {
+          alert('Por favor, informe um valor por hora válido.')
+          return
+        }
+      }
+    }
+
     try {
-      const response = await api.post(`/projects/time-entries/${entryToApprove.id}/approve`)
+      const payload: any = {
+        criarInvoice: criarInvoice, // Sempre enviar se deve criar invoice ou não
+      }
+      
+      if (isReprovada && motivoAprovacao.trim()) {
+        payload.motivoAprovacao = motivoAprovacao.trim()
+      }
+      
+      // Se for faturável e precisa de valor por hora
+      if (isFaturavel && criarInvoice) {
+        if (valorPorHoraAprovacao.trim()) {
+          const valor = parseFloat(valorPorHoraAprovacao.replace(',', '.'))
+          if (!isNaN(valor) && valor > 0) {
+            payload.valorPorHora = valor
+          }
+        } else if (entryToApprove.valorPorHora && entryToApprove.valorPorHora > 0) {
+          payload.valorPorHora = parseFloat(String(entryToApprove.valorPorHora))
+        }
+      }
+      
+      console.log('Payload de aprovação:', payload)
+      const response = await api.post(`/projects/time-entries/${entryToApprove.id}/approve`, payload)
       alert('Lançamento aprovado com sucesso!')
       setShowApproveModal(false)
       setEntryToApprove(null)
+      setMotivoAprovacao('')
+      setValorPorHoraAprovacao('')
+      setCriarInvoice(true)
       loadTimeEntries()
     } catch (error: any) {
       console.error('Erro ao aprovar lançamento:', error)
@@ -529,9 +703,57 @@ export default function HorasTrabalhadasPage() {
           <h1 className="text-3xl font-bold text-gray-900">Horas Trabalhadas</h1>
         </div>
 
+        {/* Abas de Status */}
+        <div className="bg-white rounded-lg shadow-md mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('PENDENTE')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'PENDENTE'
+                    ? 'border-yellow-500 text-yellow-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Pendente
+              </button>
+              <button
+                onClick={() => setActiveTab('REPROVADA')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'REPROVADA'
+                    ? 'border-red-500 text-red-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Reprovada
+              </button>
+              <button
+                onClick={() => setActiveTab('APROVADA')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'APROVADA'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Aprovada
+              </button>
+              <button
+                onClick={() => setActiveTab('FATURADA')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'FATURADA'
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Faturadas
+              </button>
+            </nav>
+          </div>
+        </div>
+
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Filtrar por Projeto
@@ -583,21 +805,6 @@ export default function HorasTrabalhadasPage() {
                     </option>
                   ))
                 )}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Filtrar por Status
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="PENDENTE">Pendente</option>
-                <option value="APROVADA">Aprovada</option>
-                <option value="REPROVADA">Reprovada</option>
-                <option value="">Todos os Status</option>
               </select>
             </div>
             <div>
@@ -684,11 +891,16 @@ export default function HorasTrabalhadasPage() {
         {filteredTimeEntries.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <p className="text-gray-600 mb-4">
-              {(projectFilter || clientFilter || faturavelFilter || statusFilter || dateFrom || dateTo) 
+              {(projectFilter || clientFilter || faturavelFilter || dateFrom || dateTo) 
                 ? 'Nenhuma hora encontrada com o filtro aplicado' 
-                : 'Nenhuma hora trabalhada registrada'}
+                : `Nenhuma hora trabalhada ${
+                    activeTab === 'PENDENTE' ? 'pendente' : 
+                    activeTab === 'REPROVADA' ? 'reprovada' : 
+                    activeTab === 'APROVADA' ? 'aprovada' : 
+                    'faturada'
+                  } registrada`}
             </p>
-            {!(projectFilter || clientFilter || faturavelFilter || statusFilter || dateFrom || dateTo) && (
+            {!(projectFilter || clientFilter || faturavelFilter || dateFrom || dateTo) && (
               <button
                 onClick={() => setShowCreateTimeEntryModal(true)}
                 className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -816,6 +1028,171 @@ export default function HorasTrabalhadasPage() {
                                 <p className="text-sm text-gray-700">{entry.descricao}</p>
                               </div>
                             )}
+                            {entry.status === 'APROVADA' && entry.aprovadoEm && (
+                              <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                <h4 className="font-semibold text-sm text-blue-900 mb-2">
+                                  Informações de Aprovação
+                                </h4>
+                                <div className="space-y-1 text-sm text-blue-700">
+                                  <div>
+                                    <span className="font-semibold">Aprovada em:</span>{' '}
+                                    {entry.aprovadoEm && (() => {
+                                      try {
+                                        // Tentar diferentes formatos de data
+                                        let date: Date;
+                                        if (typeof entry.aprovadoEm === 'string') {
+                                          // Se já tem T, usar diretamente
+                                          if (entry.aprovadoEm.includes('T')) {
+                                            date = new Date(entry.aprovadoEm);
+                                          } else if (entry.aprovadoEm.includes(' ')) {
+                                            // Formato SQLite datetime: "YYYY-MM-DD HH:MM:SS"
+                                            date = new Date(entry.aprovadoEm.replace(' ', 'T'));
+                                          } else {
+                                            // Tentar como date apenas
+                                            date = new Date(entry.aprovadoEm + 'T00:00:00');
+                                          }
+                                        } else {
+                                          date = new Date(entry.aprovadoEm);
+                                        }
+                                        
+                                        if (isNaN(date.getTime())) {
+                                          console.warn('Data inválida:', entry.aprovadoEm);
+                                          return '-';
+                                        }
+                                        
+                                        const dateStr = formatDate(date);
+                                        const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                        return `${dateStr} às ${timeStr}`;
+                                      } catch (error) {
+                                        console.error('Erro ao formatar data de aprovação:', error, entry.aprovadoEm);
+                                        return '-';
+                                      }
+                                    })()}
+                                  </div>
+                                  {entry.aprovador?.name && (
+                                    <div>
+                                      <span className="font-semibold">Aprovada por:</span>{' '}
+                                      {entry.aprovador.name}
+                                    </div>
+                                  )}
+                                  {entry.isFaturavel && (
+                                    <div>
+                                      <span className="font-semibold">Faturamento:</span>{' '}
+                                      <span className={entry.faturamentoDesprezado ? 'text-orange-700 font-semibold' : 'text-green-700 font-semibold'}>
+                                        {entry.faturamentoDesprezado ? '⚠️ Faturamento Desprezado' : '✓ Enviada para faturamento'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            {entry.status === 'REPROVADA' && entry.motivoReprovacao && (
+                              <div className="mt-2 p-2 bg-red-50 rounded border border-red-200">
+                                <h4 className="font-semibold text-sm text-red-900 mb-2">
+                                  Motivo da Reprovação
+                                </h4>
+                                <p className="text-sm text-red-700 mb-2">{entry.motivoReprovacao}</p>
+                                {(entry.reprovadoEm || entry.reprovadoPor) && (
+                                  <div className="mt-2 pt-2 border-t border-red-200">
+                                    <div className="space-y-1 text-sm text-red-600">
+                                      {entry.reprovadoEm && (
+                                        <div>
+                                          <span className="font-semibold">Reprovada em:</span>{' '}
+                                          {(() => {
+                                            try {
+                                              // Tentar diferentes formatos de data
+                                              let date: Date;
+                                              if (typeof entry.reprovadoEm === 'string') {
+                                                // Se já tem T, usar diretamente
+                                                if (entry.reprovadoEm.includes('T')) {
+                                                  date = new Date(entry.reprovadoEm);
+                                                } else if (entry.reprovadoEm.includes(' ')) {
+                                                  // Formato SQLite datetime: "YYYY-MM-DD HH:MM:SS"
+                                                  date = new Date(entry.reprovadoEm.replace(' ', 'T'));
+                                                } else {
+                                                  // Tentar como date apenas
+                                                  date = new Date(entry.reprovadoEm + 'T00:00:00');
+                                                }
+                                              } else {
+                                                date = new Date(entry.reprovadoEm);
+                                              }
+                                              
+                                              if (isNaN(date.getTime())) {
+                                                console.warn('Data inválida:', entry.reprovadoEm);
+                                                return '-';
+                                              }
+                                              
+                                              const dateStr = formatDate(date);
+                                              const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                              return `${dateStr} às ${timeStr}`;
+                                            } catch (error) {
+                                              console.error('Erro ao formatar data de reprovação:', error, entry.reprovadoEm);
+                                              return '-';
+                                            }
+                                          })()}
+                                        </div>
+                                      )}
+                                      {entry.reprovador?.name && (
+                                        <div>
+                                          <span className="font-semibold">Reprovada por:</span>{' '}
+                                          {entry.reprovador.name}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {entry.status === 'APROVADA' && entry.motivoAprovacao && (
+                              <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
+                                <h4 className="font-semibold text-sm text-green-900 mb-2">
+                                  Motivo da Aprovação
+                                </h4>
+                                <p className="text-sm text-green-700">{entry.motivoAprovacao}</p>
+                              </div>
+                            )}
+                            {entry.isFaturada && (
+                              <div className="mt-2 p-2 bg-purple-50 rounded border border-purple-200">
+                                <h4 className="font-semibold text-sm text-purple-900 mb-2">
+                                  Informações da Faturação
+                                </h4>
+                                <div className="space-y-1 text-sm text-purple-700">
+                                  {entry.invoiceNumber && (
+                                    <div>
+                                      <span className="font-semibold">Número da Invoice:</span>{' '}
+                                      {entry.invoiceId ? (
+                                        <Link
+                                          href={`/contas-receber/${entry.invoiceId}`}
+                                          className="text-purple-600 hover:text-purple-800 underline"
+                                        >
+                                          {entry.invoiceNumber}
+                                        </Link>
+                                      ) : (
+                                        entry.invoiceNumber
+                                      )}
+                                    </div>
+                                  )}
+                                  {entry.invoiceEmissionDate && (
+                                    <div>
+                                      <span className="font-semibold">Data do Faturamento:</span>{' '}
+                                      {formatDate(entry.invoiceEmissionDate)}
+                                    </div>
+                                  )}
+                                  {entry.invoiceDueDate && (
+                                    <div>
+                                      <span className="font-semibold">Data do Vencimento:</span>{' '}
+                                      {formatDate(entry.invoiceDueDate)}
+                                    </div>
+                                  )}
+                                  {entry.invoiceDataRecebimento && (
+                                    <div>
+                                      <span className="font-semibold">Data do Recebimento:</span>{' '}
+                                      {formatDate(entry.invoiceDataRecebimento)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <div className="ml-4 flex flex-col gap-2">
                             <Link
@@ -824,18 +1201,22 @@ export default function HorasTrabalhadasPage() {
                             >
                               Ver Detalhes
                             </Link>
-                            <button
-                              onClick={() => handleReprovar(entry.id)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm whitespace-nowrap"
-                            >
-                              Reprovar
-                            </button>
-                            <button
-                              onClick={() => handleAprovar(entry)}
-                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm whitespace-nowrap"
-                            >
-                              Aprovar
-                            </button>
+                            {!entry.isFaturada && (entry.status || 'PENDENTE') !== 'REPROVADA' && (
+                              <button
+                                onClick={() => handleReprovar(entry)}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm whitespace-nowrap"
+                              >
+                                Reprovar
+                              </button>
+                            )}
+                            {!entry.isFaturada && (entry.status || 'PENDENTE') !== 'APROVADA' && (
+                              <button
+                                onClick={() => handleAprovar(entry)}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm whitespace-nowrap"
+                              >
+                                Aprovar
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -923,6 +1304,26 @@ export default function HorasTrabalhadasPage() {
                     <p className="text-xs text-red-600 mt-2">⚠️ Selecione pelo menos um vínculo</p>
                   )}
                 </div>
+
+                {/* Tornar Faturável (apenas quando vinculado a cliente) */}
+                {!newTimeEntry.projectId && !newTimeEntry.proposalId && newTimeEntry.clientId && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newTimeEntry.isFaturavel}
+                        onChange={(e) => setNewTimeEntry({ ...newTimeEntry, isFaturavel: e.target.checked })}
+                        className="mr-2 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      />
+                      <span className="text-sm font-medium text-yellow-900">
+                        Tornar a hora Faturável
+                      </span>
+                    </label>
+                    <p className="text-xs text-yellow-700 mt-1 ml-6">
+                      Ao aprovar, será solicitado o valor por hora para criar a conta a receber.
+                    </p>
+                  </div>
+                )}
 
                 {/* Tarefa (se projeto selecionado) */}
                 {newTimeEntry.projectId && (
@@ -1024,6 +1425,7 @@ export default function HorasTrabalhadasPage() {
                         data: new Date().toISOString().split('T')[0],
                         horas: '',
                         descricao: '',
+                        isFaturavel: false,
                       })
                       setTasks([])
                     }}
@@ -1061,33 +1463,154 @@ export default function HorasTrabalhadasPage() {
                     <span className="font-semibold">Horas:</span>{' '}
                     {formatHoursFromDecimal(entryToApprove.horas)}
                   </div>
-                  {entryToApprove.isFaturavel && entryToApprove.valorPorHora > 0 && (
-                    <div>
-                      <span className="font-semibold">Valor a faturar:</span>{' '}
-                      <span className="text-green-700 font-semibold">
-                        R$ {(parseFloat(String(entryToApprove.horas)) * entryToApprove.valorPorHora).toFixed(2).replace('.', ',')}
-                      </span>
-                    </div>
-                  )}
-                  {entryToApprove.isFaturavel ? (
-                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                      <p className="text-sm text-blue-800">
-                        ✓ Esta hora é faturável. Uma conta a receber será criada ou atualizada.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
-                      <p className="text-sm text-gray-600">
-                        Esta hora não é faturável. Apenas o status será alterado para "Aprovada".
-                      </p>
-                    </div>
-                  )}
+                  {(() => {
+                    // Só mostrar valor a faturar se for faturável e tiver valorPorHora válido
+                    if (entryToApprove.isFaturavel) {
+                      const valorPorHora = entryToApprove.valorPorHora ? parseFloat(String(entryToApprove.valorPorHora)) : 0;
+                      if (valorPorHora > 0) {
+                        const horas = parseFloat(String(entryToApprove.horas)) || 0;
+                        if (horas > 0) {
+                          const valorTotal = horas * valorPorHora;
+                          if (valorTotal > 0) {
+                            return (
+                              <div>
+                                <span className="font-semibold">Valor a faturar:</span>{' '}
+                                <span className="text-green-700 font-semibold">
+                                  R$ {valorTotal.toFixed(2).replace('.', ',')}
+                                </span>
+                              </div>
+                            );
+                          }
+                        }
+                      }
+                    }
+                    return null;
+                  })()}
                 </div>
+                {(() => {
+                  const isFaturavel = entryToApprove.isFaturavel || entryToApprove.isFaturavel === true
+                  const temValorPorHora = entryToApprove.valorPorHora && entryToApprove.valorPorHora > 0
+                  
+                  if (isFaturavel) {
+                    return (
+                      <div className="space-y-4">
+                        {/* Campo de valor por hora se não tiver */}
+                        {!temValorPorHora && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Valor por Hora (R$) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={valorPorHoraAprovacao}
+                              onChange={(e) => {
+                                // Permitir apenas números, vírgula e ponto
+                                const value = e.target.value.replace(/[^\d,.]/g, '')
+                                setValorPorHoraAprovacao(value)
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                              placeholder="Ex: 150,00 ou 150.00"
+                              required={criarInvoice}
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                              Informe o valor por hora para calcular o valor total a faturar.
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Opção de criar invoice ou não */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={criarInvoice}
+                              onChange={(e) => setCriarInvoice(e.target.checked)}
+                              className="mr-2 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                            />
+                            <span className="text-sm font-medium text-blue-900">
+                              Criar conta a receber ao aprovar
+                            </span>
+                          </label>
+                          <p className="text-xs text-blue-700 mt-1 ml-6">
+                            {criarInvoice 
+                              ? 'Uma conta a receber será criada ou atualizada com o valor calculado.'
+                              : 'A hora será aprovada, mas não será criada conta a receber.'}
+                          </p>
+                        </div>
+                        
+                        {criarInvoice && (() => {
+                          // Calcular valor usando valorPorHoraAprovacao se preenchido, senão usar o salvo
+                          let valorPorHoraParaCalcular: number | null = null;
+                          
+                          if (valorPorHoraAprovacao && valorPorHoraAprovacao.trim()) {
+                            const valorDigitado = parseFloat(valorPorHoraAprovacao.replace(',', '.'));
+                            if (!isNaN(valorDigitado) && valorDigitado > 0) {
+                              valorPorHoraParaCalcular = valorDigitado;
+                            }
+                          } else if (entryToApprove.valorPorHora) {
+                            const valorSalvo = parseFloat(String(entryToApprove.valorPorHora));
+                            if (!isNaN(valorSalvo) && valorSalvo > 0) {
+                              valorPorHoraParaCalcular = valorSalvo;
+                            }
+                          }
+                          
+                          // Só mostrar se tiver valor válido e maior que zero
+                          if (valorPorHoraParaCalcular && valorPorHoraParaCalcular > 0) {
+                            const horas = parseFloat(String(entryToApprove.horas));
+                            if (!isNaN(horas) && horas > 0) {
+                              const valorTotal = horas * valorPorHoraParaCalcular;
+                              if (valorTotal > 0) {
+                                return (
+                                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                                    <p className="text-sm text-green-800">
+                                      ✓ Valor a faturar: R$ {valorTotal.toFixed(2).replace('.', ',')}
+                                    </p>
+                                  </div>
+                                );
+                              }
+                            }
+                          }
+                          // Não renderizar nada se não tiver valor válido
+                          return null;
+                        })()}
+                      </div>
+                    )
+                  } else {
+                    return (
+                      <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
+                        <p className="text-sm text-gray-600">
+                          Esta hora não é faturável. Apenas o status será alterado para "Aprovada".
+                        </p>
+                      </div>
+                    )
+                  }
+                })()}
+                {(entryToApprove.status || 'PENDENTE') === 'REPROVADA' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Motivo da Aprovação <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={motivoAprovacao}
+                      onChange={(e) => setMotivoAprovacao(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      rows={4}
+                      placeholder="Informe o motivo da aprovação..."
+                      required
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Este lançamento estava reprovado. É necessário informar o motivo da aprovação.
+                    </p>
+                  </div>
+                )}
                 <div className="flex justify-end gap-4 pt-4 border-t">
                   <button
                     onClick={() => {
                       setShowApproveModal(false)
                       setEntryToApprove(null)
+                      setMotivoAprovacao('')
+                      setValorPorHoraAprovacao('')
+                      setCriarInvoice(true)
                     }}
                     className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                   >
@@ -1098,6 +1621,61 @@ export default function HorasTrabalhadasPage() {
                     className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                   >
                     Confirmar Aprovação
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Confirmar Reprovação */}
+        {showReproveModal && entryToReprove && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Confirmar Reprovação</h2>
+              <div className="space-y-4">
+                <p className="text-gray-700">
+                  Tem certeza que deseja reprovar este lançamento de horas?
+                </p>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div>
+                    <span className="font-semibold">Data:</span>{' '}
+                    {formatDate(entryToReprove.data)}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Horas:</span>{' '}
+                    {formatHoursFromDecimal(entryToReprove.horas)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Motivo da Reprovação <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={motivoReprovacao}
+                    onChange={(e) => setMotivoReprovacao(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={4}
+                    placeholder="Informe o motivo da reprovação..."
+                    required
+                  />
+                </div>
+                <div className="flex justify-end gap-4 pt-4 border-t">
+                  <button
+                    onClick={() => {
+                      setShowReproveModal(false)
+                      setEntryToReprove(null)
+                      setMotivoReprovacao('')
+                    }}
+                    className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmReprovar}
+                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    Confirmar Reprovação
                   </button>
                 </div>
               </div>

@@ -122,8 +122,9 @@ export class ProjectsController {
   }
 
   @Patch('time-entries/:entryId')
-  async updateTimeEntry(@Param('entryId') entryId: string, @Body() timeEntryData: any): Promise<any> {
-    return this.projectsService.updateTimeEntry(entryId, timeEntryData);
+  async updateTimeEntry(@Param('entryId') entryId: string, @Body() timeEntryData: any, @Request() req?: any): Promise<any> {
+    const userId = req?.user?.id; // ID do usuário que está fazendo a atualização
+    return this.projectsService.updateTimeEntry(entryId, timeEntryData, userId);
   }
 
   @Patch(':id/time-entries/:entryId')
@@ -132,10 +133,14 @@ export class ProjectsController {
   }
 
   @Post('time-entries/:id/approve')
-  async approveTimeEntry(@Param('id') entryId: string, @Request() req?: any): Promise<any> {
+  async approveTimeEntry(@Param('id') entryId: string, @Body() body?: any, @Request() req?: any): Promise<any> {
     const companyId = req?.user?.companyId;
+    const userId = req?.user?.id; // ID do usuário que está aprovando
+    const motivoAprovacao = body?.motivoAprovacao;
+    const valorPorHora = body?.valorPorHora;
+    const criarInvoice = body?.criarInvoice !== false; // Por padrão, criar invoice (true)
     // O service agora busca o companyId automaticamente se não for fornecido
-    return this.projectsService.approveTimeEntry(entryId, companyId);
+    return this.projectsService.approveTimeEntry(entryId, companyId, motivoAprovacao, valorPorHora, criarInvoice, userId);
   }
 
   @Patch('tasks/:taskId')

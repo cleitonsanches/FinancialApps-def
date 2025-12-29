@@ -1,9 +1,11 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Invoice, InvoiceTax } from '../../database/entities/invoice.entity';
 import { Proposal } from '../../database/entities/proposal.entity';
 import { ChartOfAccounts } from '../../database/entities/chart-of-accounts.entity';
+import { TimeEntry } from '../../database/entities/time-entry.entity';
+import { InvoiceHistory } from '../../database/entities/invoice-history.entity';
 
 @Injectable()
 export class InvoicesService {
@@ -16,6 +18,10 @@ export class InvoicesService {
     private proposalRepository: Repository<Proposal>,
     @InjectRepository(ChartOfAccounts)
     private chartOfAccountsRepository: Repository<ChartOfAccounts>,
+    @InjectRepository(TimeEntry)
+    private timeEntryRepository: Repository<TimeEntry>,
+    @InjectRepository(InvoiceHistory)
+    private invoiceHistoryRepository: Repository<InvoiceHistory>,
   ) {}
 
   async findAll(companyId?: string): Promise<Invoice[]> {
@@ -41,13 +47,234 @@ export class InvoicesService {
     return invoice;
   }
 
+  async getHistory(invoiceId: string): Promise<InvoiceHistory[]> {
+    return this.invoiceHistoryRepository.find({
+      where: { invoiceId },
+      relations: ['changedByUser'],
+      order: { changedAt: 'DESC' },
+    });
+  }
+
+  private async recordHistory(
+    invoiceId: string,
+    action: string,
+    changedBy?: string,
+    fieldName?: string,
+    oldValue?: string,
+    newValue?: string,
+    description?: string,
+  ): Promise<void> {
+    const history = this.invoiceHistoryRepository.create({
+      invoiceId,
+      action,
+      changedBy,
+      fieldName,
+      oldValue,
+      newValue,
+      description,
+    });
+    await this.invoiceHistoryRepository.save(history);
+  }
+
   async create(invoiceData: Partial<Invoice>): Promise<Invoice> {
     const invoice = this.invoiceRepository.create(invoiceData);
     return this.invoiceRepository.save(invoice);
   }
 
-  async update(id: string, invoiceData: Partial<Invoice>): Promise<Invoice> {
-    await this.invoiceRepository.update(id, invoiceData);
+  async update(id: string, invoiceData: Partial<Invoice>, userId?: string): Promise<Invoice> {
+    // Buscar invoice atual para verificar se é TIMESHEET
+    const existingInvoice = await this.invoiceRepository.findOne({ where: { id } });
+    
+    if (!existingInvoice) {
+      throw new BadRequestException('Invoice não encontrada');
+    }
+
+    // Verificar se é cancelamento
+    const isCancellation = invoiceData.status === 'CANCELADA' && existingInvoice.status !== 'CANCELADA';
+    // Verificar se é recebimento
+    const isRecebimento = invoiceData.status === 'RECEBIDA' && existingInvoice.status !== 'RECEBIDA';
+    
+    // Registrar histórico de alterações
+    const changes: Array<{ field: string; old: any; new: any }> = [];
+    
+    // Comparar campos alterados
+    const fieldsToTrack = [
+      'grossValue', 'emissionDate', 'dueDate', 'numeroNF', 'tipoEmissao',
+      'desconto', 'acrescimo', 'chartOfAccountsId', 'status', 'dataRecebimento',
+      'contaCorrenteId'
+    ];
+    
+    for (const field of fieldsToTrack) {
+      if (invoiceData[field] !== undefined && invoiceData[field] !== existingInvoice[field]) {
+        const oldVal = existingInvoice[field];
+        const newVal = invoiceData[field];
+        changes.push({ field, old: oldVal, new: newVal });
+      }
+    }
+
+    // Se for cancelamento, registrar ação especial
+    if (isCancellation) {
+      await this.recordHistory(
+        id,
+        'CANCEL',
+        userId,
+        undefined,
+        undefined,
+        undefined,
+        'Conta a receber cancelada. É necessário cancelar a Nota Fiscal correspondente.',
+      );
+    } else if (isRecebimento) {
+      // Registrar recebimento
+      await this.recordHistory(
+        id,
+        'RECEIVE',
+        userId,
+        'status',
+        existingInvoice.status,
+        'RECEBIDA',
+        `Conta a receber marcada como recebida${invoiceData.dataRecebimento ? ` em ${invoiceData.dataRecebimento}` : ''}`,
+      );
+      // Registrar outros campos alterados no recebimento (dataRecebimento, contaCorrenteId)
+      for (const change of changes) {
+        if (change.field !== 'status') {
+          await this.recordHistory(
+            id,
+            'RECEIVE',
+            userId,
+            change.field,
+            change.old ? String(change.old) : null,
+            change.new ? String(change.new) : null,
+          );
+        }
+      }
+    } else if (changes.length > 0) {
+      // Registrar cada alteração
+      for (const change of changes) {
+        await this.recordHistory(
+          id,
+          'EDIT',
+          userId,
+          change.field,
+          change.old ? String(change.old) : null,
+          change.new ? String(change.new) : null,
+        );
+      }
+    }
+
+    // Se é TIMESHEET e tem selectedTimeEntries, processar horas selecionadas
+    if (existingInvoice.origem === 'TIMESHEET' && (invoiceData as any).selectedTimeEntries) {
+      const selectedTimeEntries = (invoiceData as any).selectedTimeEntries as string[];
+      const currentApprovedEntries = existingInvoice.approvedTimeEntries 
+        ? JSON.parse(existingInvoice.approvedTimeEntries) 
+        : [];
+      
+      // Se há horas desmarcadas, criar nova invoice para elas
+      const deselectedEntries = currentApprovedEntries.filter((entryId: string) => 
+        !selectedTimeEntries.includes(entryId)
+      );
+      
+      if (deselectedEntries.length > 0 && existingInvoice.status === 'PROVISIONADA') {
+        // Buscar as horas desmarcadas para calcular o valor
+        const deselectedTimeEntries = await this.timeEntryRepository.find({
+          where: { id: In(deselectedEntries) },
+          relations: ['proposal', 'project', 'project.proposal'],
+        });
+        
+        // Calcular valor total das horas desmarcadas
+        let valorDesmarcadas = 0;
+        for (const entry of deselectedTimeEntries) {
+          let valorPorHora = 0;
+          
+          // Tentar obter valorPorHora da entry
+          if (entry.valorPorHora) {
+            valorPorHora = parseFloat(String(entry.valorPorHora));
+          } else if (entry.proposal?.tipoContratacao === 'HORAS') {
+            valorPorHora = parseFloat(String(entry.proposal.valorPorHora || 0));
+          } else if (entry.project?.proposal?.tipoContratacao === 'HORAS') {
+            valorPorHora = parseFloat(String(entry.project.proposal.valorPorHora || 0));
+          }
+          
+          const horas = parseFloat(String(entry.horas || 0));
+          valorDesmarcadas += horas * valorPorHora;
+        }
+        
+        // Gerar número de invoice para as horas desmarcadas
+        // Usar o invoiceNumber original com sufixo ou gerar novo se não houver
+        let newInvoiceNumber: string;
+        if (existingInvoice.invoiceNumber) {
+          // Adicionar sufixo ao número original
+          const timestamp = Date.now().toString().slice(-6);
+          newInvoiceNumber = `${existingInvoice.invoiceNumber}-RES-${timestamp}`;
+        } else {
+          // Gerar novo número baseado no cliente e timestamp
+          const clientPrefix = existingInvoice.clientId.substring(0, 4).toUpperCase();
+          const timestamp = Date.now().toString().slice(-8);
+          newInvoiceNumber = `TIMESHEET-${clientPrefix}-${timestamp}`;
+        }
+        
+        // Criar nova invoice provisionada para as horas desmarcadas
+        const newInvoiceData: Partial<Invoice> = {
+          companyId: existingInvoice.companyId,
+          clientId: existingInvoice.clientId,
+          proposalId: existingInvoice.proposalId,
+          invoiceNumber: newInvoiceNumber,
+          origem: 'TIMESHEET',
+          status: 'PROVISIONADA',
+          approvedTimeEntries: JSON.stringify(deselectedEntries),
+          chartOfAccountsId: existingInvoice.chartOfAccountsId,
+          grossValue: valorDesmarcadas,
+          emissionDate: existingInvoice.emissionDate || new Date(),
+          dueDate: existingInvoice.dueDate || new Date(),
+        };
+        
+        const newInvoice = this.invoiceRepository.create(newInvoiceData);
+        await this.invoiceRepository.save(newInvoice);
+        
+        console.log(`Nova invoice criada para ${deselectedEntries.length} horas desmarcadas:`, newInvoice.id, 'Número:', newInvoiceNumber, 'Valor:', valorDesmarcadas);
+      }
+      
+      // Buscar as horas selecionadas para recalcular o valor
+      if (selectedTimeEntries.length > 0) {
+        const selectedTimeEntriesData = await this.timeEntryRepository.find({
+          where: { id: In(selectedTimeEntries) },
+          relations: ['proposal', 'project', 'project.proposal'],
+        });
+        
+        // Calcular valor total das horas selecionadas
+        let valorSelecionadas = 0;
+        for (const entry of selectedTimeEntriesData) {
+          let valorPorHora = 0;
+          
+          // Tentar obter valorPorHora da entry
+          if (entry.valorPorHora) {
+            valorPorHora = parseFloat(String(entry.valorPorHora));
+          } else if (entry.proposal?.tipoContratacao === 'HORAS') {
+            valorPorHora = parseFloat(String(entry.proposal.valorPorHora || 0));
+          } else if (entry.project?.proposal?.tipoContratacao === 'HORAS') {
+            valorPorHora = parseFloat(String(entry.project.proposal.valorPorHora || 0));
+          }
+          
+          const horas = parseFloat(String(entry.horas || 0));
+          valorSelecionadas += horas * valorPorHora;
+        }
+        
+        // Atualizar valor da invoice com o valor calculado das horas selecionadas
+        // Só atualizar se não foi fornecido um valor manual
+        if (!invoiceData.grossValue || invoiceData.grossValue === 0) {
+          invoiceData.grossValue = valorSelecionadas;
+        }
+      }
+      
+      // Atualizar approvedTimeEntries com apenas as horas selecionadas
+      invoiceData.approvedTimeEntries = selectedTimeEntries.length > 0 
+        ? JSON.stringify(selectedTimeEntries) 
+        : null;
+    }
+    
+    // Remover selectedTimeEntries do payload antes de salvar
+    const { selectedTimeEntries: _, ...dataToSave } = invoiceData as any;
+    
+    await this.invoiceRepository.update(id, dataToSave);
     return this.findOne(id);
   }
 

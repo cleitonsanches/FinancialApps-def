@@ -18,6 +18,12 @@ import { ensureProjectTaskTipoFields } from './database/ensure-project-task-tipo
 import { ensureTimeEntriesTable } from './database/ensure-time-entries-table';
 import { ensureTimeEntriesVinculos } from './database/ensure-time-entries-vinculos';
 import { ensureTimeEntryStatus } from './database/ensure-time-entry-status';
+import { ensureTimeEntryMotivoReprovacao } from './database/ensure-time-entry-motivo-reprovacao';
+import { ensureTimeEntryMotivoAprovacao } from './database/ensure-time-entry-motivo-aprovacao';
+import { ensureTimeEntryFaturavelFields } from './database/ensure-time-entry-faturavel-fields';
+import { ensureTimeEntryAprovacaoFields } from './database/ensure-time-entry-aprovacao-fields';
+import { ensureTimeEntryReprovacaoFields } from './database/ensure-time-entry-reprovacao-fields';
+import { ensureTimeEntriesProjectNullable } from './database/ensure-time-entries-project-nullable';
 import { ensureProjectTaskVinculos } from './database/ensure-project-task-vinculos';
 import { ensureProjectTaskExigirHoras } from './database/ensure-project-task-exigir-horas';
 import { ensureAccountsPayableTable } from './database/ensure-accounts-payable-table';
@@ -25,6 +31,7 @@ import { ensureReimbursementsTable } from './database/ensure-reimbursements-tabl
 import { ensurePhasesTable } from './database/ensure-phases-table';
 import { ensureProjectClientNullable } from './database/ensure-project-client-nullable';
 import { ensureInvoiceApprovedTimeEntries } from './database/ensure-invoice-approved-time-entries';
+import { ensureInvoiceHistoryTable } from './database/ensure-invoice-history-table';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -105,10 +112,22 @@ export class AppModule implements OnModuleInit {
     await ensureProjectTaskTipoFields(this.dataSource);
     // Garantir que a tabela time_entries existe
     await ensureTimeEntriesTable(this.dataSource);
+    // Garantir que project_id é nullable na tabela time_entries
+    await ensureTimeEntriesProjectNullable(this.dataSource);
     // Garantir que os campos de vínculos (proposal_id, client_id) existem na tabela time_entries
     await ensureTimeEntriesVinculos(this.dataSource);
     // Garantir que o campo status existe na tabela time_entries
     await ensureTimeEntryStatus(this.dataSource);
+    // Garantir que o campo motivo_reprovacao existe na tabela time_entries
+    await ensureTimeEntryMotivoReprovacao(this.dataSource);
+    // Garantir que o campo motivo_aprovacao existe na tabela time_entries
+    await ensureTimeEntryMotivoAprovacao(this.dataSource);
+    // Garantir que os campos is_faturavel e valor_por_hora existem na tabela time_entries
+    await ensureTimeEntryFaturavelFields(this.dataSource);
+    // Garantir que os campos de aprovação existem na tabela time_entries
+    await ensureTimeEntryAprovacaoFields(this.dataSource);
+    // Garantir que os campos de reprovação existem na tabela time_entries
+    await ensureTimeEntryReprovacaoFields(this.dataSource);
     // Garantir que os campos de vínculos (proposal_id, client_id) existem na tabela project_tasks
     await ensureProjectTaskVinculos(this.dataSource);
     // Garantir que o campo exigir_lancamento_horas existe na tabela project_tasks
@@ -123,6 +142,8 @@ export class AppModule implements OnModuleInit {
     await ensureProjectClientNullable(this.dataSource);
     // Garantir que a coluna approved_time_entries existe na tabela invoices
     await ensureInvoiceApprovedTimeEntries(this.dataSource);
+    // Garantir que a tabela invoice_history existe
+    await ensureInvoiceHistoryTable(this.dataSource);
   }
 }
 
