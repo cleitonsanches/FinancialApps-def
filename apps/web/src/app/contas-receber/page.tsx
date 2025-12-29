@@ -15,6 +15,50 @@ export default function ContasReceberPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [activeTotalizer, setActiveTotalizer] = useState<string | null>(null)
+  
+  // Modal de criação manual
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [clients, setClients] = useState<any[]>([])
+  const [chartOfAccounts, setChartOfAccounts] = useState<any[]>([])
+  
+  // Modal de recebimento
+  const [showRecebimentoModal, setShowRecebimentoModal] = useState(false)
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
+  const [bankAccounts, setBankAccounts] = useState<any[]>([])
+  const [recebimentoData, setRecebimentoData] = useState({
+    dataRecebimento: '',
+    valorRecebido: '',
+    contaCorrenteId: '',
+  })
+  
+  // Modais de tratamento de valor residual
+  const [showValorMenorModal, setShowValorMenorModal] = useState(false)
+  const [showValorMaiorModal, setShowValorMaiorModal] = useState(false)
+  const [diferencaValorMenor, setDiferencaValorMenor] = useState(0)
+  const [diferencaValorMaior, setDiferencaValorMaior] = useState(0)
+  const [valorMenorData, setValorMenorData] = useState({
+    opcao: '' as 'desconsiderar' | 'criar_parcela' | 'distribuir' | '',
+    novaParcelaDataVencimento: '',
+  })
+  const [valorMaiorData, setValorMaiorData] = useState({
+    opcao: '' as 'acrescimo' | 'abater_parcela' | 'distribuir' | '',
+    parcelaSelecionada: '',
+  })
+  const [parcelasProvisionadas, setParcelasProvisionadas] = useState<any[]>([])
+  const [residualInvoiceId, setResidualInvoiceId] = useState<string | null>(null)
+  const [residualInvoices, setResidualInvoices] = useState<Record<string, any>>({})
+  const [createFormData, setCreateFormData] = useState({
+    invoiceNumber: '',
+    clientId: '',
+    emissionDate: '',
+    dueDate: '',
+    grossValue: '',
+    chartOfAccountsId: '',
+    numeroNF: '',
+    tipoEmissao: 'NF' as 'NF' | 'EF',
+    desconto: '0',
+    acrescimo: '0',
+  })
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -23,6 +67,9 @@ export default function ContasReceberPage() {
       return
     }
     loadInvoices()
+    loadClients()
+    loadChartOfAccounts()
+    loadBankAccounts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -61,6 +108,388 @@ export default function ContasReceberPage() {
       alert('Erro ao carregar contas a receber')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadClients = async () => {
+    try {
+      const response = await api.get('/clients')
+      setClients(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error)
+    }
+  }
+
+  const loadChartOfAccounts = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/chart-of-accounts?companyId=${companyId}&type=RECEITA` : '/chart-of-accounts?type=RECEITA'
+      const response = await api.get(url)
+      setChartOfAccounts(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar classificações:', error)
+    }
+  }
+
+  const loadBankAccounts = async () => {
+    try {
+      const response = await api.get('/bank-accounts')
+      setBankAccounts(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar contas correntes:', error)
+    }
+  }
+
+  const loadParcelasProvisionadas = async (invoice: any) => {
+    try {
+      if (!invoice?.proposalId) return
+      const response = await api.get(`/invoices/by-proposal/${invoice.proposalId}`)
+      const parcelas = (response.data || []).filter((inv: any) => 
+        inv.status === 'PROVISIONADA' && inv.id !== invoice.id
+      )
+      setParcelasProvisionadas(parcelas)
+    } catch (error) {
+      console.error('Erro ao carregar parcelas provisionadas:', error)
+    }
+  }
+
+  const getValorAsNumber = (value: string): number => {
+    if (!value) return 0
+    return parseFloat(value.replace(/[R$\s.]/g, '').replace(',', '.')) || 0
+  }
+
+  const formatCurrency = (value: number | string | null | undefined) => {
+    if (!value && value !== 0) return 'R$ 0,00'
+    const num = typeof value === 'string' ? parseFloat(value) : value
+    return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  const handleReceber = async (invoice: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedInvoice(invoice)
+    
+    // Sugerir conta baseado no tipo de emissão
+    let contaSugerida = ''
+    if (invoice.tipoEmissao === 'NF') {
+      const btg = bankAccounts.find(acc => 
+        acc.bankName?.toLowerCase().includes('btg') || 
+        acc.bankName?.toLowerCase().includes('pactual')
+      )
+      if (btg) contaSugerida = btg.id
+    } else {
+      const santander = bankAccounts.find(acc => 
+        acc.bankName?.toLowerCase().includes('santander')
+      )
+      if (santander) contaSugerida = santander.id
+    }
+
+    setRecebimentoData({
+      dataRecebimento: invoice.dataRecebimento 
+        ? new Date(invoice.dataRecebimento).toISOString().split('T')[0] 
+        : new Date().toISOString().split('T')[0],
+      valorRecebido: invoice.grossValue 
+        ? parseFloat(invoice.grossValue.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
+      contaCorrenteId: contaSugerida,
+    })
+    setShowRecebimentoModal(true)
+  }
+
+  const handleConfirmRecebimento = async () => {
+    if (!selectedInvoice) return
+    
+    try {
+      const valorOriginal = parseFloat(selectedInvoice.grossValue?.toString() || '0')
+      const valorRecebido = getValorAsNumber(recebimentoData.valorRecebido)
+      
+      setShowRecebimentoModal(false)
+
+      if (valorRecebido < valorOriginal) {
+        const diferenca = valorOriginal - valorRecebido
+        setDiferencaValorMenor(diferenca)
+        setValorMenorData({
+          opcao: '',
+          novaParcelaDataVencimento: '',
+        })
+        await loadParcelasProvisionadas(selectedInvoice)
+        setShowValorMenorModal(true)
+      } else if (valorRecebido > valorOriginal) {
+        const diferenca = valorRecebido - valorOriginal
+        setDiferencaValorMaior(diferenca)
+        await loadParcelasProvisionadas(selectedInvoice)
+        setValorMaiorData({
+          opcao: '',
+          parcelaSelecionada: '',
+        })
+        setShowValorMaiorModal(true)
+      } else {
+        await api.put(`/invoices/${selectedInvoice.id}`, {
+          status: 'RECEBIDA',
+          dataRecebimento: recebimentoData.dataRecebimento,
+          contaCorrenteId: recebimentoData.contaCorrenteId,
+        })
+        await loadInvoices()
+        alert('Recebimento registrado com sucesso!')
+      }
+    } catch (error: any) {
+      console.error('Erro ao processar recebimento:', error)
+      alert(error.response?.data?.message || 'Erro ao processar recebimento')
+    }
+  }
+
+  const handleConfirmValorMenor = async () => {
+    if (!selectedInvoice) return
+    
+    try {
+      const valorOriginal = parseFloat(selectedInvoice.grossValue?.toString() || '0')
+      const valorRecebido = getValorAsNumber(recebimentoData.valorRecebido)
+      const diferenca = valorOriginal - valorRecebido
+
+      const updateData: any = {
+        status: 'RECEBIDA',
+        dataRecebimento: recebimentoData.dataRecebimento,
+        contaCorrenteId: recebimentoData.contaCorrenteId,
+      }
+
+      if (valorMenorData.opcao === 'desconsiderar') {
+        updateData.desconto = diferenca
+      } else if (valorMenorData.opcao === 'criar_parcela') {
+        if (!valorMenorData.novaParcelaDataVencimento) {
+          alert('Por favor, informe a data de vencimento da nova parcela')
+          return
+        }
+        const response = await api.post('/invoices', {
+          companyId: selectedInvoice.companyId,
+          clientId: selectedInvoice.clientId,
+          proposalId: selectedInvoice.proposalId,
+          invoiceNumber: `${selectedInvoice.invoiceNumber}-RESIDUAL`,
+          emissionDate: new Date().toISOString().split('T')[0],
+          dueDate: valorMenorData.novaParcelaDataVencimento,
+          grossValue: diferenca,
+          status: 'PROVISIONADA',
+          origem: selectedInvoice.origem,
+          chartOfAccountsId: selectedInvoice.chartOfAccountsId,
+        })
+        const newResidualId = response.data.id
+        setResidualInvoiceId(newResidualId)
+        // Atualizar o mapa de residuais
+        setResidualInvoices(prev => ({
+          ...prev,
+          [selectedInvoice.id]: response.data
+        }))
+      } else if (valorMenorData.opcao === 'distribuir') {
+        if (parcelasProvisionadas.length === 0) {
+          alert('Não há parcelas provisionadas para distribuir o valor')
+          return
+        }
+        const valorPorParcela = diferenca / parcelasProvisionadas.length
+        for (const parcela of parcelasProvisionadas) {
+          const novoValor = parseFloat(parcela.grossValue?.toString() || '0') + valorPorParcela
+          await api.put(`/invoices/${parcela.id}`, {
+            grossValue: novoValor,
+          })
+        }
+      }
+
+      await api.put(`/invoices/${selectedInvoice.id}`, updateData)
+      setShowValorMenorModal(false)
+      await loadInvoices()
+      
+      let mensagem = 'Recebimento registrado com sucesso!'
+      if (valorMenorData.opcao === 'desconsiderar') {
+        mensagem = `Recebimento registrado! Desconto de ${formatCurrency(diferenca)} aplicado.`
+      } else if (valorMenorData.opcao === 'criar_parcela') {
+        mensagem = `Recebimento registrado! Nova parcela de ${formatCurrency(diferenca)} criada.`
+      } else if (valorMenorData.opcao === 'distribuir') {
+        mensagem = `Recebimento registrado! Valor residual de ${formatCurrency(diferenca)} distribuído entre ${parcelasProvisionadas.length} parcelas.`
+      }
+      alert(mensagem)
+      setResidualInvoiceId(null)
+    } catch (error: any) {
+      console.error('Erro ao processar valor menor:', error)
+      alert(error.response?.data?.message || 'Erro ao processar valor menor')
+    }
+  }
+
+  const handleConfirmValorMaior = async () => {
+    if (!selectedInvoice) return
+    
+    try {
+      const valorOriginal = parseFloat(selectedInvoice.grossValue?.toString() || '0')
+      const valorRecebido = getValorAsNumber(recebimentoData.valorRecebido)
+      const diferenca = valorRecebido - valorOriginal
+
+      const updateData: any = {
+        status: 'RECEBIDA',
+        dataRecebimento: recebimentoData.dataRecebimento,
+        contaCorrenteId: recebimentoData.contaCorrenteId,
+      }
+
+      if (valorMaiorData.opcao === 'acrescimo') {
+        updateData.acrescimo = diferenca
+      } else if (valorMaiorData.opcao === 'abater_parcela') {
+        if (!valorMaiorData.parcelaSelecionada) {
+          alert('Por favor, selecione uma parcela para abater')
+          return
+        }
+        const parcela = parcelasProvisionadas.find(p => p.id === valorMaiorData.parcelaSelecionada)
+        if (parcela) {
+          const novoValor = Math.max(0, parseFloat(parcela.grossValue?.toString() || '0') - diferenca)
+          await api.put(`/invoices/${valorMaiorData.parcelaSelecionada}`, {
+            grossValue: novoValor,
+          })
+        }
+      } else if (valorMaiorData.opcao === 'distribuir') {
+        if (parcelasProvisionadas.length === 0) {
+          alert('Não há parcelas provisionadas para distribuir o abatimento')
+          return
+        }
+        const valorPorParcela = diferenca / parcelasProvisionadas.length
+        for (const parcela of parcelasProvisionadas) {
+          const novoValor = Math.max(0, parseFloat(parcela.grossValue?.toString() || '0') - valorPorParcela)
+          await api.put(`/invoices/${parcela.id}`, {
+            grossValue: novoValor,
+          })
+        }
+      }
+
+      await api.put(`/invoices/${selectedInvoice.id}`, updateData)
+      setShowValorMaiorModal(false)
+      await loadInvoices()
+      
+      let mensagem = 'Recebimento registrado com sucesso!'
+      if (valorMaiorData.opcao === 'acrescimo') {
+        mensagem = `Recebimento registrado! Acréscimo de ${formatCurrency(diferenca)} aplicado.`
+      } else if (valorMaiorData.opcao === 'abater_parcela') {
+        mensagem = `Recebimento registrado! Valor de ${formatCurrency(diferenca)} abatido da parcela selecionada.`
+      } else if (valorMaiorData.opcao === 'distribuir') {
+        mensagem = `Recebimento registrado! Abatimento de ${formatCurrency(diferenca)} distribuído entre ${parcelasProvisionadas.length} parcelas.`
+      }
+      alert(mensagem)
+    } catch (error: any) {
+      console.error('Erro ao processar valor maior:', error)
+      alert(error.response?.data?.message || 'Erro ao processar valor maior')
+    }
+  }
+
+  const loadResidualInvoices = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      if (!companyId) return
+      
+      const url = `/invoices?companyId=${companyId}`
+      const response = await api.get(url)
+      const allInvoices = response.data || []
+      
+      // Criar mapa de invoices residuais
+      const residualMap: Record<string, any> = {}
+      
+      allInvoices.forEach((invoice: any) => {
+        if (invoice.status === 'RECEBIDA' && (invoice.proposalId || invoice.clientId)) {
+          // Buscar invoice residual relacionada (pode ser por proposalId ou clientId)
+          const residuals = allInvoices.filter((inv: any) => 
+            (inv.invoiceNumber?.includes('-RESIDUAL') || inv.invoiceNumber?.includes('-RES-')) && 
+            inv.status === 'PROVISIONADA' &&
+            inv.clientId === invoice.clientId &&
+            (invoice.proposalId ? inv.proposalId === invoice.proposalId : true) &&
+            inv.id !== invoice.id
+          )
+          
+          // Se houver apenas uma parcela residual, usar ela
+          if (residuals.length === 1) {
+            residualMap[invoice.id] = residuals[0]
+          } else if (residuals.length > 1) {
+            // Se houver múltiplas, pegar a mais recente
+            const sorted = residuals.sort((a: any, b: any) => 
+              new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+            )
+            residualMap[invoice.id] = sorted[0]
+          }
+        }
+      })
+      
+      setResidualInvoices(residualMap)
+    } catch (error) {
+      console.error('Erro ao carregar parcelas residuais:', error)
+    }
+  }
+  
+  useEffect(() => {
+    if (invoices.length > 0) {
+      loadResidualInvoices()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices])
+
+  const handleOpenCreateModal = () => {
+    // Gerar número de invoice automático baseado em timestamp
+    const timestamp = Date.now().toString().slice(-8)
+    setCreateFormData({
+      invoiceNumber: `MANUAL-${timestamp}`,
+      clientId: '',
+      emissionDate: new Date().toISOString().split('T')[0],
+      dueDate: '',
+      grossValue: '',
+      chartOfAccountsId: '',
+      numeroNF: '',
+      tipoEmissao: 'NF',
+      desconto: '0',
+      acrescimo: '0',
+    })
+    setShowCreateModal(true)
+  }
+
+  const handleCreateInvoice = async () => {
+    // Validações
+    if (!createFormData.invoiceNumber || !createFormData.clientId || !createFormData.emissionDate || 
+        !createFormData.dueDate || !createFormData.grossValue) {
+      alert('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    if (parseFloat(createFormData.grossValue) <= 0) {
+      alert('O valor deve ser maior que zero')
+      return
+    }
+
+    try {
+      const companyId = getCompanyIdFromToken()
+      if (!companyId) {
+        alert('Erro: Não foi possível identificar a empresa. Faça login novamente.')
+        return
+      }
+
+      const invoiceData: any = {
+        invoiceNumber: createFormData.invoiceNumber,
+        clientId: createFormData.clientId,
+        emissionDate: createFormData.emissionDate,
+        dueDate: createFormData.dueDate,
+        grossValue: parseFloat(createFormData.grossValue),
+        status: 'PROVISIONADA',
+        origem: 'MANUAL',
+        desconto: parseFloat(createFormData.desconto || '0'),
+        acrescimo: parseFloat(createFormData.acrescimo || '0'),
+      }
+
+      if (createFormData.chartOfAccountsId) {
+        invoiceData.chartOfAccountsId = createFormData.chartOfAccountsId
+      }
+
+      if (createFormData.numeroNF) {
+        invoiceData.numeroNF = createFormData.numeroNF
+      }
+
+      if (createFormData.tipoEmissao) {
+        invoiceData.tipoEmissao = createFormData.tipoEmissao
+      }
+
+      await api.post('/invoices', invoiceData)
+      alert('Conta a receber criada com sucesso!')
+      setShowCreateModal(false)
+      loadInvoices()
+    } catch (error: any) {
+      console.error('Erro ao criar conta a receber:', error)
+      alert(error.response?.data?.message || 'Erro ao criar conta a receber')
     }
   }
 
@@ -336,12 +765,12 @@ export default function ContasReceberPage() {
               >
                 Limpar Filtros
               </button>
-              <Link
-                href="/contas-receber/nova"
+              <button
+                onClick={handleOpenCreateModal}
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
               >
-                + Nova Nota Fiscal
-              </Link>
+                + Nova Conta a Receber
+              </button>
             </div>
           </div>
         </div>
@@ -447,14 +876,12 @@ export default function ContasReceberPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emissão</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor Bruto</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impostos</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredInvoices.map((invoice) => {
-                  const impostos = calculateImpostos(invoice)
                   return (
                     <tr 
                       key={invoice.id} 
@@ -478,15 +905,6 @@ export default function ContasReceberPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         R$ {parseFloat(invoice.grossValue.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {invoice.status === 'FATURADA' ? (
-                          <span className="font-semibold">
-                            R$ {impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        ) : (
-                          <span>R$ {impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        )}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
                           {getStatusLabel(invoice.status)}
@@ -503,12 +921,14 @@ export default function ContasReceberPage() {
                           >
                             Ver Detalhes
                           </Link>
-                          <button
-                            onClick={(e) => handleDelete(invoice.id, e)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Excluir
-                          </button>
+                          {invoice.status === 'FATURADA' && (
+                            <button
+                              onClick={(e) => handleReceber(invoice, e)}
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              Receber
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -518,6 +938,455 @@ export default function ContasReceberPage() {
             </table>
           )}
         </div>
+
+        {/* Modal: Criar Conta a Receber Manual */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Nova Conta a Receber</h2>
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  Preencha os dados para criar uma conta a receber com status Provisionada
+                </p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Número da Invoice */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Número da Conta *
+                  </label>
+                  <input
+                    type="text"
+                    value={createFormData.invoiceNumber}
+                    onChange={(e) => setCreateFormData({ ...createFormData, invoiceNumber: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    placeholder="Ex: MANUAL-12345678"
+                  />
+                </div>
+
+                {/* Cliente */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Cliente *
+                  </label>
+                  <select
+                    value={createFormData.clientId}
+                    onChange={(e) => setCreateFormData({ ...createFormData, clientId: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  >
+                    <option value="">Selecione um cliente</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.razaoSocial || client.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Datas */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data de Emissão *
+                    </label>
+                    <input
+                      type="date"
+                      value={createFormData.emissionDate}
+                      onChange={(e) => setCreateFormData({ ...createFormData, emissionDate: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data de Vencimento *
+                    </label>
+                    <input
+                      type="date"
+                      value={createFormData.dueDate}
+                      onChange={(e) => setCreateFormData({ ...createFormData, dueDate: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Valor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Valor Bruto *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={createFormData.grossValue}
+                    onChange={(e) => setCreateFormData({ ...createFormData, grossValue: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                {/* Classificação */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Classificação
+                  </label>
+                  <select
+                    value={createFormData.chartOfAccountsId}
+                    onChange={(e) => setCreateFormData({ ...createFormData, chartOfAccountsId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  >
+                    <option value="">Selecione uma classificação (opcional)</option>
+                    {chartOfAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.code} - {account.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Número NF e Tipo de Emissão */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Número da NF
+                    </label>
+                    <input
+                      type="text"
+                      value={createFormData.numeroNF}
+                      onChange={(e) => setCreateFormData({ ...createFormData, numeroNF: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Emissão
+                    </label>
+                    <select
+                      value={createFormData.tipoEmissao}
+                      onChange={(e) => setCreateFormData({ ...createFormData, tipoEmissao: e.target.value as 'NF' | 'EF' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    >
+                      <option value="NF">Nota Fiscal (NF)</option>
+                      <option value="EF">Emissão Fiscal (EF)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Desconto e Acréscimo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Desconto
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={createFormData.desconto}
+                      onChange={(e) => setCreateFormData({ ...createFormData, desconto: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Acréscimo
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={createFormData.acrescimo}
+                      onChange={(e) => setCreateFormData({ ...createFormData, acrescimo: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateInvoice}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Criar Conta a Receber
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Recebimento */}
+        {showRecebimentoModal && selectedInvoice && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">Registrar Recebimento</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Data de Recebimento
+                  </label>
+                  <input
+                    type="date"
+                    value={recebimentoData.dataRecebimento}
+                    onChange={(e) => setRecebimentoData({ ...recebimentoData, dataRecebimento: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Valor Recebido
+                  </label>
+                  <input
+                    type="text"
+                    value={recebimentoData.valorRecebido}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^\d,]/g, '')
+                      const parts = value.split(',')
+                      if (parts.length > 2) return
+                      setRecebimentoData({ ...recebimentoData, valorRecebido: value })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="0,00"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Conta Corrente
+                  </label>
+                  <select
+                    value={recebimentoData.contaCorrenteId}
+                    onChange={(e) => setRecebimentoData({ ...recebimentoData, contaCorrenteId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  >
+                    <option value="">Selecione a conta corrente</option>
+                    {bankAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.bankName} - {account.accountNumber}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={() => setShowRecebimentoModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmRecebimento}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Tratamento Valor Menor */}
+        {showValorMenorModal && selectedInvoice && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">Tratar Valor Residual</h2>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm font-medium text-blue-900">
+                  Diferença apurada: <span className="text-lg font-bold">{formatCurrency(diferencaValorMenor)}</span>
+                </p>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                O valor recebido é menor que o valor original. Como deseja tratar a diferença?
+              </p>
+              <div className="space-y-4">
+                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="opcao"
+                    value="desconsiderar"
+                    checked={valorMenorData.opcao === 'desconsiderar'}
+                    onChange={(e) => setValorMenorData({ ...valorMenorData, opcao: e.target.value as any })}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">Desconsiderar</div>
+                    <div className="text-sm text-gray-600">Lançar o valor residual como Desconto</div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="opcao"
+                    value="criar_parcela"
+                    checked={valorMenorData.opcao === 'criar_parcela'}
+                    onChange={(e) => setValorMenorData({ ...valorMenorData, opcao: e.target.value as any })}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">Criar Nova Parcela</div>
+                    <div className="text-sm text-gray-600">Criar uma nova parcela com o valor residual</div>
+                    {valorMenorData.opcao === 'criar_parcela' && (
+                      <input
+                        type="date"
+                        value={valorMenorData.novaParcelaDataVencimento}
+                        onChange={(e) => setValorMenorData({ ...valorMenorData, novaParcelaDataVencimento: e.target.value })}
+                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Data de vencimento"
+                        required
+                      />
+                    )}
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="opcao"
+                    value="distribuir"
+                    checked={valorMenorData.opcao === 'distribuir'}
+                    onChange={(e) => setValorMenorData({ ...valorMenorData, opcao: e.target.value as any })}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">Distribuir</div>
+                    <div className="text-sm text-gray-600">Distribuir o valor residual entre as demais parcelas provisionadas</div>
+                  </div>
+                </label>
+              </div>
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={() => setShowValorMenorModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmValorMenor}
+                  disabled={!valorMenorData.opcao || (valorMenorData.opcao === 'criar_parcela' && !valorMenorData.novaParcelaDataVencimento)}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Tratamento Valor Maior */}
+        {showValorMaiorModal && selectedInvoice && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">Tratar Valor a Maior</h2>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm font-medium text-blue-900">
+                  Diferença apurada: <span className="text-lg font-bold">{formatCurrency(diferencaValorMaior)}</span>
+                </p>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                O valor recebido é maior que o valor original. Como deseja tratar a diferença?
+              </p>
+              <div className="space-y-4">
+                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="opcao"
+                    value="acrescimo"
+                    checked={valorMaiorData.opcao === 'acrescimo'}
+                    onChange={(e) => setValorMaiorData({ ...valorMaiorData, opcao: e.target.value as any })}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">Acréscimo</div>
+                    <div className="text-sm text-gray-600">Lançar valor maior como Acréscimo</div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="opcao"
+                    value="abater_parcela"
+                    checked={valorMaiorData.opcao === 'abater_parcela'}
+                    onChange={(e) => setValorMaiorData({ ...valorMaiorData, opcao: e.target.value as any })}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">Abater de Parcela Futura Específica</div>
+                    <div className="text-sm text-gray-600">Reduzir o valor de uma parcela provisionada específica</div>
+                    {valorMaiorData.opcao === 'abater_parcela' && (
+                      <select
+                        value={valorMaiorData.parcelaSelecionada}
+                        onChange={(e) => setValorMaiorData({ ...valorMaiorData, parcelaSelecionada: e.target.value })}
+                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      >
+                        <option value="">Selecione uma parcela</option>
+                        {parcelasProvisionadas.map((parcela) => (
+                          <option key={parcela.id} value={parcela.id}>
+                            {parcela.invoiceNumber} - {formatCurrency(parseFloat(parcela.grossValue?.toString() || '0'))}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="opcao"
+                    value="distribuir"
+                    checked={valorMaiorData.opcao === 'distribuir'}
+                    onChange={(e) => setValorMaiorData({ ...valorMaiorData, opcao: e.target.value as any })}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900">Distribuir Abatimento</div>
+                    <div className="text-sm text-gray-600">Distribuir o abatimento igualmente entre as demais parcelas provisionadas</div>
+                  </div>
+                </label>
+              </div>
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={() => setShowValorMaiorModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmValorMaior}
+                  disabled={!valorMaiorData.opcao || (valorMaiorData.opcao === 'abater_parcela' && !valorMaiorData.parcelaSelecionada)}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

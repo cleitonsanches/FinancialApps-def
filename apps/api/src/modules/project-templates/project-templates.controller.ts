@@ -54,5 +54,37 @@ export class ProjectTemplatesController {
   async deleteTask(@Param('taskId') taskId: string): Promise<void> {
     return this.projectTemplatesService.deleteTask(taskId);
   }
+
+  // Endpoints para Fases
+  @Get(':id/phases')
+  async findAllPhases(@Param('id') templateId: string): Promise<any[]> {
+    return this.projectTemplatesService.findAllPhases(templateId);
+  }
+
+  @Post(':id/phases')
+  async createPhase(@Param('id') templateId: string, @Body() phaseData: any): Promise<any> {
+    phaseData.templateId = templateId;
+    return this.projectTemplatesService.createPhase(phaseData);
+  }
+
+  @Get('phases/:phaseId')
+  async findOnePhase(@Param('phaseId') phaseId: string): Promise<any> {
+    return this.projectTemplatesService.findOnePhase(phaseId);
+  }
+
+  @Put('phases/:phaseId')
+  async updatePhase(@Param('phaseId') phaseId: string, @Body() phaseData: any): Promise<any> {
+    return this.projectTemplatesService.updatePhase(phaseId, phaseData);
+  }
+
+  @Delete('phases/:phaseId')
+  async deletePhase(@Param('phaseId') phaseId: string): Promise<void> {
+    return this.projectTemplatesService.deletePhase(phaseId);
+  }
+
+  @Post('phases/reorder')
+  async reorderPhases(@Body() data: { templateId: string; phaseOrders: { id: string; ordem: number }[] }): Promise<void> {
+    return this.projectTemplatesService.reorderPhases(data.templateId, data.phaseOrders);
+  }
 }
 

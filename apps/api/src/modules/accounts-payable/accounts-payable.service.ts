@@ -2,12 +2,18 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AccountPayable } from '../../database/entities/account-payable.entity';
+import { InvoiceAccountPayable } from '../../database/entities/invoice-account-payable.entity';
+import { Invoice } from '../../database/entities/invoice.entity';
 
 @Injectable()
 export class AccountsPayableService {
   constructor(
     @InjectRepository(AccountPayable)
     private accountPayableRepository: Repository<AccountPayable>,
+    @InjectRepository(InvoiceAccountPayable)
+    private invoiceAccountPayableRepository: Repository<InvoiceAccountPayable>,
+    @InjectRepository(Invoice)
+    private invoiceRepository: Repository<Invoice>,
   ) {}
 
   async findAll(companyId?: string): Promise<AccountPayable[]> {
@@ -112,6 +118,22 @@ export class AccountsPayableService {
     if (result.affected === 0) {
       throw new NotFoundException(`Conta a pagar com ID ${id} não encontrada`);
     }
+  }
+
+  /**
+   * Busca todas as invoices relacionadas a uma conta a pagar (SIMPLES Nacional)
+   */
+  async findRelatedInvoices(accountPayableId: string): Promise<Array<{ invoice: Invoice; valorContribuido: number }>> {
+    const relacionamentos = await this.invoiceAccountPayableRepository.find({
+      where: { accountPayableId },
+      relations: ['invoice', 'invoice.client'],
+      order: { createdAt: 'ASC' },
+    });
+
+    return relacionamentos.map(rel => ({
+      invoice: rel.invoice,
+      valorContribuido: parseFloat(rel.valorContribuido.toString()),
+    }));
   }
 }
 

@@ -17,6 +17,7 @@ export default function AccountPayableDetailsPage() {
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [chartOfAccounts, setChartOfAccounts] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
+  const [relatedInvoices, setRelatedInvoices] = useState<Array<{ invoice: any; valorContribuido: number }>>([])
   
   // Modal EDITAR
   const [showEditarModal, setShowEditarModal] = useState(false)
@@ -76,6 +77,7 @@ export default function AccountPayableDetailsPage() {
     loadSuppliers()
     loadChartOfAccounts()
     loadClients()
+    loadRelatedInvoices()
   }, [accountPayableId, router])
 
   const loadAccountPayable = async () => {
@@ -89,6 +91,16 @@ export default function AccountPayableDetailsPage() {
       router.push('/contas-pagar')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadRelatedInvoices = async () => {
+    try {
+      const response = await api.get(`/accounts-payable/${accountPayableId}/invoices`)
+      setRelatedInvoices(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar invoices relacionadas:', error)
+      // Não mostrar erro, apenas não exibir a seção
     }
   }
 
@@ -608,6 +620,56 @@ export default function AccountPayableDetailsPage() {
               )}
             </div>
           </div>
+
+          {/* Invoices Relacionadas (SIMPLES Nacional) */}
+          {relatedInvoices.length > 0 && (
+            <div className="pt-6 border-t border-gray-200">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900">Notas Fiscais que Geraram este Valor</h2>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número NF</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data Emissão</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor Bruto</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor Contribuído (6%)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {relatedInvoices.map((item) => (
+                      <tr key={item.invoice.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {item.invoice.numeroNF || item.invoice.invoiceNumber || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {item.invoice.client?.razaoSocial || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(item.invoice.emissionDate)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(parseFloat(item.invoice.grossValue?.toString() || '0'))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                          {formatCurrency(item.valorContribuido)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <Link
+                            href={`/contas-receber/${item.invoice.id}`}
+                            className="text-primary-600 hover:text-primary-900"
+                          >
+                            Ver Detalhes
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Ações */}
           <div className="flex gap-4 pt-4 border-t border-gray-200">

@@ -7,11 +7,14 @@ import { BankAccount } from '../../database/entities/bank-account.entity';
 import { TimeEntry } from '../../database/entities/time-entry.entity';
 import { InvoiceHistory } from '../../database/entities/invoice-history.entity';
 import { User } from '../../database/entities/user.entity';
+import { Client } from '../../database/entities/client.entity';
+import { AccountPayable } from '../../database/entities/account-payable.entity';
+import { InvoiceAccountPayable } from '../../database/entities/invoice-account-payable.entity';
 import { InvoicesService } from './invoices.service';
 import { InvoicesController } from './invoices.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Invoice, InvoiceTax, Proposal, ChartOfAccounts, BankAccount, TimeEntry, InvoiceHistory, User])],
+  imports: [TypeOrmModule.forFeature([Invoice, InvoiceTax, Proposal, ChartOfAccounts, BankAccount, TimeEntry, InvoiceHistory, User, Client, AccountPayable, InvoiceAccountPayable])],
   controllers: [InvoicesController],
   providers: [InvoicesService],
   exports: [InvoicesService],

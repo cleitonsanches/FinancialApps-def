@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProjectTemplate } from '../../database/entities/project-template.entity';
 import { ProjectTemplateTask } from '../../database/entities/project-template-task.entity';
+import { ProjectTemplatePhase } from '../../database/entities/project-template-phase.entity';
 
 @Injectable()
 export class ProjectTemplatesService {
@@ -11,6 +12,8 @@ export class ProjectTemplatesService {
     private templateRepository: Repository<ProjectTemplate>,
     @InjectRepository(ProjectTemplateTask)
     private taskRepository: Repository<ProjectTemplateTask>,
+    @InjectRepository(ProjectTemplatePhase)
+    private phaseRepository: Repository<ProjectTemplatePhase>,
   ) {}
 
   async findAll(companyId?: string): Promise<ProjectTemplate[]> {
@@ -20,7 +23,7 @@ export class ProjectTemplatesService {
     }
     return this.templateRepository.find({ 
       where,
-      relations: ['tasks'],
+      relations: ['phases', 'phases.tasks', 'tasks'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -28,7 +31,7 @@ export class ProjectTemplatesService {
   async findOne(id: string): Promise<ProjectTemplate> {
     return this.templateRepository.findOne({ 
       where: { id },
-      relations: ['tasks'],
+      relations: ['phases', 'phases.tasks', 'tasks'],
     });
   }
 
@@ -59,6 +62,51 @@ export class ProjectTemplatesService {
   async updateTask(taskId: string, taskData: Partial<ProjectTemplateTask>): Promise<ProjectTemplateTask> {
     await this.taskRepository.update(taskId, taskData);
     return this.taskRepository.findOne({ where: { id: taskId } }) as Promise<ProjectTemplateTask>;
+  }
+
+  // Métodos para gerenciar fases
+  async createPhase(phaseData: Partial<ProjectTemplatePhase>): Promise<ProjectTemplatePhase> {
+    // Se não foi informada a ordem, buscar a última ordem e incrementar
+    if (phaseData.ordem === undefined || phaseData.ordem === null) {
+      const lastPhase = await this.phaseRepository.findOne({
+        where: { templateId: phaseData.templateId },
+        order: { ordem: 'DESC' },
+      });
+      phaseData.ordem = lastPhase ? lastPhase.ordem + 1 : 0;
+    }
+
+    const phase = this.phaseRepository.create(phaseData);
+    return this.phaseRepository.save(phase);
+  }
+
+  async findAllPhases(templateId: string): Promise<ProjectTemplatePhase[]> {
+    return this.phaseRepository.find({
+      where: { templateId },
+      relations: ['tasks'],
+      order: { ordem: 'ASC' },
+    });
+  }
+
+  async findOnePhase(id: string): Promise<ProjectTemplatePhase> {
+    return this.phaseRepository.findOne({
+      where: { id },
+      relations: ['tasks', 'template'],
+    });
+  }
+
+  async updatePhase(id: string, phaseData: Partial<ProjectTemplatePhase>): Promise<ProjectTemplatePhase> {
+    await this.phaseRepository.update(id, phaseData);
+    return this.findOnePhase(id);
+  }
+
+  async deletePhase(id: string): Promise<void> {
+    await this.phaseRepository.delete(id);
+  }
+
+  async reorderPhases(templateId: string, phaseOrders: { id: string; ordem: number }[]): Promise<void> {
+    for (const { id, ordem } of phaseOrders) {
+      await this.phaseRepository.update(id, { ordem });
+    }
   }
 }
 

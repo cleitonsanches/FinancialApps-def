@@ -5,6 +5,7 @@ import { Proposal } from '../../database/entities/proposal.entity';
 import { Project, ProjectTask } from '../../database/entities/project.entity';
 import { ProjectTemplate } from '../../database/entities/project-template.entity';
 import { ProjectTemplateTask } from '../../database/entities/project-template-task.entity';
+import { Phase } from '../../database/entities/phase.entity';
 
 @Injectable()
 export class ProposalsService {
@@ -19,6 +20,8 @@ export class ProposalsService {
     private projectTemplateRepository: Repository<ProjectTemplate>,
     @InjectRepository(ProjectTemplateTask)
     private projectTemplateTaskRepository: Repository<ProjectTemplateTask>,
+    @InjectRepository(Phase)
+    private phaseRepository: Repository<Phase>,
   ) {}
 
   async findAll(companyId?: string, status?: string): Promise<Proposal[]> {
@@ -274,9 +277,10 @@ export class ProposalsService {
       throw new Error('Proposta não encontrada');
     }
 
+    // Carregar template com fases e tarefas (tasks para compatibilidade com templates antigos)
     const template = await this.projectTemplateRepository.findOne({
       where: { id: templateId },
-      relations: ['tasks'],
+      relations: ['phases', 'phases.tasks', 'tasks'],
     });
 
     if (!template) {
@@ -298,53 +302,116 @@ export class ProposalsService {
 
     const savedProject = await this.projectRepository.save(project);
 
-    // Calcular e criar tarefas
     const tasks: ProjectTask[] = [];
     const taskMap = new Map<string, ProjectTask>();
+    const phases: Phase[] = [];
+    const phaseMap = new Map<string, Phase>();
 
-    // Ordenar tarefas do template por ordem
-    const sortedTemplateTasks = (template.tasks || []).sort((a, b) => a.ordem - b.ordem);
+    // Se o template tiver fases, criar fases primeiro
+    if (template.phases && template.phases.length > 0) {
+      // Ordenar fases por ordem
+      const sortedPhases = [...template.phases].sort((a, b) => a.ordem - b.ordem);
 
-    for (const templateTask of sortedTemplateTasks) {
-      let taskStartDate: Date;
+      for (const templatePhase of sortedPhases) {
+        const phase = this.phaseRepository.create({
+          projectId: savedProject.id,
+          name: templatePhase.name,
+          description: templatePhase.description,
+          ordem: templatePhase.ordem,
+          status: 'PENDENTE',
+        });
 
-      if (templateTask.diasAposInicioProjeto !== null && templateTask.diasAposInicioProjeto !== undefined) {
-        // Tarefa baseada na data de início do projeto
-        taskStartDate = new Date(startDate);
-        taskStartDate.setDate(taskStartDate.getDate() + templateTask.diasAposInicioProjeto);
-      } else if (templateTask.tarefaAnteriorId) {
-        // Tarefa baseada na tarefa anterior
-        const previousTask = taskMap.get(templateTask.tarefaAnteriorId);
-        if (previousTask && previousTask.dataInicio) {
-          taskStartDate = new Date(previousTask.dataInicio);
-          taskStartDate.setDate(taskStartDate.getDate() + templateTask.duracaoPrevistaDias);
+        const savedPhase = await this.phaseRepository.save(phase);
+        phases.push(savedPhase);
+        phaseMap.set(templatePhase.id, savedPhase);
+
+        // Criar tarefas dentro da fase
+        if (templatePhase.tasks && templatePhase.tasks.length > 0) {
+          const sortedPhaseTasks = [...templatePhase.tasks].sort((a, b) => a.ordem - b.ordem);
+
+          for (const templateTask of sortedPhaseTasks) {
+            let taskStartDate: Date;
+
+            if (templateTask.diasAposInicioProjeto !== null && templateTask.diasAposInicioProjeto !== undefined) {
+              taskStartDate = new Date(startDate);
+              taskStartDate.setDate(taskStartDate.getDate() + templateTask.diasAposInicioProjeto);
+            } else if (templateTask.tarefaAnteriorId) {
+              const previousTask = taskMap.get(templateTask.tarefaAnteriorId);
+              if (previousTask && previousTask.dataInicio) {
+                taskStartDate = new Date(previousTask.dataInicio);
+                taskStartDate.setDate(taskStartDate.getDate() + templateTask.duracaoPrevistaDias);
+              } else {
+                taskStartDate = new Date(startDate);
+              }
+            } else {
+              taskStartDate = new Date(startDate);
+            }
+
+            const taskEndDate = new Date(taskStartDate);
+            taskEndDate.setDate(taskEndDate.getDate() + templateTask.duracaoPrevistaDias);
+
+            const exigirLancamentoHoras = proposal.tipoContratacao === 'HORAS';
+            
+            const task = this.projectTaskRepository.create({
+              projectId: savedProject.id,
+              phaseId: savedPhase.id,
+              name: templateTask.name,
+              description: templateTask.description,
+              dataInicio: taskStartDate,
+              dataConclusao: taskEndDate,
+              status: 'PENDENTE',
+              ordem: templateTask.ordem,
+              exigirLancamentoHoras: exigirLancamentoHoras,
+            });
+
+            const savedTask = await this.projectTaskRepository.save(task);
+            tasks.push(savedTask);
+            taskMap.set(templateTask.id, savedTask);
+          }
+        }
+      }
+    } else if (template.tasks && template.tasks.length > 0) {
+      // Compatibilidade com templates antigos (sem fases)
+      const sortedTemplateTasks = [...template.tasks].sort((a, b) => a.ordem - b.ordem);
+
+      for (const templateTask of sortedTemplateTasks) {
+        let taskStartDate: Date;
+
+        if (templateTask.diasAposInicioProjeto !== null && templateTask.diasAposInicioProjeto !== undefined) {
+          taskStartDate = new Date(startDate);
+          taskStartDate.setDate(taskStartDate.getDate() + templateTask.diasAposInicioProjeto);
+        } else if (templateTask.tarefaAnteriorId) {
+          const previousTask = taskMap.get(templateTask.tarefaAnteriorId);
+          if (previousTask && previousTask.dataInicio) {
+            taskStartDate = new Date(previousTask.dataInicio);
+            taskStartDate.setDate(taskStartDate.getDate() + templateTask.duracaoPrevistaDias);
+          } else {
+            taskStartDate = new Date(startDate);
+          }
         } else {
           taskStartDate = new Date(startDate);
         }
-      } else {
-        taskStartDate = new Date(startDate);
+
+        const taskEndDate = new Date(taskStartDate);
+        taskEndDate.setDate(taskEndDate.getDate() + templateTask.duracaoPrevistaDias);
+
+        const exigirLancamentoHoras = proposal.tipoContratacao === 'HORAS';
+        
+        const task = this.projectTaskRepository.create({
+          projectId: savedProject.id,
+          name: templateTask.name,
+          description: templateTask.description,
+          dataInicio: taskStartDate,
+          dataConclusao: taskEndDate,
+          status: 'PENDENTE',
+          ordem: templateTask.ordem,
+          exigirLancamentoHoras: exigirLancamentoHoras,
+        });
+
+        const savedTask = await this.projectTaskRepository.save(task);
+        tasks.push(savedTask);
+        taskMap.set(templateTask.id, savedTask);
       }
-
-      const taskEndDate = new Date(taskStartDate);
-      taskEndDate.setDate(taskEndDate.getDate() + templateTask.duracaoPrevistaDias);
-
-      // Se a negociação for "Por Horas", marcar como exigir lançamento de horas
-      const exigirLancamentoHoras = proposal.tipoContratacao === 'HORAS';
-      
-      const task = this.projectTaskRepository.create({
-        projectId: savedProject.id,
-        name: templateTask.name,
-        description: templateTask.description,
-        dataInicio: taskStartDate,
-        dataConclusao: taskEndDate,
-        status: 'PENDENTE',
-        ordem: templateTask.ordem,
-        exigirLancamentoHoras: exigirLancamentoHoras,
-      });
-
-      const savedTask = await this.projectTaskRepository.save(task);
-      tasks.push(savedTask);
-      taskMap.set(templateTask.id, savedTask);
     }
 
     // Calcular data fim do projeto baseada na última tarefa
@@ -362,6 +429,11 @@ export class ProposalsService {
         dataInicio: savedProject.dataInicio ? savedProject.dataInicio.toISOString().split('T')[0] : null,
         dataFim: savedProject.dataFim ? savedProject.dataFim.toISOString().split('T')[0] : null,
       },
+      phases: phases.map(phase => ({
+        ...phase,
+        dataInicio: phase.dataInicio ? phase.dataInicio.toISOString().split('T')[0] : null,
+        dataFim: phase.dataFim ? phase.dataFim.toISOString().split('T')[0] : null,
+      })),
       tasks: tasks.map(task => ({
         ...task,
         dataInicio: task.dataInicio ? task.dataInicio.toISOString().split('T')[0] : null,

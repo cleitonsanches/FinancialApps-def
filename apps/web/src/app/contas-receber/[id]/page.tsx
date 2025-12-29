@@ -38,6 +38,7 @@ export default function InvoiceDetailsPage() {
   // Modal FATURADA
   const [showFaturadaModal, setShowFaturadaModal] = useState(false)
   const [faturadaData, setFaturadaData] = useState({
+    dataFaturamento: '', // Data em que está sendo faturada
     dataVencimento: '',
     valor: '',
     numeroNF: '',
@@ -485,15 +486,20 @@ export default function InvoiceDetailsPage() {
       setSelectedTimeEntries([])
     }
     
+    // Inicializar data de faturamento com a data atual
+    const hoje = new Date().toISOString().split('T')[0]
+    
     // Se não tem classificação, limpar o campo para o usuário preencher
     if (!invoice.chartOfAccountsId) {
       setFaturadaData({
         ...faturadaData,
+        dataFaturamento: hoje,
         chartOfAccountsId: '',
       })
     } else {
       setFaturadaData({
         ...faturadaData,
+        dataFaturamento: hoje,
         chartOfAccountsId: invoice.chartOfAccountsId,
       })
     }
@@ -533,6 +539,12 @@ export default function InvoiceDetailsPage() {
 
   const handleConfirmFaturada = async () => {
     try {
+      // Validar data de faturamento
+      if (!faturadaData.dataFaturamento) {
+        alert('Por favor, informe a data de faturamento')
+        return
+      }
+
       // Se não for EF, exigir número da NF
       if (faturadaData.tipoEmissao === 'NF' && !faturadaData.numeroNF) {
         alert('Por favor, informe o número da NF')
@@ -548,10 +560,12 @@ export default function InvoiceDetailsPage() {
       // Preparar payload
       const payload: any = {
         status: 'FATURADA',
+        emissionDate: faturadaData.dataFaturamento, // Atualizar data de emissão com a data de faturamento
         numeroNF: faturadaData.tipoEmissao === 'NF' ? faturadaData.numeroNF : null,
         tipoEmissao: faturadaData.tipoEmissao,
         dueDate: faturadaData.dataVencimento,
         grossValue: getValorAsNumber(faturadaData.valor),
+        dataFaturamento: faturadaData.dataFaturamento, // Enviar também como dataFaturamento para o backend usar no SIMPLES
       }
 
       // Se tem classificação selecionada, adicionar ao payload
@@ -1262,6 +1276,19 @@ export default function InvoiceDetailsPage() {
                 </div>
               )}
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data de Faturamento <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={faturadaData.dataFaturamento}
+                  onChange={(e) => setFaturadaData({ ...faturadaData, dataFaturamento: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500">Data em que a nota fiscal está sendo faturada (usada para calcular a competência do SIMPLES)</p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Data de Vencimento

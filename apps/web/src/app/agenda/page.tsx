@@ -1019,7 +1019,7 @@ export default function AgendaPage() {
                 onClick={() => setShowCreateTaskModal(true)}
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
               >
-                + Nova Tarefa/Atividade
+                + Nova Atividade
               </button>
             </div>
           </div>
@@ -1558,7 +1558,7 @@ export default function AgendaPage() {
         {showCreateTaskModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Nova Tarefa/Atividade</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Nova Atividade</h2>
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                   <p className="text-sm text-blue-800 font-medium mb-2">Vínculo (selecione pelo menos um):</p>

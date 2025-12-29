@@ -35,5 +35,10 @@ export class AccountsPayableController {
   async delete(@Param('id') id: string): Promise<void> {
     return this.accountsPayableService.delete(id);
   }
+
+  @Get(':id/invoices')
+  async findRelatedInvoices(@Param('id') id: string): Promise<any[]> {
+    return this.accountsPayableService.findRelatedInvoices(id);
+  }
 }
 

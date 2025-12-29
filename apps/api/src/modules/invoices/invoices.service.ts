@@ -6,6 +6,9 @@ import { Proposal } from '../../database/entities/proposal.entity';
 import { ChartOfAccounts } from '../../database/entities/chart-of-accounts.entity';
 import { TimeEntry } from '../../database/entities/time-entry.entity';
 import { InvoiceHistory } from '../../database/entities/invoice-history.entity';
+import { Client } from '../../database/entities/client.entity';
+import { AccountPayable } from '../../database/entities/account-payable.entity';
+import { InvoiceAccountPayable } from '../../database/entities/invoice-account-payable.entity';
 
 @Injectable()
 export class InvoicesService {
@@ -22,6 +25,12 @@ export class InvoicesService {
     private timeEntryRepository: Repository<TimeEntry>,
     @InjectRepository(InvoiceHistory)
     private invoiceHistoryRepository: Repository<InvoiceHistory>,
+    @InjectRepository(Client)
+    private clientRepository: Repository<Client>,
+    @InjectRepository(AccountPayable)
+    private accountPayableRepository: Repository<AccountPayable>,
+    @InjectRepository(InvoiceAccountPayable)
+    private invoiceAccountPayableRepository: Repository<InvoiceAccountPayable>,
   ) {}
 
   async findAll(companyId?: string): Promise<Invoice[]> {
@@ -93,6 +102,8 @@ export class InvoicesService {
     const isCancellation = invoiceData.status === 'CANCELADA' && existingInvoice.status !== 'CANCELADA';
     // Verificar se é recebimento
     const isRecebimento = invoiceData.status === 'RECEBIDA' && existingInvoice.status !== 'RECEBIDA';
+    // Verificar se é faturamento (mudança para FATURADA)
+    const isFaturamento = invoiceData.status === 'FATURADA' && existingInvoice.status !== 'FATURADA';
     
     // Registrar histórico de alterações
     const changes: Array<{ field: string; old: any; new: any }> = [];
@@ -271,11 +282,171 @@ export class InvoicesService {
         : null;
     }
     
-    // Remover selectedTimeEntries do payload antes de salvar
-    const { selectedTimeEntries: _, ...dataToSave } = invoiceData as any;
+    // Extrair dataFaturamento antes de remover do payload (usar apenas para cálculo do SIMPLES)
+    const dataFaturamento = (invoiceData as any).dataFaturamento;
+    
+    // Remover selectedTimeEntries e dataFaturamento do payload antes de salvar
+    const { selectedTimeEntries: _, dataFaturamento: __, ...dataToSave } = invoiceData as any;
     
     await this.invoiceRepository.update(id, dataToSave);
+    
+    // Se for faturamento e não for EF, processar SIMPLES Nacional
+    if (isFaturamento) {
+      const updatedInvoice = await this.findOne(id);
+      if (updatedInvoice.tipoEmissao !== 'EF') {
+        // Usar dataFaturamento fornecida ou emissionDate atualizada
+        const dataParaSimples = dataFaturamento || updatedInvoice.emissionDate;
+        await this.processarSimplesNacional(updatedInvoice, dataParaSimples);
+      }
+    }
+    
     return this.findOne(id);
+  }
+
+  /**
+   * Processa o cálculo e criação/atualização da conta a pagar do SIMPLES Nacional
+   * Calcula 6% sobre o valor bruto e cria/atualiza conta a pagar provisionada
+   */
+  private async processarSimplesNacional(invoice: Invoice, dataFaturamento?: string): Promise<void> {
+    try {
+      // Calcular 6% do valor bruto
+      const valorBruto = parseFloat(invoice.grossValue?.toString() || '0');
+      const valorSimples = valorBruto * 0.06;
+
+      if (valorSimples <= 0) {
+        return; // Não criar conta a pagar se o valor for zero
+      }
+
+      // Usar data de faturamento se fornecida, senão usar data de emissão
+      const dataReferencia = dataFaturamento 
+        ? new Date(dataFaturamento) 
+        : (invoice.emissionDate ? new Date(invoice.emissionDate) : new Date());
+      
+      // Obter mês e ano da data de referência (data de faturamento)
+      const mes = dataReferencia.getMonth() + 1; // 1-12
+      const ano = dataReferencia.getFullYear();
+
+      // Calcular vencimento: dia 25 do mês subsequente
+      const mesSubsequente = mes === 12 ? 1 : mes + 1; // Se dezembro, próximo mês é janeiro
+      const anoSubsequente = mes === 12 ? ano + 1 : ano; // Se dezembro, incrementar ano
+      const vencimento = new Date(anoSubsequente, mesSubsequente - 1, 25); // getMonth() usa 0-11, então subtrair 1
+
+      // Buscar ou criar fornecedor RECEITA FEDERAL DO BRASIL
+      const fornecedor = await this.buscarOuCriarReceitaFederal(invoice.companyId);
+
+      // Buscar ou criar classificação Tributos - SIMPLES
+      const classificacao = await this.buscarOuCriarClassificacaoTributosSimples(invoice.companyId);
+
+      // Verificar se a invoice já foi relacionada a uma conta a pagar do SIMPLES
+      const relacionamentoExistente = await this.invoiceAccountPayableRepository.findOne({
+        where: { invoiceId: invoice.id },
+      });
+
+      if (relacionamentoExistente) {
+        console.log(`⚠️  Invoice ${invoice.invoiceNumber} já foi relacionada a uma conta a pagar do SIMPLES. Pulando...`);
+        return; // Já foi processada, não processar novamente
+      }
+
+      // Buscar conta a pagar existente para o mês/ano
+      const competencia = `${String(mes).padStart(2, '0')}/${ano}`;
+      const descricao = `SIMPLES NACIONAL competência ${competencia}`;
+
+      let accountPayable = await this.accountPayableRepository.findOne({
+        where: {
+          companyId: invoice.companyId,
+          supplierId: fornecedor.id,
+          description: descricao,
+          status: 'PROVISIONADA',
+        },
+      });
+
+      if (accountPayable) {
+        // Atualizar valor existente
+        const novoValor = parseFloat(accountPayable.totalValue?.toString() || '0') + valorSimples;
+        await this.accountPayableRepository.update(accountPayable.id, {
+          totalValue: novoValor,
+        });
+        accountPayable = await this.accountPayableRepository.findOne({ where: { id: accountPayable.id } });
+      } else {
+        // Criar nova conta a pagar
+        accountPayable = this.accountPayableRepository.create({
+          companyId: invoice.companyId,
+          supplierId: fornecedor.id,
+          description: descricao,
+          chartOfAccountsId: classificacao?.id,
+          emissionDate: dataReferencia, // Usar data de faturamento como data de emissão da conta a pagar
+          dueDate: vencimento,
+          totalValue: valorSimples,
+          status: 'PROVISIONADA',
+        });
+        accountPayable = await this.accountPayableRepository.save(accountPayable);
+      }
+
+      // Relacionar invoice com account payable
+      const relacionamento = this.invoiceAccountPayableRepository.create({
+        invoiceId: invoice.id,
+        accountPayableId: accountPayable.id,
+        valorContribuido: valorSimples,
+      });
+      await this.invoiceAccountPayableRepository.save(relacionamento);
+
+      console.log(`✅ SIMPLES Nacional processado: Invoice ${invoice.invoiceNumber} contribuiu com ${valorSimples.toFixed(2)} para AccountPayable ${accountPayable.id}`);
+    } catch (error) {
+      console.error('Erro ao processar SIMPLES Nacional:', error);
+      // Não lançar erro para não quebrar o fluxo de faturamento
+    }
+  }
+
+  /**
+   * Busca ou cria o fornecedor RECEITA FEDERAL DO BRASIL
+   */
+  private async buscarOuCriarReceitaFederal(companyId: string): Promise<Client> {
+    let fornecedor = await this.clientRepository.findOne({
+      where: {
+        companyId,
+        razaoSocial: 'RECEITA FEDERAL DO BRASIL',
+      },
+    });
+
+    if (!fornecedor) {
+      // Criar fornecedor
+      fornecedor = this.clientRepository.create({
+        companyId,
+        razaoSocial: 'RECEITA FEDERAL DO BRASIL',
+        name: 'RECEITA FEDERAL DO BRASIL',
+      });
+      fornecedor = await this.clientRepository.save(fornecedor);
+      console.log('✅ Fornecedor RECEITA FEDERAL DO BRASIL criado');
+    }
+
+    return fornecedor;
+  }
+
+  /**
+   * Busca ou cria a classificação Tributos - SIMPLES
+   */
+  private async buscarOuCriarClassificacaoTributosSimples(companyId: string): Promise<ChartOfAccounts | null> {
+    let classificacao = await this.chartOfAccountsRepository.findOne({
+      where: {
+        companyId,
+        name: 'Tributos - SIMPLES',
+        type: 'DESPESA',
+      },
+    });
+
+    if (!classificacao) {
+      // Criar classificação
+      classificacao = this.chartOfAccountsRepository.create({
+        companyId,
+        name: 'Tributos - SIMPLES',
+        code: 'TRIBUTOS-SIMPLES',
+        type: 'DESPESA',
+      });
+      classificacao = await this.chartOfAccountsRepository.save(classificacao);
+      console.log('✅ Classificação Tributos - SIMPLES criada');
+    }
+
+    return classificacao;
   }
 
   async delete(id: string): Promise<void> {
