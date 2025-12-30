@@ -101,6 +101,7 @@ export default function InvoiceDetailsPage() {
       // Preencher dados do modal com dados atuais
       if (response.data) {
         setFaturadaData({
+          dataFaturamento: response.data.dataFaturamento ? new Date(response.data.dataFaturamento).toISOString().split('T')[0] : (response.data.emissionDate ? new Date(response.data.emissionDate).toISOString().split('T')[0] : ''),
           dataVencimento: response.data.dueDate ? new Date(response.data.dueDate).toISOString().split('T')[0] : '',
           valor: response.data.grossValue ? parseFloat(response.data.grossValue.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
           numeroNF: response.data.numeroNF || '',
