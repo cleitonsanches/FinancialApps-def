@@ -17,6 +17,20 @@ type FieldType =
   | 'sistema_destino'
   | 'data_entrega_homologacao'
   | 'data_entrega_producao'
+  | 'data_inicio_analise'
+  | 'data_programada_homologacao'
+  | 'data_programada_producao'
+  | 'tipo_produto_assinado'
+  | 'quantidade_usuarios'
+  | 'valor_unitario_usuario'
+  | 'data_inicio_assinatura'
+  | 'vencimento_assinatura'
+  | 'descricao_manutencao'
+  | 'valor_mensal_manutencao'
+  | 'data_inicio_manutencao'
+  | 'vencimento_manutencao'
+  | 'valor_mensal_fixo'
+  | 'data_fim_contrato'
 
 interface TemplateField {
   key: FieldType
