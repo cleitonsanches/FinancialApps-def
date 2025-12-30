@@ -1,0 +1,96 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+    # Evitar deploy automático em cada push, apenas quando explicitamente necessário
+    # Para ativar: descomente as linhas acima e comente o workflow_dispatch abaixo
+  workflow_dispatch:
+    # Permite deploy manual pelo GitHub Actions UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build API
+        run: npm run build --workspace=apps/api
+
+      - name: Build Web
+        run: npm run build --workspace=apps/web
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            # Ir para o diretório do projeto
+            cd /var/www/FinancialApps-def
+            
+            # Fazer backup do banco de dados antes do deploy
+            if [ -f database.sqlite ]; then
+              cp database.sqlite database.sqlite.backup.$(date +%Y%m%d_%H%M%S)
+              echo "✅ Backup do banco de dados criado"
+            fi
+            
+            # Fazer pull das mudanças
+            echo "📥 Fazendo pull das mudanças..."
+            git pull origin main || echo "⚠️ Erro ao fazer pull (continuando...)"
+            
+            # Instalar dependências (se necessário)
+            echo "📦 Instalando dependências..."
+            npm install
+            
+            # Rebuild do projeto
+            echo "🔨 Fazendo build da API..."
+            npm run build --workspace=apps/api
+            
+            echo "🔨 Fazendo build do Web..."
+            npm run build --workspace=apps/web
+            
+            # Verificar se o banco de dados existe, se não, criar
+            if [ ! -f database.sqlite ]; then
+              echo "📊 Banco de dados não encontrado. Criando..."
+              npm run init:db || echo "⚠️ Erro ao criar banco (pode já existir)"
+            fi
+            
+            # Reiniciar aplicações PM2
+            echo "🔄 Reiniciando aplicações..."
+            pm2 restart all
+            
+            # Salvar configuração PM2
+            pm2 save
+            
+            # Verificar status
+            echo "📊 Status das aplicações:"
+            pm2 status
+            
+            echo "✅ Deploy concluído!"
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            echo "🔍 Verificando logs das aplicações..."
+            pm2 logs --lines 20 --nostream
+
