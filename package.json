@@ -16,7 +16,11 @@
     "seed:admin": "npm run seed:admin --workspace=apps/api",
     "auto-save": "node auto-save.js",
     "auto-save:start": "start /B node auto-save.js",
-    "start": "start-dev.bat"
+    "start": "start-dev.bat",
+    "type-check": "npm run type-check --workspace=apps/web",
+    "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:api": "npm run build --workspace=apps/api"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"
