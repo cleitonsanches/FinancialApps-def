@@ -6,10 +6,17 @@ export async function ensureProposalMotivoFields(dataSource: DataSource): Promis
   try {
     await queryRunner.connect();
     
-    // Verificar se as colunas existem
+    // Verificar se a tabela existe primeiro
     const table = await queryRunner.getTable('proposals');
-    const hasMotivoCancelamento = table?.columns.find(col => col.name === 'motivo_cancelamento');
-    const hasMotivoDeclinio = table?.columns.find(col => col.name === 'motivo_declinio');
+    if (!table) {
+      console.log('⚠️ Tabela proposals não encontrada. Pulando verificação de colunas.');
+      await queryRunner.release();
+      return;
+    }
+    
+    // Verificar se as colunas existem
+    const hasMotivoCancelamento = table.columns.find(col => col.name === 'motivo_cancelamento');
+    const hasMotivoDeclinio = table.columns.find(col => col.name === 'motivo_declinio');
     
     if (!hasMotivoCancelamento) {
       console.log('Adicionando coluna motivo_cancelamento à tabela proposals...');
@@ -33,5 +40,6 @@ export async function ensureProposalMotivoFields(dataSource: DataSource): Promis
     await queryRunner.release();
   }
 }
+
 
 

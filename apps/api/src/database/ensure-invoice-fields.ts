@@ -6,10 +6,17 @@ export async function ensureInvoiceFields(dataSource: DataSource): Promise<void>
   try {
     await queryRunner.connect();
     
-    // Verificar se a coluna data_recebimento existe
+    // Verificar se a tabela existe primeiro
     const table = await queryRunner.getTable('invoices');
-    const hasDataRecebimento = table?.columns.find(col => col.name === 'data_recebimento');
-    const hasNumeroNF = table?.columns.find(col => col.name === 'numero_nf');
+    if (!table) {
+      console.log('⚠️ Tabela invoices não encontrada. Pulando verificação de colunas.');
+      await queryRunner.release();
+      return;
+    }
+    
+    // Verificar se a coluna data_recebimento existe
+    const hasDataRecebimento = table.columns.find(col => col.name === 'data_recebimento');
+    const hasNumeroNF = table.columns.find(col => col.name === 'numero_nf');
     
     if (!hasDataRecebimento) {
       console.log('Adicionando coluna data_recebimento à tabela invoices...');

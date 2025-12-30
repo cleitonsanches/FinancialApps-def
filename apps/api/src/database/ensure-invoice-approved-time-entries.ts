@@ -6,9 +6,16 @@ export async function ensureInvoiceApprovedTimeEntries(dataSource: DataSource): 
   try {
     await queryRunner.connect();
     
-    // Verificar se a coluna já existe
+    // Verificar se a tabela existe primeiro
     const table = await queryRunner.getTable('invoices');
-    const columnExists = table?.findColumnByName('approved_time_entries');
+    if (!table) {
+      console.log('⚠️ Tabela invoices não encontrada. Pulando verificação de coluna approved_time_entries.');
+      await queryRunner.release();
+      return;
+    }
+    
+    // Verificar se a coluna já existe
+    const columnExists = table.findColumnByName('approved_time_entries');
     
     if (!columnExists) {
       console.log('Adicionando coluna approved_time_entries na tabela invoices...');
@@ -22,7 +29,7 @@ export async function ensureInvoiceApprovedTimeEntries(dataSource: DataSource): 
     }
   } catch (error) {
     console.error('Erro ao adicionar coluna approved_time_entries:', error);
-    throw error;
+    // Não lançar erro para não impedir o servidor de iniciar
   } finally {
     await queryRunner.release();
   }

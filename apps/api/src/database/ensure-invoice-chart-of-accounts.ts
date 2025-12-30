@@ -6,9 +6,16 @@ export async function ensureInvoiceChartOfAccounts(dataSource: DataSource): Prom
   try {
     await queryRunner.connect();
     
-    // Verificar se a coluna já existe
+    // Verificar se a tabela existe primeiro
     const table = await queryRunner.getTable('invoices');
-    const hasColumn = table?.columns.find(col => col.name === 'chart_of_accounts_id');
+    if (!table) {
+      console.log('⚠️ Tabela invoices não encontrada. Pulando verificação de coluna chart_of_accounts_id.');
+      await queryRunner.release();
+      return;
+    }
+    
+    // Verificar se a coluna já existe
+    const hasColumn = table.columns.find(col => col.name === 'chart_of_accounts_id');
     
     if (!hasColumn) {
       console.log('Adicionando coluna chart_of_accounts_id na tabela invoices...');
@@ -33,5 +40,6 @@ export async function ensureInvoiceChartOfAccounts(dataSource: DataSource): Prom
     await queryRunner.release();
   }
 }
+
 
 
