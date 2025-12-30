@@ -27,7 +27,25 @@ import { TimeEntry } from './entities/time-entry.entity';
 import { ProposalAditivo } from './entities/proposal-aditivo.entity';
 
 async function initDatabase() {
-  const databasePath = join(process.cwd(), 'database.sqlite');
+  // Determinar caminho do banco: usar variável de ambiente ou caminho relativo à raiz do projeto
+  // O PM2 roda na raiz (/var/www/FinancialApps-def), então process.cwd() é a raiz
+  // Mas quando executado via npm run, pode estar em apps/api, então subimos 3 níveis do __dirname
+  let databasePath: string;
+  
+  if (process.env.DATABASE_PATH) {
+    // Se é caminho relativo, converter para absoluto baseado na raiz do projeto
+    const projectRoot = join(__dirname, '../../../../');
+    if (process.env.DATABASE_PATH.startsWith('./') || !process.env.DATABASE_PATH.startsWith('/')) {
+      databasePath = join(projectRoot, process.env.DATABASE_PATH.replace(/^\.\//, ''));
+    } else {
+      databasePath = process.env.DATABASE_PATH;
+    }
+  } else {
+    // Calcular caminho relativo à raiz do projeto
+    // __dirname está em apps/api/src/database, precisamos subir 3 níveis
+    const projectRoot = join(__dirname, '../../../../');
+    databasePath = join(projectRoot, 'database.sqlite');
+  }
   
   console.log('📂 Database path:', databasePath);
   console.log('📂 __dirname:', __dirname);
