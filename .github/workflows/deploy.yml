@@ -17,6 +17,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.VPS_HOST }}" ]; then
+            echo "❌ Erro: VPS_HOST secret não está configurado!"
+            echo "Por favor, configure os secrets no GitHub:"
+            echo "  Settings > Secrets and variables > Actions"
+            echo "  Adicione: VPS_HOST, VPS_USER, VPS_SSH_KEY"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VPS_USER }}" ]; then
+            echo "❌ Erro: VPS_USER secret não está configurado!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then
+            echo "❌ Erro: VPS_SSH_KEY secret não está configurado!"
+            exit 1
+          fi
+          echo "✅ Todos os secrets estão configurados"
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -38,7 +57,8 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          port: ${{ secrets.VPS_PORT || '22' }}
+          timeout: 300s
           script: |
             # Ir para o diretório do projeto
             cd /var/www/FinancialApps-def

@@ -4,39 +4,117 @@ Este projeto usa GitHub Actions para fazer deploy automático na VPS.
 
 ## Configuração Inicial
 
+### ⚠️ IMPORTANTE: Configurar Secrets no GitHub PRIMEIRO!
+
+**O workflow NÃO funcionará sem configurar os secrets primeiro!**
+
 ### 1. Configurar Secrets no GitHub
 
 Você precisa adicionar os seguintes secrets no repositório do GitHub:
 
-1. Acesse: `https://github.com/seu-usuario/FinancialApps-def/settings/secrets/actions`
-2. Clique em "New repository secret" e adicione:
+1. **Acesse:** `https://github.com/cleitonsanches/FinancialApps-def/settings/secrets/actions`
+   - Ou: Vá em `Settings` > `Secrets and variables` > `Actions` > `New repository secret`
 
-   - **`VPS_HOST`**: IP ou domínio da VPS (ex: `92.113.32.118`)
-   - **`VPS_USER`**: Usuário SSH (ex: `root`)
-   - **`VPS_SSH_KEY`**: Chave SSH privada para autenticação
-   - **`VPS_PORT`**: (Opcional) Porta SSH, padrão é `22`
+2. **Clique em "New repository secret" e adicione cada um:**
+
+   #### Secret 1: `VPS_HOST`
+   - **Name:** `VPS_HOST`
+   - **Secret:** `92.113.32.118` (seu IP da VPS)
+
+   #### Secret 2: `VPS_USER`
+   - **Name:** `VPS_USER`
+   - **Secret:** `root` (ou outro usuário SSH)
+
+   #### Secret 3: `VPS_SSH_KEY`
+   - **Name:** `VPS_SSH_KEY`
+   - **Secret:** (veja instruções abaixo para gerar)
+
+   #### Secret 4: `VPS_PORT` (Opcional)
+   - **Name:** `VPS_PORT`
+   - **Secret:** `22` (padrão, pode deixar vazio se usar porta 22)
 
 ### 2. Gerar Chave SSH (se ainda não tiver)
 
+**No Windows (PowerShell ou Git Bash):**
+
 ```bash
-# No seu computador local
+# Gerar chave SSH
 ssh-keygen -t rsa -b 4096 -C "github-actions-deploy" -f ~/.ssh/vps_deploy_key
 
-# Copiar a chave pública para a VPS
-ssh-copy-id -i ~/.ssh/vps_deploy_key.pub root@92.113.32.118
+# Pressione Enter para aceitar o local padrão
+# Pressione Enter para deixar a senha vazia (ou defina uma senha se preferir)
+```
 
-# Testar conexão
+**OU se já tiver uma chave SSH:**
+```bash
+# Verificar chaves existentes
+ls ~/.ssh/
+```
+
+### 3. Copiar Chave Pública para a VPS
+
+**Opção A: Usando ssh-copy-id (Linux/Git Bash)**
+```bash
+ssh-copy-id -i ~/.ssh/vps_deploy_key.pub root@92.113.32.118
+```
+
+**Opção B: Manual (Windows PowerShell)**
+```powershell
+# 1. Copiar conteúdo da chave pública
+Get-Content ~/.ssh/vps_deploy_key.pub
+
+# 2. Conectar na VPS
+ssh root@92.113.32.118
+
+# 3. Na VPS, executar:
+mkdir -p ~/.ssh
+nano ~/.ssh/authorized_keys
+
+# 4. Cole o conteúdo da chave pública, salve (Ctrl+X, Y, Enter)
+
+# 5. Ajustar permissões
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+```
+
+**Testar conexão:**
+```bash
 ssh -i ~/.ssh/vps_deploy_key root@92.113.32.118
 ```
 
-### 3. Adicionar a Chave Privada ao GitHub
+### 4. Adicionar a Chave Privada ao GitHub
 
-1. Copie o conteúdo da chave privada:
+1. **Copie o conteúdo COMPLETO da chave privada:**
+
+   **Windows PowerShell:**
+   ```powershell
+   Get-Content ~/.ssh/vps_deploy_key -Raw
+   ```
+
+   **Linux/Mac:**
    ```bash
    cat ~/.ssh/vps_deploy_key
    ```
 
-2. No GitHub, adicione como secret `VPS_SSH_KEY` com o conteúdo completo da chave (incluindo `-----BEGIN OPENSSH PRIVATE KEY-----` e `-----END OPENSSH PRIVATE KEY-----`)
+2. **Copie TUDO**, incluindo:
+   - `-----BEGIN OPENSSH PRIVATE KEY-----`
+   - Todo o conteúdo da chave
+   - `-----END OPENSSH PRIVATE KEY-----`
+
+3. **No GitHub:**
+   - Vá em `Settings` > `Secrets and variables` > `Actions`
+   - Clique em `New repository secret`
+   - **Name:** `VPS_SSH_KEY`
+   - **Secret:** Cole o conteúdo completo da chave privada
+   - Clique em `Add secret`
+
+### 5. Verificar Configuração
+
+Após adicionar todos os secrets, você deve ter:
+- ✅ `VPS_HOST`
+- ✅ `VPS_USER`
+- ✅ `VPS_SSH_KEY`
+- ⚪ `VPS_PORT` (opcional)
 
 ### 4. Configurar Git na VPS (se ainda não tiver)
 
