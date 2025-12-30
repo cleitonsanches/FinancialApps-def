@@ -3,9 +3,13 @@
 
 Write-Host "🚀 Iniciando exportação de dados..." -ForegroundColor Cyan
 
+# Mudar para o diretório raiz do projeto
+$projectRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $projectRoot
+
 # Caminho do banco de dados local
-$dbPath = Join-Path $PSScriptRoot ".." "apps" "api" "database.sqlite"
-$exportDir = Join-Path $PSScriptRoot ".." "export"
+$dbPath = Join-Path $projectRoot "apps" "api" "database.sqlite"
+$exportDir = Join-Path $projectRoot "export"
 
 # Verificar se o banco existe
 if (-not (Test-Path $dbPath)) {
