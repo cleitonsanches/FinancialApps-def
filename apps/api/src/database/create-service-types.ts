@@ -1,25 +1,30 @@
 import { DataSource } from 'typeorm';
 import { join } from 'path';
 import * as fs from 'fs';
+import { randomUUID } from 'crypto';
 
 async function createServiceTypes() {
-  // O banco está em apps/api/database.sqlite
-  // Quando executado via ts-node, process.cwd() pode estar na raiz do projeto
-  const possiblePaths = [
-    join(process.cwd(), 'apps', 'api', 'database.sqlite'),
-    join(process.cwd(), 'database.sqlite'),
-    join(__dirname, '..', '..', 'database.sqlite'),
-  ];
+  // Usar a mesma lógica do init-database.ts e seed-admin.ts
+  let databasePath: string;
   
-  let databasePath = possiblePaths[0];
-  for (const path of possiblePaths) {
-    if (fs.existsSync(path)) {
-      databasePath = path;
-      break;
+  if (process.env.DATABASE_PATH) {
+    // Se é caminho relativo, converter para absoluto baseado na raiz do projeto
+    const projectRoot = join(__dirname, '../../../../');
+    if (process.env.DATABASE_PATH.startsWith('./') || !process.env.DATABASE_PATH.startsWith('/')) {
+      databasePath = join(projectRoot, process.env.DATABASE_PATH.replace(/^\.\//, ''));
+    } else {
+      databasePath = process.env.DATABASE_PATH;
     }
+  } else {
+    // Calcular caminho relativo à raiz do projeto
+    // __dirname está em apps/api/src/database, precisamos subir 3 níveis
+    const projectRoot = join(__dirname, '../../../../');
+    databasePath = join(projectRoot, 'database.sqlite');
   }
   
-  console.log('Caminho do banco de dados:', databasePath);
+  console.log('📂 Database path:', databasePath);
+  console.log('📂 __dirname:', __dirname);
+  console.log('📂 process.cwd():', process.cwd());
   
   const dataSource = new DataSource({
     type: 'sqlite',
@@ -88,7 +93,7 @@ async function createServiceTypes() {
           );
           
           if (exists.length === 0) {
-            const id = crypto.randomUUID();
+            const id = randomUUID();
             await queryRunner.query(
               `INSERT INTO service_types (id, company_id, code, name, active, created_at, updated_at) 
                VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
