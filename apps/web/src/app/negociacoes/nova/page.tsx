@@ -963,7 +963,7 @@ export default function NovaNegociacaoPage() {
                               <input
                                 type="date"
                                 value={parcela.dataVencimento}
-                                onChange={(e) => handleParcelaDataChange(index, e.target.value)}
+                                onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                               />
                             </div>
