@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { Proposal } from './proposal.entity';
 
 @Entity('proposal_aditivos')
@@ -10,7 +10,8 @@ export class ProposalAditivo {
   @Column({ name: 'proposal_id' })
   proposalId: string;
 
-  @ManyToOne(() => Proposal, proposal => proposal.aditivos)
+  // Relacionamento unidirecional (sem OneToMany em Proposal) para evitar problema de relacionamento bidirecional
+  @ManyToOne(() => Proposal)
   @JoinColumn({ name: 'proposal_id' })
   proposal: Proposal;
 
@@ -32,5 +33,6 @@ export class ProposalAditivo {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
+
 
 
