@@ -1247,12 +1247,16 @@ export default function AgendaPage() {
                             <button
                               onClick={() => {
                                 setSelectedTask(task)
-                                setNewTimeEntry({
+                                const timeEntryData = {
+                                  projectId: task.project?.id || '',
+                                  proposalId: task.proposalId || '',
+                                  clientId: task.clientId || '',
                                   taskId: task.id,
                                   horas: '',
                                   data: new Date().toISOString().split('T')[0],
                                   descricao: '',
-                                })
+                                }
+                                setNewTimeEntry(timeEntryData)
                                 setShowRegisterHoursModal(true)
                               }}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm whitespace-nowrap"
@@ -1958,6 +1962,7 @@ export default function AgendaPage() {
                       projectId: '',
                       proposalId: '',
                       clientId: '',
+                      phaseId: '',
                       name: '',
                       description: '',
                       horasEstimadas: '',
@@ -1971,6 +1976,7 @@ export default function AgendaPage() {
                       horaFim: '',
                       semPrazoDefinido: false,
                       diaInteiro: false,
+                      exigirLancamentoHoras: false,
                     })
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
@@ -2139,6 +2145,9 @@ export default function AgendaPage() {
                       setShowRegisterHoursModal(false)
                       setSelectedTask(null)
                       setNewTimeEntry({
+                        projectId: '',
+                        proposalId: '',
+                        clientId: '',
                         taskId: '',
                         horas: '',
                         data: new Date().toISOString().split('T')[0],
@@ -2159,6 +2168,9 @@ export default function AgendaPage() {
                     setShowRegisterHoursModal(false)
                     setSelectedTask(null)
                     setNewTimeEntry({
+                      projectId: '',
+                      proposalId: '',
+                      clientId: '',
                       taskId: '',
                       horas: '',
                       data: new Date().toISOString().split('T')[0],
