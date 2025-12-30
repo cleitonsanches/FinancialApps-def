@@ -9,7 +9,27 @@ import { Client } from './entities/client.entity';
 import { Contact } from './entities/contact.entity';
 
 async function seedAdmin() {
-  const databasePath = join(process.cwd(), 'database.sqlite');
+  // Usar a mesma lógica do init-database.ts: calcular caminho relativo à raiz do projeto
+  let databasePath: string;
+  
+  if (process.env.DATABASE_PATH) {
+    // Se é caminho relativo, converter para absoluto baseado na raiz do projeto
+    const projectRoot = join(__dirname, '../../../../');
+    if (process.env.DATABASE_PATH.startsWith('./') || !process.env.DATABASE_PATH.startsWith('/')) {
+      databasePath = join(projectRoot, process.env.DATABASE_PATH.replace(/^\.\//, ''));
+    } else {
+      databasePath = process.env.DATABASE_PATH;
+    }
+  } else {
+    // Calcular caminho relativo à raiz do projeto
+    // __dirname está em apps/api/src/database, precisamos subir 3 níveis
+    const projectRoot = join(__dirname, '../../../../');
+    databasePath = join(projectRoot, 'database.sqlite');
+  }
+  
+  console.log('📂 Database path:', databasePath);
+  console.log('📂 __dirname:', __dirname);
+  console.log('📂 process.cwd():', process.cwd());
   
   const dataSource = new DataSource({
     type: 'sqlite',
