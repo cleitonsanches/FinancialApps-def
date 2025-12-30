@@ -306,6 +306,7 @@ export default function ProjectDetailsPage() {
         horaFim: '',
         semPrazoDefinido: false,
         diaInteiro: false,
+        exigirLancamentoHoras: false,
         phaseId: '',
       })
       loadTasks()
