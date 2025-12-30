@@ -606,15 +606,17 @@ export default function EditarNegociacaoPage() {
                         tipoContratacao: newTipo,
                         parcelas: [],
                         quantidadeParcelas: '',
-                        formaFaturamento: 'ONESHOT',
-                        // Se for Fixo Recorrente, definir formaFaturamento como Mensal
-                        formaFaturamento: newTipo === 'FIXO_RECORRENTE' ? 'MENSAL' : formData.formaFaturamento
+                        formaFaturamento: 'ONESHOT'
                       })
                     } else {
-                      // Manter parcelas existentes se a forma de faturamento for PARCELADO
+                      // Se mudar para FIXO_RECORRENTE, definir formaFaturamento como MENSAL
+                      const updateData: any = { tipoContratacao: newTipo }
+                      if (newTipo === 'FIXO_RECORRENTE') {
+                        updateData.formaFaturamento = 'MENSAL'
+                      }
                       setFormData({ 
                         ...formData, 
-                        tipoContratacao: newTipo
+                        ...updateData
                       })
                     }
                   }}
