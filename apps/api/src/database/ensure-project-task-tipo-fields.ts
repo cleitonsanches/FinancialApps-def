@@ -6,6 +6,14 @@ export async function ensureProjectTaskTipoFields(dataSource: DataSource): Promi
   try {
     await queryRunner.connect();
     
+    // Verificar se a tabela existe primeiro
+    const table = await queryRunner.getTable('project_tasks');
+    if (!table) {
+      console.log('⚠️ Tabela project_tasks não encontrada. Pulando verificação de colunas.');
+      await queryRunner.release();
+      return;
+    }
+    
     // Verificar e adicionar coluna tipo
     const tipoColumn = await queryRunner.query(`
       SELECT name FROM pragma_table_info('project_tasks') WHERE name = 'tipo'
@@ -67,5 +75,6 @@ export async function ensureProjectTaskTipoFields(dataSource: DataSource): Promi
     await queryRunner.release();
   }
 }
+
 
 
