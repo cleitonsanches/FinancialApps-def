@@ -191,7 +191,7 @@ export default function PlanoContasPage() {
               <p className="text-gray-600 mb-4">
                 {(nameFilter || typeFilter || statusFilter) ? 'Nenhuma conta encontrada com o filtro aplicado' : 'Nenhuma conta cadastrada'}
               </p>
-              {!filter && (
+              {!(nameFilter || typeFilter || statusFilter) && (
                 <Link
                   href="/cadastros/plano-contas/novo"
                   className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
