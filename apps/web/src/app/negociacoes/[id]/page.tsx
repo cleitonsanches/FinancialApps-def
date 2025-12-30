@@ -2380,7 +2380,7 @@ export default function NegotiationDetailsPage() {
                   Cancelar
                 </button>
                 <button
-                  onClick={handleConfirmCancelDecline}
+                  onClick={() => handleConfirmCancelDecline()}
                   className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                 >
                   Confirmar
