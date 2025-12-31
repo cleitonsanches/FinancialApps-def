@@ -74,7 +74,7 @@ import_table() {
     if [ ! -f "$csv_path" ]; then
         echo "⚠️  Arquivo não encontrado: $csv_file (ignorando...)"
         return 1
-    }
+    fi
     
     # Verificar se o CSV tem conteúdo (mais de 1 linha = header + dados)
     line_count=$(wc -l < "$csv_path" | tr -d ' ')
