@@ -47,6 +47,8 @@ export default function NegotiationDetailsPage() {
     dataInicioManutencao: '',
     vencimentoManutencao: '',
   })
+  const [showObservacoesModal, setShowObservacoesModal] = useState(false)
+  const [observacoesText, setObservacoesText] = useState('')
   
   // Dados temporários
   const [calculatedParcels, setCalculatedParcels] = useState<any[]>([])
@@ -1362,44 +1364,9 @@ export default function NegotiationDetailsPage() {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={async () => {
-                    try {
-                      const token = localStorage.getItem('token')
-                      if (!token) {
-                        alert('Faça login para exportar o PDF')
-                        return
-                      }
-                      
-                      // Usar a URL da API já configurada
-                      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '')
-                      // A URL já inclui /api se necessário, então usar /negotiations diretamente
-                      const pdfUrl = apiBaseUrl.replace(/\/api$/, '') + `/api/negotiations/${negotiation.id}/pdf`
-                      
-                      const response = await fetch(pdfUrl, {
-                        method: 'GET',
-                        headers: {
-                          'Authorization': `Bearer ${token}`,
-                        },
-                      })
-                      
-                      if (!response.ok) {
-                        const errorText = await response.text()
-                        throw new Error(errorText || 'Erro ao gerar PDF')
-                      }
-                      
-                      const blob = await response.blob()
-                      const url = window.URL.createObjectURL(blob)
-                      const a = document.createElement('a')
-                      a.href = url
-                      a.download = `proposta-${negotiation.numero || negotiation.id}.pdf`
-                      document.body.appendChild(a)
-                      a.click()
-                      window.URL.revokeObjectURL(url)
-                      document.body.removeChild(a)
-                    } catch (error: any) {
-                      console.error('Erro ao exportar PDF:', error)
-                      alert(error.message || 'Erro ao exportar PDF')
-                    }
+                  onClick={() => {
+                    setShowObservacoesModal(true)
+                    setObservacoesText('')
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
                 >
@@ -2663,6 +2630,94 @@ export default function NegotiationDetailsPage() {
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
                   Não Criar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Observações para PDF */}
+        {showObservacoesModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">Exportar PDF</h2>
+              <p className="mb-4 text-gray-600">
+                Adicione observações relevantes que serão incluídas no PDF (opcional):
+              </p>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Observações
+                </label>
+                <textarea
+                  value={observacoesText}
+                  onChange={(e) => setObservacoesText(e.target.value)}
+                  rows={6}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Digite observações relevantes para incluir no PDF..."
+                />
+              </div>
+              
+              <div className="flex gap-4">
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('token')
+                      if (!token) {
+                        alert('Faça login para exportar o PDF')
+                        setShowObservacoesModal(false)
+                        return
+                      }
+                      
+                      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+                      let pdfUrl = apiBaseUrl.replace(/\/api$/, '') + `/api/negotiations/${negotiation.id}/pdf`
+                      
+                      // Adicionar observações como query parameter
+                      if (observacoesText.trim()) {
+                        pdfUrl += `?observacoes=${encodeURIComponent(observacoesText.trim())}`
+                      }
+                      
+                      const response = await fetch(pdfUrl, {
+                        method: 'GET',
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                        },
+                      })
+                      
+                      if (!response.ok) {
+                        const errorText = await response.text()
+                        throw new Error(errorText || 'Erro ao gerar PDF')
+                      }
+                      
+                      const blob = await response.blob()
+                      const url = window.URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `proposta-${negotiation.numero || negotiation.id}.pdf`
+                      document.body.appendChild(a)
+                      a.click()
+                      window.URL.revokeObjectURL(url)
+                      document.body.removeChild(a)
+                      
+                      setShowObservacoesModal(false)
+                      setObservacoesText('')
+                    } catch (error: any) {
+                      console.error('Erro ao exportar PDF:', error)
+                      alert(error.message || 'Erro ao exportar PDF')
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Exportar PDF
+                </button>
+                <button
+                  onClick={() => {
+                    setShowObservacoesModal(false)
+                    setObservacoesText('')
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
                 </button>
               </div>
             </div>

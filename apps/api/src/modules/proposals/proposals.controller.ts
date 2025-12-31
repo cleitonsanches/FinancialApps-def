@@ -100,9 +100,13 @@ export class ProposalsController {
   }
 
   @Get(':id/pdf')
-  async generatePdf(@Param('id') id: string, @Res() res: Response): Promise<void> {
+  async generatePdf(
+    @Param('id') id: string,
+    @Query('observacoes') observacoes?: string,
+    @Res() res?: Response,
+  ): Promise<void> {
     try {
-      const pdfBuffer = await this.proposalPdfService.generatePdf(id);
+      const pdfBuffer = await this.proposalPdfService.generatePdf(id, observacoes);
       const proposal = await this.proposalsService.findOne(id);
       
       res.setHeader('Content-Type', 'application/pdf');

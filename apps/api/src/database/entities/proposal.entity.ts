@@ -185,6 +185,9 @@ export class Proposal {
   @Column({ name: 'parcelas', type: 'text', nullable: true })
   parcelas?: string;
 
+  @Column({ name: 'observacoes', type: 'text', nullable: true })
+  observacoes?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
