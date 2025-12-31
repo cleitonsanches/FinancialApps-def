@@ -1069,10 +1069,17 @@ export default function AdministracaoPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <Link
                             href={`/cadastros/conta-corrente/${account.id}`}
-                            className="text-primary-600 hover:text-primary-900"
+                            className="text-primary-600 hover:text-primary-900 mr-4"
                           >
                             Editar
                           </Link>
+                          <button
+                            onClick={() => handleDeleteBankAccount(account.id, account.bankName)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                            title="Excluir conta"
+                          >
+                            Excluir
+                          </button>
                         </td>
                       </tr>
                     ))}
