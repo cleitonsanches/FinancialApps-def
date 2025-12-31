@@ -1,0 +1,112 @@
+#!/bin/bash
+
+echo "=========================================="
+echo "DIAGNÓSTICO COMPLETO - DADOS SUMIRAM"
+echo "=========================================="
+echo ""
+
+cd /var/www/FinancialApps-def/apps/api || exit 1
+
+echo "1. Verificando banco de dados..."
+if [ ! -f "database.sqlite" ]; then
+    echo "❌ Banco de dados NÃO encontrado em apps/api/database.sqlite"
+    echo "   Procurando em outros locais..."
+    find /var/www/FinancialApps-def -name "*.sqlite" 2>/dev/null
+    exit 1
+fi
+
+echo "✅ Banco encontrado: $(pwd)/database.sqlite"
+DB_SIZE=$(du -h database.sqlite | cut -f1)
+echo "   Tamanho: $DB_SIZE"
+echo ""
+
+echo "2. Verificando ESTRUTURA das tabelas..."
+echo ""
+echo "Tabelas existentes:"
+sqlite3 database.sqlite ".tables" 2>/dev/null || echo "❌ Erro ao listar tabelas"
+echo ""
+
+echo "3. Contando registros em CADA tabela..."
+echo ""
+echo "=== PROPOSTAS/NEGOCIAÇÕES ==="
+sqlite3 database.sqlite "SELECT COUNT(*) as total FROM proposals;" 2>/dev/null || echo "❌ Erro ou tabela não existe"
+echo ""
+echo "=== PROJETOS ==="
+sqlite3 database.sqlite "SELECT COUNT(*) as total FROM projects;" 2>/dev/null || echo "❌ Erro ou tabela não existe"
+echo ""
+echo "=== FATURAS/INVOICES ==="
+sqlite3 database.sqlite "SELECT COUNT(*) as total FROM invoices;" 2>/dev/null || echo "❌ Erro ou tabela não existe"
+echo ""
+echo "=== HORAS/Time Entries ==="
+sqlite3 database.sqlite "SELECT COUNT(*) as total FROM time_entries;" 2>/dev/null || echo "❌ Erro ou tabela não existe"
+echo ""
+echo "=== TAREFAS/Project Tasks ==="
+sqlite3 database.sqlite "SELECT COUNT(*) as total FROM project_tasks;" 2>/dev/null || echo "❌ Erro ou tabela não existe"
+echo ""
+echo "=== CLIENTES ==="
+sqlite3 database.sqlite "SELECT COUNT(*) as total FROM clients;" 2>/dev/null || echo "❌ Erro ou tabela não existe"
+echo ""
+echo "=== USUÁRIOS ==="
+sqlite3 database.sqlite "SELECT COUNT(*) as total FROM users;" 2>/dev/null || echo "❌ Erro ou tabela não existe"
+echo ""
+echo "=== EMPRESAS ==="
+sqlite3 database.sqlite "SELECT COUNT(*) as total FROM companies;" 2>/dev/null || echo "❌ Erro ou tabela não existe"
+echo ""
+
+echo "4. Verificando company_id nos registros..."
+echo ""
+echo "Company IDs únicos em PROPOSALS:"
+sqlite3 database.sqlite "SELECT DISTINCT company_id FROM proposals LIMIT 10;" 2>/dev/null || echo "❌ Erro"
+echo ""
+echo "Company IDs únicos em PROJECTS:"
+sqlite3 database.sqlite "SELECT DISTINCT company_id FROM projects LIMIT 10;" 2>/dev/null || echo "❌ Erro"
+echo ""
+echo "Company IDs únicos em INVOICES:"
+sqlite3 database.sqlite "SELECT DISTINCT company_id FROM invoices LIMIT 10;" 2>/dev/null || echo "❌ Erro"
+echo ""
+
+echo "5. Mostrando alguns registros de exemplo..."
+echo ""
+echo "=== Primeiras 3 PROPOSTAS ==="
+sqlite3 database.sqlite "SELECT id, title, status, company_id FROM proposals LIMIT 3;" 2>/dev/null || echo "❌ Erro"
+echo ""
+echo "=== Primeiros 3 PROJETOS ==="
+sqlite3 database.sqlite "SELECT id, name, status, company_id FROM projects LIMIT 3;" 2>/dev/null || echo "❌ Erro"
+echo ""
+echo "=== Primeiras 3 FATURAS ==="
+sqlite3 database.sqlite "SELECT id, invoice_number, status, company_id FROM invoices LIMIT 3;" 2>/dev/null || echo "❌ Erro"
+echo ""
+
+echo "6. Verificando status da API..."
+echo ""
+pm2 status | grep -E "financial-api|financial-web" || echo "⚠️ PM2 não encontrado ou apps não rodando"
+echo ""
+
+echo "7. Últimos erros da API (últimas 50 linhas)..."
+echo ""
+pm2 logs financial-api --lines 50 --nostream 2>/dev/null | tail -50 || echo "⚠️ Não foi possível ler logs"
+echo ""
+
+echo "8. Testando endpoints da API..."
+echo ""
+cd /var/www/FinancialApps-def
+echo "Testando /projects:"
+curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3001/projects || echo "❌ API não responde"
+echo ""
+echo "Testando /negotiations:"
+curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3001/negotiations || echo "❌ API não responde"
+echo ""
+echo "Testando /invoices:"
+curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3001/invoices || echo "❌ API não responde"
+echo ""
+
+echo "=========================================="
+echo "DIAGNÓSTICO CONCLUÍDO"
+echo "=========================================="
+echo ""
+echo "IMPORTANTE: Verifique se:"
+echo "1. As tabelas existem"
+echo "2. Os registros têm company_id correto"
+echo "3. A API está retornando dados (ou erro)"
+echo "4. Há erros nos logs do PM2"
+
