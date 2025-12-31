@@ -102,18 +102,18 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
   if (view === 'day') {
     const dayTasks = getTasksForDate(currentDate)
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center mb-4">
+      <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+        <div className="flex justify-between items-center mb-4 gap-2">
           <button
             onClick={() => navigateDate('prev')}
-            className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+            className="px-3 md:px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm md:text-base flex-shrink-0"
           >
             ← Anterior
           </button>
           <h2 className="text-base md:text-xl font-bold text-center flex-1 px-2">{formatDate(currentDate)}</h2>
           <button
             onClick={() => navigateDate('next')}
-            className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+            className="px-3 md:px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm md:text-base flex-shrink-0"
           >
             Próximo →
           </button>
@@ -128,19 +128,19 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
                 className={`border rounded-lg p-3 cursor-pointer hover:shadow-md ${getTaskStatusColor(task.status)}`}
                 onClick={() => onTaskClick(task)}
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-semibold">{task.name}</h3>
-                    <p className="text-xs mt-1">{task.project?.name}</p>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold break-words">{task.name}</h3>
+                    <p className="text-xs mt-1 break-words">{task.project?.name}</p>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       onRegisterHours(task)
                     }}
-                    className="ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                    className="sm:ml-2 px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 self-start sm:self-auto"
                   >
-                    ⏱️
+                    ⏱️ Lançar Horas
                   </button>
                 </div>
               </div>
