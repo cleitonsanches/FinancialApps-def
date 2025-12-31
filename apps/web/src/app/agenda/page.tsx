@@ -804,7 +804,7 @@ export default function AgendaPage() {
                 📅 Calendário
               </button>
               {viewMode === 'calendar' && (
-                <div className="flex gap-2 ml-4">
+                <div className="flex gap-2 mt-2 md:mt-0 md:ml-4 flex-wrap">
                   <button
                     onClick={() => setCalendarView('day')}
                     className={`px-3 py-2 rounded-lg text-sm ${
@@ -1051,47 +1051,47 @@ export default function AgendaPage() {
                       return (
                         <div
                           key={task.id}
-                          className={`border rounded-lg p-4 hover:bg-gray-50 ${
+                          className={`border rounded-lg p-3 md:p-4 hover:bg-gray-50 ${
                             isEvento 
                               ? 'border-blue-200 bg-blue-50' 
                               : 'border-gray-200'
                           }`}
                         >
-                          <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
+                          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
                               <span className="text-lg">{icon}</span>
-                              <h3 className="text-lg font-semibold text-gray-900">{task.name}</h3>
-                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
+                              <h3 className="text-base md:text-lg font-semibold text-gray-900 break-words">{task.name}</h3>
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
                                 {tipoLabel}
                               </span>
-                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getTaskStatusColor(task.status)}`}>
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getTaskStatusColor(task.status)}`}>
                                 {getTaskStatusLabel(task.status)}
                               </span>
                               {timeDisplay && (
-                                <span className="text-xs text-gray-600 font-medium">
+                                <span className="text-xs text-gray-600 font-medium whitespace-nowrap">
                                   {timeDisplay}
                                 </span>
                               )}
                             </div>
-                            <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-2">
-                              <div>
+                            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:gap-4 text-sm text-gray-500 mb-2">
+                              <div className="break-words">
                                 <span className="font-semibold">Projeto:</span>{' '}
                                 <Link
                                   href={`/projetos/${task.project?.id}`}
-                                  className="text-primary-600 hover:text-primary-700 underline"
+                                  className="text-primary-600 hover:text-primary-700 underline break-all"
                                 >
                                   {task.project?.name || '-'}
                                 </Link>
                               </div>
                               {task.project?.client && (
-                                <div>
+                                <div className="break-words">
                                   <span className="font-semibold">Cliente:</span>{' '}
                                   {task.project.client.name || task.project.client.razaoSocial || '-'}
                                 </div>
                               )}
                               {task.usuarioResponsavel && (
-                                <div>
+                                <div className="break-words">
                                   <span className="font-semibold">Envolvidos:</span>{' '}
                                   {task.usuarioResponsavel.name}
                                 </div>
@@ -1118,7 +1118,7 @@ export default function AgendaPage() {
                               )}
                             </div>
                             {(task.dataInicio || task.dataFimPrevista || task.dataConclusao) && (
-                              <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-2 mt-2 pt-2 border-t border-gray-200">
+                              <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:gap-4 text-sm text-gray-500 mb-2 mt-2 pt-2 border-t border-gray-200">
                                 {task.dataInicio && (
                                   <div>
                                     <span className="font-semibold">Data de Início:</span>{' '}
@@ -1137,7 +1137,7 @@ export default function AgendaPage() {
                               <h4 className="font-semibold text-sm text-gray-900 mb-2">
                                 Descrição da tarefa
                               </h4>
-                              <p className="text-sm text-gray-700">{task.description || 'Sem descrição'}</p>
+                              <p className="text-sm text-gray-700 break-words">{task.description || 'Sem descrição'}</p>
                             </div>
                             {tasksWithHours[task.id] && tasksWithHours[task.id].length > 0 && (
                               <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -1171,7 +1171,7 @@ export default function AgendaPage() {
                                     )
                                   })}
                                   <div className="mt-2 pt-2 border-t border-blue-300">
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex flex-col gap-1 md:flex-row md:justify-between md:items-center">
                                       <span className="font-semibold text-blue-900">
                                         Total: {tasksWithHours[task.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0).toFixed(2)}h
                                       </span>
@@ -1195,7 +1195,7 @@ export default function AgendaPage() {
                               </div>
                             )}
                           </div>
-                          <div className="ml-4 flex flex-col gap-2">
+                          <div className="flex flex-row md:flex-col gap-2 md:ml-4 flex-shrink-0 w-full md:w-auto">
                             <button
                               onClick={() => {
                                 setSelectedTask(task)
@@ -1227,7 +1227,7 @@ export default function AgendaPage() {
                                 })
                                 setShowEditTaskModal(true)
                               }}
-                              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap"
+                              className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap"
                             >
                               Editar
                             </button>
@@ -1240,7 +1240,7 @@ export default function AgendaPage() {
                                 })
                                 setShowUpdateStatusModal(true)
                               }}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm whitespace-nowrap"
+                              className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm whitespace-nowrap"
                             >
                               Alterar Status
                             </button>
@@ -1259,7 +1259,7 @@ export default function AgendaPage() {
                                 setNewTimeEntry(timeEntryData)
                                 setShowRegisterHoursModal(true)
                               }}
-                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm whitespace-nowrap"
+                              className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm whitespace-nowrap"
                             >
                               ⏱️ Lançar Horas
                             </button>
@@ -1274,43 +1274,38 @@ export default function AgendaPage() {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="mb-4 flex gap-2">
-              <button
-                onClick={() => setCalendarView('day')}
-                className={`px-4 py-2 rounded-lg ${
-                  calendarView === 'day'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                Dia
-              </button>
-              <button
-                onClick={() => setCalendarView('week')}
-                className={`px-4 py-2 rounded-lg ${
-                  calendarView === 'week'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                Semana
-              </button>
-              <button
-                onClick={() => setCalendarView('month')}
-                className={`px-4 py-2 rounded-lg ${
-                  calendarView === 'month'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                Mês
-              </button>
-            </div>
-            <p className="text-center text-gray-600">
-              Visualização em calendário ({calendarView}) em desenvolvimento
-            </p>
-          </div>
+          <CalendarView
+            tasks={filteredTasks}
+            view={calendarView}
+            onTaskClick={(task: any) => {
+              setSelectedTask(task)
+              setEditTaskData({
+                description: task.description || '',
+                dataInicio: task.dataInicio ? (typeof task.dataInicio === 'string' ? task.dataInicio.split('T')[0] : new Date(task.dataInicio).toISOString().split('T')[0]) : '',
+                dataFimPrevista: task.dataFimPrevista ? (typeof task.dataFimPrevista === 'string' ? task.dataFimPrevista.split('T')[0] : new Date(task.dataFimPrevista).toISOString().split('T')[0]) : '',
+                usuarioResponsavelId: task.usuarioResponsavelId || '',
+                tipo: task.tipo || 'ATIVIDADE',
+                horaInicio: task.horaInicio || '',
+                horaFim: task.horaFim || '',
+                semPrazoDefinido: task.semPrazoDefinido || false,
+                diaInteiro: task.diaInteiro || false,
+              })
+              setShowEditTaskModal(true)
+            }}
+            onRegisterHours={(task: any) => {
+              setSelectedTask(task)
+              setNewTimeEntry({
+                projectId: task.project?.id || '',
+                proposalId: task.proposalId || '',
+                clientId: task.clientId || '',
+                taskId: task.id,
+                horas: '',
+                data: new Date().toISOString().split('T')[0],
+                descricao: '',
+              })
+              setShowRegisterHoursModal(true)
+            }}
+          />
         )}
 
         {/* Modal Alterar Status */}
