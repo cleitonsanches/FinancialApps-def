@@ -134,12 +134,50 @@ export default function AdministracaoPage() {
     }
   }
 
+  const handleDeleteChartAccount = async (accountId: string, accountName: string) => {
+    if (!confirm(`Tem certeza que deseja excluir a conta "${accountName}"? Esta ação não pode ser desfeita.`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/chart-of-accounts/${accountId}`)
+      alert('Conta excluída com sucesso!')
+      loadChartAccounts()
+      if (selectedChartAccount?.id === accountId) {
+        setShowChartAccountDetails(false)
+        setSelectedChartAccount(null)
+      }
+    } catch (error: any) {
+      console.error('Erro ao excluir conta:', error)
+      alert(error.response?.data?.message || 'Erro ao excluir conta')
+    }
+  }
+
   const loadBankAccounts = async () => {
     try {
       const response = await api.get('/bank-accounts')
       setBankAccounts(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar contas correntes:', error)
+    }
+  }
+
+  const handleDeleteBankAccount = async (accountId: string, bankName: string) => {
+    if (!confirm(`Tem certeza que deseja excluir a conta "${bankName}"? Esta ação não pode ser desfeita.`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/bank-accounts/${accountId}`)
+      alert('Conta excluída com sucesso!')
+      loadBankAccounts()
+      if (selectedBankAccount?.id === accountId) {
+        setShowBankAccountDetails(false)
+        setSelectedBankAccount(null)
+      }
+    } catch (error: any) {
+      console.error('Erro ao excluir conta:', error)
+      alert(error.response?.data?.message || 'Erro ao excluir conta')
     }
   }
 
@@ -831,14 +869,20 @@ export default function AdministracaoPage() {
                             {account.status === 'ATIVA' ? 'Ativa' : 'Inativa'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                           <Link
                             href={`/cadastros/plano-contas/${account.id}`}
-                            className="text-primary-600 hover:text-primary-900"
-                            onClick={(e) => e.stopPropagation()}
+                            className="text-primary-600 hover:text-primary-900 mr-4"
                           >
                             Editar
                           </Link>
+                          <button
+                            onClick={() => handleDeleteChartAccount(account.id, account.name)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                            title="Excluir conta"
+                          >
+                            Excluir
+                          </button>
                         </td>
                       </tr>
                     ))}
