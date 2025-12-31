@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import * as PDFDocument from 'pdfkit';
 import { Proposal } from '../../database/entities/proposal.entity';
 import { Project, ProjectTask } from '../../database/entities/project.entity';
 import { Invoice } from '../../database/entities/invoice.entity';
 import { TimeEntry } from '../../database/entities/time-entry.entity';
+
+const PDFDocument = require('pdfkit');
 
 @Injectable()
 export class ProposalPdfService {
@@ -70,7 +71,7 @@ export class ProposalPdfService {
     }
 
     // Criar PDF
-    const doc = new (PDFDocument as any)({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50 });
     const buffers: Buffer[] = [];
 
     doc.on('data', buffers.push.bind(buffers));
