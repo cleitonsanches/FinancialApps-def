@@ -101,6 +101,10 @@ jobs:
               npm run init:db || echo "⚠️ Erro ao criar banco (pode já existir)"
             fi
             
+            # Executar migrações pendentes
+            echo "🔄 Executando migrações..."
+            npm run migrate:proposal-observacoes --workspace=apps/api || echo "⚠️ Migração pode já ter sido executada"
+            
             # Reiniciar aplicações PM2
             echo "🔄 Reiniciando aplicações..."
             pm2 restart all
