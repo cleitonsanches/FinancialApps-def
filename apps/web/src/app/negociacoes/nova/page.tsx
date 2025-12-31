@@ -601,6 +601,18 @@ export default function NovaNegociacaoPage() {
     
     const novasParcelas: Array<{ numero: number; valor: string; dataFaturamento: string; dataVencimento: string }> = []
     
+    if (quantidade <= 0 || valorTotal <= 0) {
+      setFormData({
+        ...formData,
+        quantidadeParcelas: e.target.value,
+        parcelas: [],
+      })
+      return
+    }
+    
+    // Para Migração de Dados com PARCELADO, usar dataFaturamento como base
+    const dataFaturamentoBase = formData.dataFaturamento || formData.inicioFaturamento
+    
     if (formData.tipoContratacao === 'FIXO_RECORRENTE') {
       // Fixo Recorrente: valor da proposta para cada parcela
       const valorFormatado = valorTotal.toLocaleString('pt-BR', {
@@ -617,11 +629,12 @@ export default function NovaNegociacaoPage() {
           dataFaturamento = dataBase.toISOString().split('T')[0]
         }
         
-        // Calcular vencimento baseado em vencimento (mensal)
+        // Calcular vencimento baseado em vencimento (dias após faturamento)
         let dataVencimento = ''
-        if (formData.vencimento) {
-          const dataBase = new Date(formData.vencimento)
-          dataBase.setMonth(dataBase.getMonth() + (i - 1))
+        if (dataFaturamento && formData.vencimento) {
+          const vencimentoDias = parseInt(formData.vencimento.toString()) || 30
+          const dataBase = new Date(dataFaturamento)
+          dataBase.setDate(dataBase.getDate() + vencimentoDias)
           dataVencimento = dataBase.toISOString().split('T')[0]
         }
         
@@ -632,8 +645,8 @@ export default function NovaNegociacaoPage() {
           dataVencimento,
         })
       }
-    } else if (formData.tipoContratacao === 'PROJETO') {
-      // Projeto: dividir valor da proposta pela quantidade
+    } else {
+      // Projeto ou Migração de Dados: dividir valor da proposta pela quantidade
       const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
       const valorFormatado = valorPorParcela.toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
@@ -641,19 +654,25 @@ export default function NovaNegociacaoPage() {
       })
       
       for (let i = 1; i <= quantidade; i++) {
-        // Calcular data de faturamento baseada em inicioFaturamento (mensal)
+        // Calcular data de faturamento
         let dataFaturamento = ''
-        if (formData.inicioFaturamento) {
+        if (dataFaturamentoBase) {
+          // Para Migração de Dados, usar dataFaturamento como base
+          const dataBase = new Date(dataFaturamentoBase)
+          dataBase.setMonth(dataBase.getMonth() + (i - 1))
+          dataFaturamento = dataBase.toISOString().split('T')[0]
+        } else if (formData.inicioFaturamento) {
           const dataBase = new Date(formData.inicioFaturamento)
           dataBase.setMonth(dataBase.getMonth() + (i - 1))
           dataFaturamento = dataBase.toISOString().split('T')[0]
         }
         
-        // Calcular vencimento baseado em vencimento (mensal)
+        // Calcular vencimento baseado em vencimento (dias após faturamento)
         let dataVencimento = ''
-        if (formData.vencimento) {
-          const dataBase = new Date(formData.vencimento)
-          dataBase.setMonth(dataBase.getMonth() + (i - 1))
+        if (dataFaturamento && formData.vencimento) {
+          const vencimentoDias = parseInt(formData.vencimento.toString()) || 30
+          const dataBase = new Date(dataFaturamento)
+          dataBase.setDate(dataBase.getDate() + vencimentoDias)
           dataVencimento = dataBase.toISOString().split('T')[0]
         }
         
@@ -935,27 +954,95 @@ export default function NovaNegociacaoPage() {
                     type="date"
                     id="dataFaturamento"
                     value={formData.dataFaturamento}
-                    onChange={(e) => setFormData({ ...formData, dataFaturamento: e.target.value })}
+                    onChange={(e) => {
+                      const novaDataFaturamento = e.target.value
+                      setFormData(prev => {
+                        // Se já tem parcelas e mudou a data de faturamento, recalcular
+                        if (prev.parcelas.length > 0 && prev.quantidadeParcelas) {
+                          const novasParcelas = prev.parcelas.map((p, index) => {
+                            const dataBase = new Date(novaDataFaturamento)
+                            dataBase.setMonth(dataBase.getMonth() + index)
+                            const novaDataFaturamentoParcela = dataBase.toISOString().split('T')[0]
+                            
+                            // Recalcular vencimento também
+                            let novaDataVencimento = ''
+                            if (prev.vencimento) {
+                              const vencimentoDias = parseInt(prev.vencimento.toString()) || 30
+                              const dataVenc = new Date(novaDataFaturamentoParcela)
+                              dataVenc.setDate(dataVenc.getDate() + vencimentoDias)
+                              novaDataVencimento = dataVenc.toISOString().split('T')[0]
+                            }
+                            
+                            return {
+                              ...p,
+                              dataFaturamento: novaDataFaturamentoParcela,
+                              dataVencimento: novaDataVencimento || p.dataVencimento,
+                            }
+                          })
+                          return { ...prev, dataFaturamento: novaDataFaturamento, parcelas: novasParcelas }
+                        }
+                        return { ...prev, dataFaturamento: novaDataFaturamento }
+                      })
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     required={isMigracaoDados}
                   />
                 </div>
 
-                {/* Data do Vencimento */}
-                <div>
-                  <label htmlFor="dataVencimento" className="block text-sm font-medium text-gray-700 mb-2">
-                    Data do Vencimento *
-                  </label>
-                  <input
-                    type="date"
-                    id="dataVencimento"
-                    value={formData.dataVencimento}
-                    onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    required={isMigracaoDados && formData.formaFaturamento === 'ONESHOT'}
-                    disabled={formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL'}
-                  />
-                </div>
+                {/* Data do Vencimento (somente para ONESHOT) */}
+                {formData.formaFaturamento === 'ONESHOT' && (
+                  <div>
+                    <label htmlFor="dataVencimento" className="block text-sm font-medium text-gray-700 mb-2">
+                      Data do Vencimento *
+                    </label>
+                    <input
+                      type="date"
+                      id="dataVencimento"
+                      value={formData.dataVencimento}
+                      onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required={isMigracaoDados && formData.formaFaturamento === 'ONESHOT'}
+                    />
+                  </div>
+                )}
+
+                {/* Vencimento em dias (para PARCELADO - usado como base para calcular vencimento das parcelas) */}
+                {(formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') && (
+                  <div>
+                    <label htmlFor="vencimento" className="block text-sm font-medium text-gray-700 mb-2">
+                      Vencimento (dias após faturamento) *
+                    </label>
+                    <input
+                      type="number"
+                      id="vencimento"
+                      min="1"
+                      value={formData.vencimento || ''}
+                      onChange={(e) => {
+                        const vencimentoValue = e.target.value
+                        setFormData({ ...formData, vencimento: vencimentoValue })
+                        // Recalcular parcelas se já existirem
+                        if (formData.parcelas.length > 0 && formData.dataFaturamento) {
+                          const novasParcelas = formData.parcelas.map((p, index) => {
+                            if (p.dataFaturamento && vencimentoValue) {
+                              const dataFaturamento = new Date(p.dataFaturamento)
+                              const dataVencimento = new Date(dataFaturamento)
+                              dataVencimento.setDate(dataVencimento.getDate() + parseInt(vencimentoValue))
+                              return { ...p, dataVencimento: dataVencimento.toISOString().split('T')[0] }
+                            }
+                            return p
+                          })
+                          setFormData(prev => ({ ...prev, vencimento: vencimentoValue, parcelas: novasParcelas }))
+                        } else {
+                          setFormData(prev => ({ ...prev, vencimento: vencimentoValue }))
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Ex: 30"
+                      required={isMigracaoDados && (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL')}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Número de dias após a data de faturamento para o vencimento</p>
+                  </div>
+                )}
               </div>
 
               {/* Quantidade de Parcelas (se Parcelado) */}
