@@ -138,17 +138,14 @@ export default function ProjetosPage() {
   const getProjectData = (project: any) => {
     const projectTasks = tasks.filter(t => t.project?.id === project.id)
     
-    // Calcular status
+    // Usar status do banco de dados (não calcular automaticamente)
+    // O status deve ser controlado manualmente pelo usuário
     let calculatedStatus = project.status || 'PLANEJAMENTO'
-    if (projectTasks.length > 0) {
-      const allCompleted = projectTasks.every(t => t.status === 'CONCLUIDA')
-      if (allCompleted) {
-        calculatedStatus = 'CONCLUIDO'
-      } else {
-        const hasInProgressOrCompleted = projectTasks.some(t => t.status === 'EM_PROGRESSO' || t.status === 'CONCLUIDA')
-        if (hasInProgressOrCompleted) {
-          calculatedStatus = 'EM_ANDAMENTO'
-        }
+    // Se não tem status definido e tem tarefas, sugerir EM_ANDAMENTO se houver tarefas em progresso ou concluídas
+    if (!project.status && projectTasks.length > 0) {
+      const hasInProgressOrCompleted = projectTasks.some(t => t.status === 'EM_PROGRESSO' || t.status === 'CONCLUIDA')
+      if (hasInProgressOrCompleted) {
+        calculatedStatus = 'EM_ANDAMENTO' // Apenas sugestão visual, não atualiza o banco
       }
     }
 

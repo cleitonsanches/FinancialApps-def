@@ -419,11 +419,18 @@ export default function ProjectDetailsPage() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
+      // Status de tarefas
       PENDENTE: 'bg-yellow-100 text-yellow-800',
       EM_PROGRESSO: 'bg-blue-100 text-blue-800',
       CONCLUIDA: 'bg-green-100 text-green-800',
       BLOQUEADA: 'bg-red-100 text-red-800',
       CANCELADA: 'bg-gray-100 text-gray-800',
+      // Status de projetos
+      PLANEJAMENTO: 'bg-gray-100 text-gray-800',
+      EM_ANDAMENTO: 'bg-blue-100 text-blue-800',
+      CONCLUIDO: 'bg-green-100 text-green-800',
+      CANCELADO: 'bg-red-100 text-red-800',
+      PAUSADO: 'bg-yellow-100 text-yellow-800',
     }
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
@@ -452,27 +459,28 @@ export default function ProjectDetailsPage() {
   // Calcular total de horas estimadas
   const totalHoursEstimated = tasks.reduce((sum, task) => sum + (parseFloat(task.horasEstimadas) || 0), 0)
 
-  // Calcular status do projeto baseado nas tarefas
+  // Calcular status sugerido do projeto baseado nas tarefas (apenas para exibição)
+  // O status real do projeto é controlado manualmente pelo usuário
   const calculateProjectStatus = () => {
     if (!project) {
       return 'PLANEJAMENTO'
     }
     
-    if (tasks.length === 0) {
-      return project.status || 'PLANEJAMENTO'
+    // Sempre usar o status do banco de dados (não calcular automaticamente)
+    // Se o projeto já tem status definido, usar ele
+    if (project.status) {
+      return project.status
     }
     
-    const allCompleted = tasks.every(t => t.status === 'CONCLUIDA')
-    if (allCompleted && tasks.length > 0) {
-      return 'CONCLUIDO'
+    // Se não tem status e tem tarefas, sugerir EM_ANDAMENTO se houver tarefas em progresso ou concluídas
+    if (tasks.length > 0) {
+      const hasInProgressOrCompleted = tasks.some(t => t.status === 'EM_PROGRESSO' || t.status === 'CONCLUIDA')
+      if (hasInProgressOrCompleted) {
+        return 'EM_ANDAMENTO' // Sugestão, mas não atualiza o banco
+      }
     }
     
-    const hasInProgressOrCompleted = tasks.some(t => t.status === 'EM_PROGRESSO' || t.status === 'CONCLUIDA')
-    if (hasInProgressOrCompleted) {
-      return 'EM_ANDAMENTO'
-    }
-    
-    return project.status || 'PLANEJAMENTO'
+    return 'PLANEJAMENTO'
   }
 
   const calculatedProjectStatus = calculateProjectStatus()
@@ -528,6 +536,7 @@ export default function ProjectDetailsPage() {
       const updateData: any = {
         name: editingProject.name,
         description: editingProject.description || null,
+        status: editingProject.status || 'PLANEJAMENTO',
       }
 
       // Adicionar datas se preenchidas
@@ -601,6 +610,7 @@ export default function ProjectDetailsPage() {
                       setEditingProject({
                         name: project.name || '',
                         description: project.description || '',
+                        status: project.status || 'PLANEJAMENTO',
                         dataInicio: project.dataInicio ? (typeof project.dataInicio === 'string' ? project.dataInicio.split('T')[0] : new Date(project.dataInicio).toISOString().split('T')[0]) : '',
                         dataFim: project.dataFim ? (typeof project.dataFim === 'string' ? project.dataFim.split('T')[0] : new Date(project.dataFim).toISOString().split('T')[0]) : '',
                       })
@@ -1801,6 +1811,24 @@ export default function ProjectDetailsPage() {
                     placeholder="Digite a descrição do projeto"
                     rows={4}
                   />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editingProject.status}
+                    onChange={(e) => setEditingProject({ ...editingProject, status: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  >
+                    <option value="PLANEJAMENTO">Planejamento</option>
+                    <option value="EM_ANDAMENTO">Em Andamento</option>
+                    <option value="CONCLUIDO">Concluído</option>
+                    <option value="CANCELADO">Cancelado</option>
+                    <option value="PAUSADO">Pausado</option>
+                  </select>
                 </div>
 
                 {/* Data de Início */}
