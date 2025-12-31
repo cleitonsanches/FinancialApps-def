@@ -154,11 +154,11 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
   if (view === 'week') {
     const weekDays = getWeekDays(currentDate)
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center mb-4">
+      <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+        <div className="flex justify-between items-center mb-4 gap-2">
           <button
             onClick={() => navigateDate('prev')}
-            className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+            className="px-3 md:px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm md:text-base flex-shrink-0"
           >
             ← Semana Anterior
           </button>
@@ -167,7 +167,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
           </h2>
           <button
             onClick={() => navigateDate('next')}
-            className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+            className="px-3 md:px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm md:text-base flex-shrink-0"
           >
             Próxima Semana →
           </button>
