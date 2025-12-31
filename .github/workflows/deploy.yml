@@ -63,10 +63,31 @@ jobs:
             # Ir para o diretório do projeto
             cd /var/www/FinancialApps-def
             
-            # Fazer backup do banco de dados antes do deploy
-            if [ -f database.sqlite ]; then
-              cp database.sqlite database.sqlite.backup.$(date +%Y%m%d_%H%M%S)
-              echo "✅ Backup do banco de dados criado"
+            # Fazer backup do banco de dados ANTES do deploy
+            # Procurar banco em todos os locais possíveis
+            DB_FOUND=""
+            DB_BACKUP_DIR="backups"
+            mkdir -p "$DB_BACKUP_DIR"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            
+            # Verificar locais possíveis (ordem de prioridade)
+            for DB_LOC in "apps/api/database.sqlite" "database.sqlite" "apps/api/../database.sqlite"; do
+              if [ -f "$DB_LOC" ]; then
+                DB_SIZE=$(du -h "$DB_LOC" | cut -f1)
+                TABLES=$(sqlite3 "$DB_LOC" ".tables" 2>/dev/null | wc -w)
+                echo "✅ Banco encontrado: $DB_LOC (Tamanho: $DB_SIZE, Tabelas: $TABLES)"
+                
+                # Fazer backup
+                cp "$DB_LOC" "$DB_BACKUP_DIR/database.sqlite.backup.$TIMESTAMP"
+                echo "✅ Backup criado: $DB_BACKUP_DIR/database.sqlite.backup.$TIMESTAMP"
+                
+                DB_FOUND="$DB_LOC"
+                break
+              fi
+            done
+            
+            if [ -z "$DB_FOUND" ]; then
+              echo "⚠️ AVISO: Nenhum banco de dados encontrado. Será criado um novo após o deploy."
             fi
             
             # Limpar arquivos não rastreados que podem causar conflito (como export/*.csv)
@@ -95,10 +116,28 @@ jobs:
             echo "🔨 Fazendo build do Web..."
             npm run build --workspace=apps/web
             
-            # Verificar se o banco de dados existe, se não, criar
-            if [ ! -f database.sqlite ]; then
-              echo "📊 Banco de dados não encontrado. Criando..."
-              npm run init:db || echo "⚠️ Erro ao criar banco (pode já existir)"
+            # Verificar se o banco de dados existe APÓS o pull
+            # NÃO criar banco novo se já existe um em qualquer local
+            DB_EXISTS=false
+            
+            # Verificar locais possíveis
+            for DB_LOC in "apps/api/database.sqlite" "database.sqlite"; do
+              if [ -f "$DB_LOC" ]; then
+                DB_SIZE=$(du -h "$DB_LOC" | cut -f1)
+                TABLES=$(sqlite3 "$DB_LOC" ".tables" 2>/dev/null | wc -w)
+                echo "✅ Banco existe: $DB_LOC (Tamanho: $DB_SIZE, Tabelas: $TABLES)"
+                DB_EXISTS=true
+                break
+              fi
+            done
+            
+            # SÓ criar banco se realmente não existir nenhum
+            if [ "$DB_EXISTS" = false ]; then
+              echo "📊 Nenhum banco encontrado. Criando novo banco..."
+              npm run init:db --workspace=apps/api || echo "⚠️ Erro ao criar banco"
+              echo "⚠️ ATENÇÃO: Banco novo criado! Se você tinha dados, restaure do backup."
+            else
+              echo "✅ Banco de dados preservado. Não foi necessário criar novo banco."
             fi
             
             # Executar migrações pendentes

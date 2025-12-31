@@ -82,12 +82,47 @@ async function initDatabase() {
   
   console.log(`📦 Carregadas ${allEntities.length} entidades`);
   
+  // Verificar se o banco já existe e tem dados
+  const dbExists = fs.existsSync(databasePath);
+  let existingTables: string[] = [];
+  
+  if (dbExists) {
+    // Conectar temporariamente para verificar tabelas existentes
+    const tempDataSource = new DataSource({
+      type: 'sqlite',
+      database: databasePath,
+      entities: allEntities,
+      synchronize: false, // NUNCA usar synchronize em banco existente
+      logging: false,
+    });
+    
+    try {
+      await tempDataSource.initialize();
+      const queryRunner = tempDataSource.createQueryRunner();
+      const tables = await queryRunner.query(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name NOT LIKE 'sqlite_%'
+      `);
+      existingTables = tables.map((t: any) => t.name);
+      await tempDataSource.destroy();
+      
+      if (existingTables.length > 0) {
+        console.log(`⚠️ AVISO: Banco já existe com ${existingTables.length} tabela(s): ${existingTables.join(', ')}`);
+        console.log('⚠️ NÃO será apagado ou recriado. Use migrations para adicionar tabelas.');
+        return; // Sair sem fazer nada para preservar dados existentes
+      }
+    } catch (error) {
+      console.log('⚠️ Não foi possível verificar tabelas existentes. Continuando...');
+      await tempDataSource.destroy().catch(() => {});
+    }
+  }
+
   // Criar DataSource usando lista explícita (mais confiável que glob para ts-node)
   const dataSource = new DataSource({
     type: 'sqlite',
     database: databasePath,
     entities: allEntities, // Lista explícita garante que todas sejam carregadas
-    synchronize: true, // Habilitar para criar tabelas
+    synchronize: true, // Seguro aqui porque só cria se não existir
     logging: true,
   });
 
@@ -96,10 +131,14 @@ async function initDatabase() {
     await dataSource.initialize();
     console.log('✅ Banco de dados conectado com sucesso!');
     
-    console.log('Criando tabelas...');
-    // O synchronize: true já cria as tabelas automaticamente
-    await dataSource.synchronize();
-    console.log('✅ Tabelas criadas com sucesso!');
+    if (!dbExists || existingTables.length === 0) {
+      console.log('Criando tabelas...');
+      // O synchronize: true cria as tabelas apenas se não existirem
+      await dataSource.synchronize();
+      console.log('✅ Tabelas criadas com sucesso!');
+    } else {
+      console.log('✅ Banco já existe com tabelas. Preservando dados existentes.');
+    }
     
     await dataSource.destroy();
     console.log('Conexão fechada.');
