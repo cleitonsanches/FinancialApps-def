@@ -85,6 +85,21 @@ export default function PlanoContasPage() {
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
+  const handleDelete = async (accountId: string, accountName: string) => {
+    if (!confirm(`Tem certeza que deseja excluir a conta "${accountName}"? Esta ação não pode ser desfeita.`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/chart-of-accounts/${accountId}`)
+      alert('Conta excluída com sucesso!')
+      loadChartAccounts()
+    } catch (error: any) {
+      console.error('Erro ao excluir conta:', error)
+      alert(error.response?.data?.message || 'Erro ao excluir conta')
+    }
+  }
+
   const filteredAccounts = chartAccounts.filter((account) => {
     // Filtro por nome
     if (nameFilter) {

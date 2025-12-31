@@ -99,6 +99,21 @@ export default function AdministracaoPage() {
     }
   }
 
+  const handleDeleteProjectTemplate = async (templateId: string, templateName: string) => {
+    if (!confirm(`Tem certeza que deseja excluir o template "${templateName}"? Esta ação não pode ser desfeita.`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/project-templates/${templateId}`)
+      alert('Template excluído com sucesso!')
+      loadProjectTemplates()
+    } catch (error: any) {
+      console.error('Erro ao excluir template:', error)
+      alert(error.response?.data?.message || 'Erro ao excluir template')
+    }
+  }
+
   const loadProposalTemplates = async () => {
     try {
       const response = await api.get('/proposal-templates')
@@ -422,14 +437,20 @@ export default function AdministracaoPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {template.tasks?.length || 0}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                           <Link
                             href={`/templates/projeto-template/${template.id}`}
                             className="text-primary-600 hover:text-primary-900 mr-4"
-                            onClick={(e) => e.stopPropagation()}
                           >
                             Editar
                           </Link>
+                          <button
+                            onClick={() => handleDeleteProjectTemplate(template.id, template.name)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                            title="Excluir template"
+                          >
+                            Excluir
+                          </button>
                         </td>
                       </tr>
                     ))}
