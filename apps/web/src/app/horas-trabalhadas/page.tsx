@@ -1752,6 +1752,97 @@ export default function HorasTrabalhadasPage() {
             </div>
           </div>
         )}
+
+        {/* Modal de Editar Hora Trabalhada */}
+        {showEditTimeEntryModal && entryToEdit && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Editar Hora Trabalhada</h2>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Data */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Data <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editTimeEntryData.data}
+                    onChange={(e) => setEditTimeEntryData({ ...editTimeEntryData, data: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+
+                {/* Horas */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Horas Trabalhadas <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editTimeEntryData.horas}
+                    onChange={(e) => setEditTimeEntryData({ ...editTimeEntryData, horas: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ex: 8h, 1h30min, 40 horas"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Formatos aceitos: 8h, 1h30min, 40 horas</p>
+                </div>
+
+                {/* Descrição */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={editTimeEntryData.descricao}
+                    onChange={(e) => setEditTimeEntryData({ ...editTimeEntryData, descricao: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={3}
+                    placeholder="Descreva o trabalho realizado..."
+                  />
+                </div>
+
+                {/* Faturável (se aplicável) */}
+                {entryToEdit.clientId && (!entryToEdit.projectId && !entryToEdit.taskId) && (
+                  <div>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={editTimeEntryData.isFaturavel}
+                        onChange={(e) => setEditTimeEntryData({ ...editTimeEntryData, isFaturavel: e.target.checked })}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700">Faturável</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+                <button
+                  onClick={() => {
+                    setShowEditTimeEntryModal(false)
+                    setEntryToEdit(null)
+                    setEditTimeEntryData({ horas: '', data: '', descricao: '', isFaturavel: false })
+                  }}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleEditTimeEntry}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
