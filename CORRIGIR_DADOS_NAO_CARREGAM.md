@@ -6,9 +6,26 @@ Após o deploy, as páginas de Projetos, Negociações, Horas Trabalhadas e Cont
 ## Causa Provável
 O campo `observacoes` foi adicionado à entidade `Proposal`, mas a migração pode não ter sido executada no VPS.
 
-## Solução
+## Solução Rápida
 
-### 1. Executar Migração no VPS
+### PASSO 1: Executar Script de Diagnóstico
+
+Conecte-se ao VPS via SSH e execute:
+
+```bash
+cd /var/www/FinancialApps-def
+chmod +x DIAGNOSTICO_VPS.sh
+./DIAGNOSTICO_VPS.sh
+```
+
+Este script vai mostrar:
+- Se o banco de dados existe
+- Quantos registros há em cada tabela
+- Se a coluna `observacoes` existe (PROVÁVEL CAUSA DO PROBLEMA)
+- Status da API
+- Erros recentes
+
+### PASSO 2: Executar Migração (PROVAVELMENTE NECESSÁRIO)
 
 Conecte-se ao VPS via SSH e execute:
 
