@@ -110,7 +110,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
           >
             ← Anterior
           </button>
-          <h2 className="text-xl font-bold">{formatDate(currentDate)}</h2>
+          <h2 className="text-base md:text-xl font-bold text-center flex-1 px-2">{formatDate(currentDate)}</h2>
           <button
             onClick={() => navigateDate('next')}
             className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
@@ -172,29 +172,41 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
             Próxima Semana →
           </button>
         </div>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-2 overflow-x-auto">
           {weekDays.map((day, index) => {
             const dayTasks = getTasksForDate(day)
+            const isToday = day.toDateString() === new Date().toDateString()
             return (
-              <div key={index} className="border rounded-lg p-2 min-h-[200px]">
-                <div className="font-semibold text-sm mb-2 text-center">
+              <div 
+                key={index} 
+                className={`border rounded-lg p-2 min-h-[150px] md:min-h-[200px] ${
+                  isToday ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'
+                }`}
+              >
+                <div className={`font-semibold text-sm mb-2 text-center ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
                   {day.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric' })}
                 </div>
                 <div className="space-y-1">
-                  {dayTasks.slice(0, 3).map((task: any) => (
-                    <div
-                      key={task.id}
-                      className={`text-xs p-1 rounded cursor-pointer hover:shadow ${getTaskStatusColor(task.status)}`}
-                      onClick={() => onTaskClick(task)}
-                      title={task.name}
-                    >
-                      <div className="truncate">{task.name}</div>
-                    </div>
-                  ))}
-                  {dayTasks.length > 3 && (
-                    <div className="text-xs text-gray-500 text-center">
-                      +{dayTasks.length - 3} mais
-                    </div>
+                  {dayTasks.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-4">Nenhuma tarefa</p>
+                  ) : (
+                    <>
+                      {dayTasks.slice(0, 3).map((task: any) => (
+                        <div
+                          key={task.id}
+                          className={`text-xs p-1 rounded cursor-pointer hover:shadow ${getTaskStatusColor(task.status)}`}
+                          onClick={() => onTaskClick(task)}
+                          title={task.name}
+                        >
+                          <div className="truncate">{task.name}</div>
+                        </div>
+                      ))}
+                      {dayTasks.length > 3 && (
+                        <div className="text-xs text-gray-500 text-center">
+                          +{dayTasks.length - 3} mais
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -211,43 +223,50 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-white rounded-lg shadow-md p-4 md:p-6 overflow-x-auto">
+      <div className="flex justify-between items-center mb-4 gap-2 min-w-0">
         <button
           onClick={() => navigateDate('prev')}
-          className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+          className="px-3 md:px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm md:text-base flex-shrink-0"
         >
           ← Mês Anterior
         </button>
-        <h2 className="text-xl font-bold capitalize">{monthName}</h2>
+        <h2 className="text-base md:text-xl font-bold capitalize text-center flex-1 px-2">
+          {monthName}
+        </h2>
         <button
           onClick={() => navigateDate('next')}
-          className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+          className="px-3 md:px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm md:text-base flex-shrink-0"
         >
           Próximo Mês →
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1 md:gap-2">
         {weekDays.map((day) => (
-          <div key={day} className="text-center font-semibold text-gray-700 p-2">
+          <div key={day} className="text-center font-semibold text-gray-700 p-1 md:p-2 text-xs md:text-sm">
             {day}
           </div>
         ))}
         {days.map((day, index) => {
           const dayTasks = getTasksForDate(day)
+          const isToday = day && day.toDateString() === new Date().toDateString()
           return (
             <div
               key={index}
-              className={`border rounded-lg p-2 min-h-[100px] ${
-                day ? 'bg-white' : 'bg-gray-50'
+              className={`border rounded-lg p-1 md:p-2 min-h-[60px] md:min-h-[100px] ${
+                day === null
+                  ? 'bg-gray-50'
+                  : isToday
+                  ? 'bg-blue-50 border-blue-300'
+                  : 'bg-white border-gray-200'
               }`}
             >
               {day && (
                 <>
-                  <div className="font-semibold text-sm mb-1">
+                  <div className={`font-semibold text-xs md:text-sm mb-0.5 md:mb-1 ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
                     {day.getDate()}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5 md:space-y-1">
                     {dayTasks.slice(0, 2).map((task: any) => {
                       const isEvento = task.tipo === 'EVENTO'
                       const isAtividade = task.tipo === 'ATIVIDADE' || !task.tipo
@@ -259,7 +278,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
                       return (
                         <div
                           key={task.id}
-                          className={`text-xs p-1 rounded cursor-pointer hover:shadow truncate flex items-center gap-1 ${
+                          className={`text-[10px] md:text-xs p-0.5 md:p-1 rounded cursor-pointer hover:shadow truncate flex items-center gap-0.5 md:gap-1 ${
                             isEvento 
                               ? 'bg-blue-50 text-blue-800 border border-blue-200' 
                               : getTaskStatusColor(task.status)
@@ -267,14 +286,13 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
                           onClick={() => onTaskClick(task)}
                           title={`${task.name}${timeDisplay}`}
                         >
-                          <span>{icon}</span>
-                          <span className="truncate">{task.name}</span>
-                          {timeDisplay && <span className="text-xs opacity-75">{timeDisplay}</span>}
+                          <span className="text-xs">{icon}</span>
+                          <span className="truncate flex-1">{task.name}</span>
                         </div>
                       )
                     })}
                     {dayTasks.length > 2 && (
-                      <div className="text-xs text-gray-500">
+                      <div className="text-[10px] md:text-xs text-gray-500 text-center">
                         +{dayTasks.length - 2}
                       </div>
                     )}
