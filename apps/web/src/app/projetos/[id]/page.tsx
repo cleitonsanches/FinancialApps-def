@@ -50,6 +50,9 @@ export default function ProjectDetailsPage() {
   const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<any>(null)
   const [editingTimeEntry, setEditingTimeEntry] = useState<any>(null)
   const [desiredStatus, setDesiredStatus] = useState<string | null>(null) // Status que o usuário deseja aplicar após lançar horas
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false)
+  const [editingProject, setEditingProject] = useState<any>(null)
+  const [savingProject, setSavingProject] = useState(false)
   
   // Form states
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
