@@ -1361,6 +1361,50 @@ export default function NegotiationDetailsPage() {
                 )}
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('token')
+                      if (!token) {
+                        alert('Faça login para exportar o PDF')
+                        return
+                      }
+                      
+                      // Usar a URL da API já configurada
+                      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+                      // A URL já inclui /api se necessário, então usar /negotiations diretamente
+                      const pdfUrl = apiBaseUrl.replace(/\/api$/, '') + `/api/negotiations/${negotiation.id}/pdf`
+                      
+                      const response = await fetch(pdfUrl, {
+                        method: 'GET',
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                        },
+                      })
+                      
+                      if (!response.ok) {
+                        const errorText = await response.text()
+                        throw new Error(errorText || 'Erro ao gerar PDF')
+                      }
+                      
+                      const blob = await response.blob()
+                      const url = window.URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `proposta-${negotiation.numero || negotiation.id}.pdf`
+                      document.body.appendChild(a)
+                      a.click()
+                      window.URL.revokeObjectURL(url)
+                      document.body.removeChild(a)
+                    } catch (error: any) {
+                      console.error('Erro ao exportar PDF:', error)
+                      alert(error.message || 'Erro ao exportar PDF')
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                >
+                  📄 Exportar PDF
+                </button>
                 <Link
                   href={`/negociacoes/editar/${negotiation.id}`}
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
