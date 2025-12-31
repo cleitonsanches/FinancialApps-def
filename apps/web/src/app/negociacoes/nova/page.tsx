@@ -472,14 +472,53 @@ export default function NovaNegociacaoPage() {
       const negotiationResponse = await api.get(`/negotiations/${savedNegotiationId}`)
       const negotiation = negotiationResponse.data
 
+      // Buscar cliente completo se necessário
+      let client = negotiation.client
+      if (!client && negotiation.clientId) {
+        const clientResponse = await api.get(`/clients/${negotiation.clientId}`)
+        client = clientResponse.data
+      }
+      if (!client && formData.clientId) {
+        const clientResponse = await api.get(`/clients/${formData.clientId}`)
+        client = clientResponse.data
+      }
+
+      // Função helper para obter nome do serviço
+      const getServiceTypeLabel = (serviceType: string) => {
+        if (!serviceType) return '-'
+        const serviceTypeObj = serviceTypes.find(st => st.code === serviceType || st.name === serviceType)
+        if (serviceTypeObj) {
+          return serviceTypeObj.name
+        }
+        const labels: Record<string, string> = {
+          AUTOMACOES: 'Automações',
+          CONSULTORIA: 'Consultoria',
+          TREINAMENTO: 'Treinamento',
+          MIGRACAO_DADOS: 'Migração de Dados',
+          ANALISE_DADOS: 'Análise de Dados',
+          ASSINATURAS: 'Assinaturas',
+          MANUTENCOES: 'Manutenções',
+          DESENVOLVIMENTOS: 'Desenvolvimentos',
+          CONTRATO_FIXO: 'Contrato Fixo',
+        }
+        return labels[serviceType] || serviceType
+      }
+
+      // Gerar nome do projeto: NOME_CLIENTE_CAIXA_ALTA + "-" + nome_serviço
+      const finalServiceType = negotiation.serviceType || formData.serviceType
+      const clientName = client?.razaoSocial || client?.name || client?.nome || 'CLIENTE'
+      const clientNameUpper = clientName.toUpperCase()
+      const serviceName = getServiceTypeLabel(finalServiceType)
+      const projectName = `${clientNameUpper}-${serviceName}`
+
       // Criar projeto manualmente
       const projectData: any = {
         companyId,
         clientId: negotiation.clientId || formData.clientId,
         proposalId: savedNegotiationId,
-        name: negotiation.numero || `Projeto - ${negotiation.title || negotiation.serviceType}`,
+        name: projectName,
         description: `Projeto criado automaticamente a partir da negociação ${negotiation.numero || savedNegotiationId.substring(0, 8)}`,
-        serviceType: negotiation.serviceType || formData.serviceType,
+        serviceType: finalServiceType,
         dataInicio: formData.inicio || new Date().toISOString().split('T')[0],
         status: 'PENDENTE',
       }

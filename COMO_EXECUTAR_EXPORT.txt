@@ -1,0 +1,43 @@
+========================================
+COMO EXECUTAR A EXPORTACAO
+========================================
+
+O PowerShell nao tem SQLite instalado. Use o Node.js:
+
+OPCAO 1 (Recomendada - Node.js):
+--------------------------------
+1. Abra o PowerShell ou CMD
+2. Vá para o diretório do projeto:
+   cd C:\Users\CleitonSanchesBR-iT\Documents\FinancialApps-def
+
+3. Execute:
+   node scripts/export-data-node.js
+
+OPCAO 2 (Instalar SQLite3):
+---------------------------
+1. Baixe SQLite3:
+   https://www.sqlite.org/download.html
+   (Escolha: sqlite-tools-win-x64-xxxxx.zip)
+
+2. Extraia e adicione ao PATH do Windows
+
+3. Depois execute:
+   powershell -ExecutionPolicy Bypass -File .\scripts\export-data.ps1
+
+OPCAO 3 (Via npm):
+------------------
+1. Instale SQLite3 globalmente:
+   npm install -g sqlite3
+
+2. Depois execute:
+   powershell -ExecutionPolicy Bypass -File .\scripts\export-data.ps1
+
+========================================
+COMANDO RAPIDO (COPIE E COLE):
+========================================
+
+cd C:\Users\CleitonSanchesBR-iT\Documents\FinancialApps-def
+node scripts/export-data-node.js
+
+========================================
+

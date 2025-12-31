@@ -1,0 +1,58 @@
+==========================================
+COMO EXECUTAR O SCRIPT DE EXPORTAÇÃO
+==========================================
+
+IMPORTANTE: Execute no PowerShell (NÃO no CMD!)
+
+OPÇÃO 1 (Mais Simples):
+-----------------------
+1. Abra o PowerShell
+2. Cole estes comandos UM POR VEZ:
+
+cd C:\Users\CleitonSanchesBR-iT\Documents\FinancialApps-def
+
+powershell -ExecutionPolicy Bypass -File .\scripts\export-data.ps1
+
+
+OPÇÃO 2 (Se der erro na Opção 1):
+----------------------------------
+1. Abra o PowerShell
+2. Cole estes comandos:
+
+cd C:\Users\CleitonSanchesBR-iT\Documents\FinancialApps-def
+
+.\scripts\export-data.ps1
+
+
+OPÇÃO 3 (Se ainda não funcionar):
+----------------------------------
+1. Abra o PowerShell
+2. Cole este comando:
+
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+
+3. Depois cole:
+
+cd C:\Users\CleitonSanchesBR-iT\Documents\FinancialApps-def
+.\scripts\export-data.ps1
+
+
+OPÇÃO 4 (Pelo CMD):
+-------------------
+1. Abra o CMD
+2. Cole:
+
+cd C:\Users\CleitonSanchesBR-iT\Documents\FinancialApps-def
+powershell -ExecutionPolicy Bypass -File scripts\export-data.ps1
+
+
+==========================================
+VERIFICAR SE FUNCIONOU
+==========================================
+
+Depois de executar, verifique:
+
+dir export
+
+Se aparecer arquivos .csv, funcionou! ✅
+

@@ -1,0 +1,21 @@
+Exportacao de Dados - FinancialApps
+Data: 2025-12-31T12:44:15.282Z
+Banco de origem: C:\Users\CleitonSanchesBR-iT\Documents\FinancialApps-def\apps\api\database.sqlite
+
+Tabelas exportadas:
+  - service_types.csv
+  - chart_of_accounts.csv
+  - bank_accounts.csv
+  - clients.csv
+  - contacts.csv
+  - proposal_templates.csv
+  - project_templates.csv
+  - project_template_phases.csv
+  - project_template_tasks.csv
+  - subscription_products.csv
+
+INSTRUCOES:
+1. Verifique se todos os arquivos CSV foram criados
+2. Copie a pasta 'export' para a VPS
+3. Na VPS, execute: ./scripts/import-data.sh
+4. ATENCAO: Ajuste o company_id antes de importar (veja ajustar-company-id.sh)

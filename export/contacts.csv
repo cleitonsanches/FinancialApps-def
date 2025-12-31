@@ -1,0 +1,4 @@
+id,company_id,name,email,phone,position,client_id,created_at,updated_at
+2d31c583-a4d0-4cbc-b473-d4238a46507d,952cc139-6685-48a9-8596-cdffff550bc2,Leonardo Passos,,,,d503833b-131e-47e0-b9e5-2052cd62faa7,2025-12-23 20:58:26,2025-12-23 20:58:26
+ac7bbee2-3644-48ef-a3ef-55e57b8602d6,952cc139-6685-48a9-8596-cdffff550bc2,Andrea Vernaglia,,,,ac0266ab-bde5-4c5c-bfb0-c1e641cfbf33,2025-12-24 18:24:55,2025-12-24 18:24:55
+76626a3e-d7d3-4fac-8a4e-8c1b41ae73de,952cc139-6685-48a9-8596-cdffff550bc2,Marcus,,,,0a5c36be-b9db-4623-a460-d7eaca4aa0fc,2025-12-26 12:52:50,2025-12-26 12:52:50

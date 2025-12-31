@@ -1,0 +1,72 @@
+========================================
+PROXIMOS PASSOS - IMPORTACAO NA VPS
+========================================
+
+IMPORTANTE: O script import-data.sh eh para executar NA VPS, nao no Windows!
+
+========================================
+PASSO 1: COPIAR PASTA EXPORT PARA VPS
+========================================
+
+No PowerShell do Windows, execute:
+
+scp -r export root@92.113.32.118:/var/www/FinancialApps-def/
+
+
+========================================
+PASSO 2: CONECTAR NA VPS
+========================================
+
+No PowerShell, execute:
+
+ssh root@92.113.32.118
+
+
+========================================
+PASSO 3: NA VPS - EXECUTAR SCRIPTS
+========================================
+
+Depois de conectar na VPS, execute estes comandos:
+
+# 1. Ir para o diretorio do projeto
+cd /var/www/FinancialApps-def
+
+# 2. Verificar se a pasta export chegou
+ls -la export/
+
+# 3. Dar permissao de execucao aos scripts
+chmod +x scripts/*.sh
+
+# 4. Ajustar company_id nos CSVs
+bash scripts/ajustar-company-id.sh
+
+# 5. Importar dados
+bash scripts/import-data.sh
+
+# 6. Executar tipos de servicos
+npm run migrate:service-types --workspace=apps/api
+
+# 7. Reiniciar aplicacoes
+pm2 restart all
+pm2 save
+
+
+========================================
+RESUMO DO QUE FAZER
+========================================
+
+WINDOWS:
+--------
+scp -r export root@92.113.32.118:/var/www/FinancialApps-def/
+
+VPS (apos conectar via ssh):
+----------------------------
+cd /var/www/FinancialApps-def
+chmod +x scripts/*.sh
+bash scripts/ajustar-company-id.sh
+bash scripts/import-data.sh
+npm run migrate:service-types --workspace=apps/api
+pm2 restart all
+
+========================================
+

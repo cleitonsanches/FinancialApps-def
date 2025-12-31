@@ -8,11 +8,12 @@ import { Project, ProjectTask } from '../../database/entities/project.entity';
 import { Phase } from '../../database/entities/phase.entity';
 import { Client } from '../../database/entities/client.entity';
 import { User } from '../../database/entities/user.entity';
+import { ServiceType } from '../../database/entities/service-type.entity';
 import { ProposalsService } from './proposals.service';
 import { ProposalsController } from './proposals.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Proposal, ProposalTemplate, ProjectTemplate, ProjectTemplateTask, Project, ProjectTask, Phase, Client, User])],
+  imports: [TypeOrmModule.forFeature([Proposal, ProposalTemplate, ProjectTemplate, ProjectTemplateTask, Project, ProjectTask, Phase, Client, User, ServiceType])],
   controllers: [ProposalsController],
   providers: [ProposalsService],
   exports: [ProposalsService],

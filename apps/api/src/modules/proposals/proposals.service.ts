@@ -6,6 +6,8 @@ import { Project, ProjectTask } from '../../database/entities/project.entity';
 import { ProjectTemplate } from '../../database/entities/project-template.entity';
 import { ProjectTemplateTask } from '../../database/entities/project-template-task.entity';
 import { Phase } from '../../database/entities/phase.entity';
+import { Client } from '../../database/entities/client.entity';
+import { ServiceType } from '../../database/entities/service-type.entity';
 
 @Injectable()
 export class ProposalsService {
@@ -22,6 +24,10 @@ export class ProposalsService {
     private projectTemplateTaskRepository: Repository<ProjectTemplateTask>,
     @InjectRepository(Phase)
     private phaseRepository: Repository<Phase>,
+    @InjectRepository(Client)
+    private clientRepository: Repository<Client>,
+    @InjectRepository(ServiceType)
+    private serviceTypeRepository: Repository<ServiceType>,
   ) {}
 
   async findAll(companyId?: string, status?: string): Promise<Proposal[]> {
@@ -287,13 +293,49 @@ export class ProposalsService {
       throw new Error('Template não encontrado');
     }
 
+    // Buscar cliente para gerar nome do projeto
+    let client = null;
+    if (proposal.clientId) {
+      client = await this.clientRepository.findOne({ where: { id: proposal.clientId } });
+    }
+
+    // Buscar tipo de serviço para obter nome legível
+    let serviceTypeName = template.serviceType || '';
+    if (template.serviceType) {
+      const serviceType = await this.serviceTypeRepository.findOne({
+        where: { code: template.serviceType, companyId: proposal.companyId },
+      });
+      if (serviceType) {
+        serviceTypeName = serviceType.name;
+      } else {
+        // Fallback para mapeamento estático
+        const labels: Record<string, string> = {
+          AUTOMACOES: 'Automações',
+          CONSULTORIA: 'Consultoria',
+          TREINAMENTO: 'Treinamento',
+          MIGRACAO_DADOS: 'Migração de Dados',
+          ANALISE_DADOS: 'Análise de Dados',
+          ASSINATURAS: 'Assinaturas',
+          MANUTENCOES: 'Manutenções',
+          DESENVOLVIMENTOS: 'Desenvolvimentos',
+          CONTRATO_FIXO: 'Contrato Fixo',
+        };
+        serviceTypeName = labels[template.serviceType] || template.serviceType;
+      }
+    }
+
+    // Gerar nome do projeto: NOME_CLIENTE_CAIXA_ALTA + "-" + nome_serviço
+    const clientName = client?.razaoSocial || client?.name || client?.nome || 'CLIENTE';
+    const clientNameUpper = clientName.toUpperCase();
+    const projectName = `${clientNameUpper}-${serviceTypeName}`;
+
     // Criar projeto
     const project = this.projectRepository.create({
       companyId: proposal.companyId,
       clientId: proposal.clientId,
       proposalId: proposal.id,
       templateId: template.id,
-      name: template.name,
+      name: projectName,
       description: template.description,
       serviceType: template.serviceType,
       dataInicio: startDate,

@@ -12,10 +12,11 @@
 ## Melhorias de Funcionalidades
 
 ### Dados de Referência
-- [ ] Verificar e migrar dados de referência (tipos de serviços, plano de contas, etc.)
-  - Verificar scripts de seed existentes
-  - Criar scripts de migração de dados de referência
-  - Documentar quais dados precisam ser criados manualmente
+- [x] Verificar scripts de seed existentes (concluído)
+- [x] Documentar dados que precisam ser migrados (ver `DADOS_REFERENCIA.md`)
+- [x] Corrigir script `create-service-types.ts` para usar caminho correto do banco
+- [ ] Executar `npm run migrate:service-types` na VPS
+- [ ] Decidir: exportar/importar dados do banco local OU criar scripts de seed adicionais
 
 ## Outros
 - Tarefas adicionais serão adicionadas aqui conforme necessário

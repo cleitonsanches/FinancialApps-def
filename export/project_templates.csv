@@ -1,0 +1,5 @@
+id,company_id,name,description,service_type,created_at,updated_at
+917d7b97-8aa8-46bd-ae82-324b7eb2ac84,952cc139-6685-48a9-8596-cdffff550bc2,Consultoria,,Consultoria,2025-12-23 19:35:43,2025-12-23 19:45:49
+83a56e43-bfd1-4fb3-838d-ffb666bc5436,952cc139-6685-48a9-8596-cdffff550bc2,Migração de dados,,Migração de dados,2025-12-23 19:46:07,2025-12-23 19:50:53
+fca0201b-8488-46f4-8d27-975153ccaa2e,952cc139-6685-48a9-8596-cdffff550bc2,Treinamento,,Treinamento,2025-12-24 18:13:00,2025-12-24 18:15:08
+d5c80bca-197f-420c-bd82-20806df087fd,952cc139-6685-48a9-8596-cdffff550bc2,Teste de criação de template com fase,,Análise de dados,2025-12-28 20:23:57,2025-12-28 20:23:57

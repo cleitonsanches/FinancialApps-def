@@ -433,6 +433,14 @@ export default function NegotiationDetailsPage() {
     return labels[serviceType] || serviceType
   }
 
+  // Função para gerar nome do projeto no formato: NOME_CLIENTE_CAIXA_ALTA + "-" + nome_serviço
+  const generateProjectName = (client: any, serviceType: string) => {
+    const clientName = client?.razaoSocial || client?.name || client?.nome || 'CLIENTE'
+    const clientNameUpper = clientName.toUpperCase()
+    const serviceName = getServiceTypeLabel(serviceType)
+    return `${clientNameUpper}-${serviceName}`
+  }
+
   const getStatusDateLabel = (status: string) => {
     const labels: Record<string, string> = {
       ENVIADA: 'Data do Envio',
@@ -870,7 +878,8 @@ export default function NegotiationDetailsPage() {
         return
       }
 
-      const projectName = negotiation.titulo || negotiation.title || `Projeto - ${negotiation.numero || negotiationId}`
+      // Gerar nome do projeto: NOME_CLIENTE_CAIXA_ALTA + "-" + nome_serviço
+      const projectName = generateProjectName(negotiation.client, negotiation.serviceType)
       const projectData = {
         companyId,
         proposalId: negotiationId,
@@ -1162,8 +1171,9 @@ export default function NegotiationDetailsPage() {
       const templateResponse = await api.get(`/project-templates/${selectedTemplateId}`)
       const template = templateResponse.data
 
-      // Criar projeto
-      const projectName = template.name || negotiation.titulo || negotiation.title || `Projeto - ${negotiation.numero || negotiationId}`
+      // Gerar nome do projeto: NOME_CLIENTE_CAIXA_ALTA + "-" + nome_serviço
+      const finalServiceType = template.serviceType || negotiation.serviceType
+      const projectName = generateProjectName(negotiation.client, finalServiceType)
       const projectData = {
         companyId,
         proposalId: negotiationId,
@@ -1171,7 +1181,7 @@ export default function NegotiationDetailsPage() {
         templateId: selectedTemplateId,
         name: projectName,
         description: template.description || `Projeto criado automaticamente a partir da negociação ${negotiation.numero || negotiationId}`,
-        serviceType: template.serviceType || negotiation.serviceType,
+        serviceType: finalServiceType,
         status: 'PENDENTE',
         dataInicio: startDate,
       }

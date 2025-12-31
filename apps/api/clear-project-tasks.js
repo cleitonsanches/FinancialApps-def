@@ -76,3 +76,4 @@ db.get('SELECT COUNT(*) as count FROM project_tasks', (err, row) => {
 });
 
 
+

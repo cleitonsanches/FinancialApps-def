@@ -91,7 +91,7 @@ server {
 
 ```nginx
 server {
-    listen 80;
+    listen 8080;  # Usando porta 8080 para não conflitar com Traefik
     server_name 92.113.32.118;  # Substitua pelo seu domínio ou IP
 
     # Frontend (Next.js)
