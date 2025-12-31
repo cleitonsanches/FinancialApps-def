@@ -1,10 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ProposalsService } from './proposals.service';
+import { ProposalPdfService } from './proposal-pdf.service';
 import { Proposal } from '../../database/entities/proposal.entity';
 
 @Controller(['proposals', 'negotiations'])
 export class ProposalsController {
-  constructor(private proposalsService: ProposalsService) {}
+  constructor(
+    private proposalsService: ProposalsService,
+    private proposalPdfService: ProposalPdfService,
+  ) {}
 
   @Get()
   async findAll(
@@ -92,6 +97,20 @@ export class ProposalsController {
       vencimentoManutencao: dadosManutencao.vencimentoManutencao ? new Date(dadosManutencao.vencimentoManutencao) : undefined,
       descricaoManutencao: dadosManutencao.descricaoManutencao,
     });
+  }
+
+  @Get(':id/pdf')
+  async generatePdf(@Param('id') id: string, @Res() res: Response): Promise<void> {
+    try {
+      const pdfBuffer = await this.proposalPdfService.generatePdf(id);
+      const proposal = await this.proposalsService.findOne(id);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="proposta-${proposal.numero || id}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || 'Erro ao gerar PDF' });
+    }
   }
 }
 

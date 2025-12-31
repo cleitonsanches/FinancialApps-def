@@ -9,13 +9,16 @@ import { Phase } from '../../database/entities/phase.entity';
 import { Client } from '../../database/entities/client.entity';
 import { User } from '../../database/entities/user.entity';
 import { ServiceType } from '../../database/entities/service-type.entity';
+import { Invoice } from '../../database/entities/invoice.entity';
+import { TimeEntry } from '../../database/entities/time-entry.entity';
 import { ProposalsService } from './proposals.service';
 import { ProposalsController } from './proposals.controller';
+import { ProposalPdfService } from './proposal-pdf.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Proposal, ProposalTemplate, ProjectTemplate, ProjectTemplateTask, Project, ProjectTask, Phase, Client, User, ServiceType])],
+  imports: [TypeOrmModule.forFeature([Proposal, ProposalTemplate, ProjectTemplate, ProjectTemplateTask, Project, ProjectTask, Phase, Client, User, ServiceType, Invoice, TimeEntry])],
   controllers: [ProposalsController],
-  providers: [ProposalsService],
+  providers: [ProposalsService, ProposalPdfService],
   exports: [ProposalsService],
 })
 export class ProposalsModule {}
