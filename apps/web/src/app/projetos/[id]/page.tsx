@@ -53,6 +53,7 @@ export default function ProjectDetailsPage() {
   const [showEditProjectModal, setShowEditProjectModal] = useState(false)
   const [editingProject, setEditingProject] = useState<any>(null)
   const [savingProject, setSavingProject] = useState(false)
+  const [savingProject, setSavingProject] = useState(false)
   
   // Form states
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
@@ -515,6 +516,42 @@ export default function ProjectDetailsPage() {
 
   const completionDate = calculateCompletionDate()
 
+  const handleSaveProject = async () => {
+    if (!editingProject) return
+
+    if (!editingProject.name.trim()) {
+      alert('O nome do projeto é obrigatório')
+      return
+    }
+
+    try {
+      setSavingProject(true)
+      const updateData: any = {
+        name: editingProject.name,
+        description: editingProject.description || null,
+      }
+
+      // Adicionar datas se preenchidas
+      if (editingProject.dataInicio) {
+        updateData.dataInicio = editingProject.dataInicio
+      }
+      if (editingProject.dataFim) {
+        updateData.dataFim = editingProject.dataFim
+      }
+
+      const response = await api.put(`/projects/${projectId}`, updateData)
+      setProject(response.data)
+      setShowEditProjectModal(false)
+      setEditingProject(null)
+      alert('Projeto atualizado com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao atualizar projeto:', error)
+      alert(error.response?.data?.message || 'Erro ao atualizar projeto')
+    } finally {
+      setSavingProject(false)
+    }
+  }
+
   // Verificar se há template aplicado (se há tarefas, significa que pode ter template aplicado)
   const hasTemplateApplied = tasks.length > 0
 
@@ -557,8 +594,25 @@ export default function ProjectDetailsPage() {
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{project.name}</h1>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
+                  <button
+                    onClick={() => {
+                      setEditingProject({
+                        name: project.name || '',
+                        description: project.description || '',
+                        dataInicio: project.dataInicio ? (typeof project.dataInicio === 'string' ? project.dataInicio.split('T')[0] : new Date(project.dataInicio).toISOString().split('T')[0]) : '',
+                        dataFim: project.dataFim ? (typeof project.dataFim === 'string' ? project.dataFim.split('T')[0] : new Date(project.dataFim).toISOString().split('T')[0]) : '',
+                      })
+                      setShowEditProjectModal(true)
+                    }}
+                    className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    title="Editar informações do projeto"
+                  >
+                    ✏️ Editar
+                  </button>
+                </div>
                 {project.description && (
                   <p className="text-gray-600">{project.description}</p>
                 )}
