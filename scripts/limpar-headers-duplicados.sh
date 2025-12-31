@@ -31,14 +31,13 @@ clean_table() {
     fi
     
     # Remover linhas onde o ID é igual ao nome da coluna (header importado)
-    # Isso funciona porque o header geralmente tem o mesmo nome da coluna
+    # Headers geralmente têm valores como 'id', 'company_id', 'code', 'name', etc.
+    # Verificar se o ID não é um UUID válido (UUIDs têm formato específico)
     sqlite3 "$DB_PATH" << EOF
 DELETE FROM $table_name 
-WHERE $id_column = '$id_column' 
-   OR $id_column = 'id'
-   OR $id_column = 'company_id'
-   OR $id_column = 'code'
-   OR $id_column = 'name';
+WHERE $id_column IN ('id', 'company_id', 'code', 'name', 'bankName', 'agency', 'accountNumber', 'type', 'status')
+   OR $id_column NOT LIKE '%-%-%-%-%'  -- UUIDs têm formato xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+   OR LENGTH($id_column) < 36;  -- UUIDs têm 36 caracteres (com hífens)
 EOF
     
     # Contar registros depois
