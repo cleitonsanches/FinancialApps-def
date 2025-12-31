@@ -28,6 +28,14 @@ export default function HorasTrabalhadasPage() {
   const [showReproveModal, setShowReproveModal] = useState(false)
   const [entryToApprove, setEntryToApprove] = useState<any>(null)
   const [entryToReprove, setEntryToReprove] = useState<any>(null)
+  const [showEditTimeEntryModal, setShowEditTimeEntryModal] = useState(false)
+  const [entryToEdit, setEntryToEdit] = useState<any>(null)
+  const [editTimeEntryData, setEditTimeEntryData] = useState<any>({
+    horas: '',
+    data: '',
+    descricao: '',
+    isFaturavel: false,
+  })
   const [motivoReprovacao, setMotivoReprovacao] = useState('')
   const [motivoAprovacao, setMotivoAprovacao] = useState('')
   const [valorPorHoraAprovacao, setValorPorHoraAprovacao] = useState('')
@@ -601,6 +609,46 @@ export default function HorasTrabalhadasPage() {
     setValorPorHoraAprovacao('')
     setCriarInvoice(true) // Por padrão, criar invoice
     setShowApproveModal(true)
+  }
+
+  const handleEditTimeEntry = async () => {
+    if (!editTimeEntryData.horas || !editTimeEntryData.data) {
+      alert('Por favor, preencha as horas e a data.')
+      return
+    }
+
+    const horasDecimal = parseHoursToDecimal(editTimeEntryData.horas)
+    if (horasDecimal === null) {
+      alert('Formato de horas inválido. Use formatos como: 40h, 1h30min, 50 horas')
+      return
+    }
+
+    try {
+      const payload: any = {
+        data: editTimeEntryData.data,
+        horas: horasDecimal,
+        descricao: editTimeEntryData.descricao || null,
+        isFaturavel: editTimeEntryData.isFaturavel || false,
+      }
+
+      // Remover campos null/undefined
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === null || payload[key] === '') {
+          delete payload[key]
+        }
+      })
+
+      await api.patch(`/projects/time-entries/${entryToEdit.id}`, payload)
+      
+      alert('Hora trabalhada atualizada com sucesso!')
+      setShowEditTimeEntryModal(false)
+      setEntryToEdit(null)
+      setEditTimeEntryData({ horas: '', data: '', descricao: '', isFaturavel: false })
+      loadTimeEntries()
+    } catch (error: any) {
+      console.error('Erro ao atualizar hora trabalhada:', error)
+      alert(error.response?.data?.message || 'Erro ao atualizar hora trabalhada')
+    }
   }
 
   const confirmApprove = async () => {
@@ -1195,12 +1243,34 @@ export default function HorasTrabalhadasPage() {
                             )}
                           </div>
                           <div className="ml-4 flex flex-col gap-2">
-                            <Link
-                              href={`/horas-trabalhadas/${entry.id}`}
-                              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap text-center"
-                            >
-                              Ver Detalhes
-                            </Link>
+                            {(entry.status || 'PENDENTE') === 'PENDENTE' ? (
+                              <button
+                                onClick={() => {
+                                  setEntryToEdit(entry)
+                                  setEditTimeEntryData({
+                                    horas: formatHoursFromDecimal(parseFloat(entry.horas) || 0),
+                                    data: entry.data ? (typeof entry.data === 'string' ? entry.data.split('T')[0] : new Date(entry.data).toISOString().split('T')[0]) : '',
+                                    descricao: entry.descricao || '',
+                                    isFaturavel: entry.isFaturavel || false,
+                                  })
+                                  setShowEditTimeEntryModal(true)
+                                }}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm whitespace-nowrap"
+                              >
+                                Editar
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  // Mostrar informações em um alert ou modal simples
+                                  const info = `Data: ${formatDate(entry.data)}\nHoras: ${formatHoursFromDecimal(parseFloat(entry.horas) || 0)}\n${entry.descricao ? `Descrição: ${entry.descricao}\n` : ''}Status: ${entry.status || 'PENDENTE'}`
+                                  alert(info)
+                                }}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap"
+                              >
+                                Ver Detalhes
+                              </button>
+                            )}
                             {!entry.isFaturada && (entry.status || 'PENDENTE') !== 'REPROVADA' && (
                               <button
                                 onClick={() => handleReprovar(entry)}

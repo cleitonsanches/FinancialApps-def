@@ -1376,14 +1376,8 @@ export default function AgendaPage() {
                       const updatePayload: any = {
                         status: updateTaskData.status,
                       }
-                      // Só incluir percentual se for fornecido, válido e maior que 0
-                      if (updateTaskData.percentual && updateTaskData.percentual.trim() !== '') {
-                        const percentualValue = parseFloat(updateTaskData.percentual)
-                        if (!isNaN(percentualValue) && percentualValue > 0 && percentualValue <= 100) {
-                          updatePayload.percentual = percentualValue
-                        }
-                      }
-                      // Não enviar percentual se for 0 ou vazio (evita erro de coluna inexistente)
+                      // Percentual de conclusão não é suportado pela API atual
+                      // Removido para evitar erro - apenas status é atualizado
                       
                       // Usar a rota PATCH /projects/tasks/:taskId se não houver projectId, ou PUT se houver
                       if (selectedTask.project?.id) {
