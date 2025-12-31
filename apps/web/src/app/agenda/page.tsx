@@ -162,7 +162,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
           >
             ← Semana Anterior
           </button>
-          <h2 className="text-xl font-bold">
+          <h2 className="text-sm md:text-xl font-bold text-center flex-1 px-2">
             {formatDate(weekDays[0])} - {formatDate(weekDays[6])}
           </h2>
           <button
