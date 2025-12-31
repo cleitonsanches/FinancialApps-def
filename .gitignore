@@ -61,4 +61,8 @@ Thumbs.db
 # Turbo
 .turbo/
 
+# Export/Import files
+export/
+*.csv
+
 

@@ -989,7 +989,7 @@ export default function NovaNegociacaoPage() {
                   />
                 </div>
 
-                {/* Data do Vencimento (somente para ONESHOT) */}
+                {/* Data do Vencimento - disponível para ONESHOT e também opcional para PARCELADO */}
                 {formData.formaFaturamento === 'ONESHOT' && (
                   <div>
                     <label htmlFor="dataVencimento" className="block text-sm font-medium text-gray-700 mb-2">
@@ -1008,39 +1008,56 @@ export default function NovaNegociacaoPage() {
 
                 {/* Vencimento em dias (para PARCELADO - usado como base para calcular vencimento das parcelas) */}
                 {(formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') && (
-                  <div>
-                    <label htmlFor="vencimento" className="block text-sm font-medium text-gray-700 mb-2">
-                      Vencimento (dias após faturamento) *
-                    </label>
-                    <input
-                      type="number"
-                      id="vencimento"
-                      min="1"
-                      value={formData.vencimento || ''}
-                      onChange={(e) => {
-                        const vencimentoValue = e.target.value
-                        setFormData({ ...formData, vencimento: vencimentoValue })
-                        // Recalcular parcelas se já existirem
-                        if (formData.parcelas.length > 0 && formData.dataFaturamento) {
-                          const novasParcelas = formData.parcelas.map((p, index) => {
-                            if (p.dataFaturamento && vencimentoValue) {
-                              const dataFaturamento = new Date(p.dataFaturamento)
-                              const dataVencimento = new Date(dataFaturamento)
-                              dataVencimento.setDate(dataVencimento.getDate() + parseInt(vencimentoValue))
-                              return { ...p, dataVencimento: dataVencimento.toISOString().split('T')[0] }
-                            }
-                            return p
-                          })
-                          setFormData(prev => ({ ...prev, vencimento: vencimentoValue, parcelas: novasParcelas }))
-                        } else {
-                          setFormData(prev => ({ ...prev, vencimento: vencimentoValue }))
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="Ex: 30"
-                      required={isMigracaoDados && (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL')}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Número de dias após a data de faturamento para o vencimento</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="vencimento" className="block text-sm font-medium text-gray-700 mb-2">
+                        Vencimento (dias após faturamento) *
+                      </label>
+                      <input
+                        type="number"
+                        id="vencimento"
+                        min="1"
+                        value={formData.vencimento || ''}
+                        onChange={(e) => {
+                          const vencimentoValue = e.target.value
+                          setFormData({ ...formData, vencimento: vencimentoValue })
+                          // Recalcular parcelas se já existirem
+                          if (formData.parcelas.length > 0 && formData.dataFaturamento) {
+                            const novasParcelas = formData.parcelas.map((p, index) => {
+                              if (p.dataFaturamento && vencimentoValue) {
+                                const dataFaturamento = new Date(p.dataFaturamento)
+                                const dataVencimento = new Date(dataFaturamento)
+                                dataVencimento.setDate(dataVencimento.getDate() + parseInt(vencimentoValue))
+                                return { ...p, dataVencimento: dataVencimento.toISOString().split('T')[0] }
+                              }
+                              return p
+                            })
+                            setFormData(prev => ({ ...prev, vencimento: vencimentoValue, parcelas: novasParcelas }))
+                          } else {
+                            setFormData(prev => ({ ...prev, vencimento: vencimentoValue }))
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Ex: 30"
+                        required={isMigracaoDados && (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL')}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Número de dias após a data de faturamento para o vencimento</p>
+                    </div>
+
+                    {/* Data do Vencimento também disponível para PARCELADO (opcional, para usar como base alternativa) */}
+                    <div>
+                      <label htmlFor="dataVencimentoParcelado" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data do Vencimento (opcional - se preenchida, será usada como base para calcular vencimentos das parcelas)
+                      </label>
+                      <input
+                        type="date"
+                        id="dataVencimentoParcelado"
+                        value={formData.dataVencimento || ''}
+                        onChange={(e) => setFormData({ ...formData, dataVencimento: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Se preenchida, as parcelas usarão esta data como base para cálculo (em vez dos dias)</p>
+                    </div>
                   </div>
                 )}
               </div>

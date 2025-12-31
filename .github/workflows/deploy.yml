@@ -69,9 +69,20 @@ jobs:
               echo "✅ Backup do banco de dados criado"
             fi
             
-            # Fazer pull das mudanças
+            # Limpar arquivos não rastreados que podem causar conflito (como export/*.csv)
+            echo "🧹 Limpando arquivos não rastreados na pasta export/..."
+            if [ -d "export" ]; then
+              rm -rf export/*.csv export/*.txt 2>/dev/null || true
+              echo "✅ Arquivos CSV removidos da pasta export/"
+            fi
+            
+            # Fazer pull das mudanças (usando estratégia para sobrescrever arquivos locais)
             echo "📥 Fazendo pull das mudanças..."
-            git pull origin main || echo "⚠️ Erro ao fazer pull (continuando...)"
+            git fetch origin main
+            git reset --hard origin/main || {
+              echo "⚠️ Erro ao fazer reset. Tentando merge..."
+              git merge -X theirs origin/main || echo "⚠️ Erro no merge (continuando...)"
+            }
             
             # Instalar dependências (se necessário)
             echo "📦 Instalando dependências..."
