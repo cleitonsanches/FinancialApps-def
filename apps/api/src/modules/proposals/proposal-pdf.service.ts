@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import * as PDFDocument from 'pdfkit';
 import { Proposal } from '../../database/entities/proposal.entity';
 import { Project, ProjectTask } from '../../database/entities/project.entity';
@@ -51,7 +51,7 @@ export class ProposalPdfService {
       const projectIds = projects.map(p => p.id);
       if (projectIds.length > 0) {
         timeEntries = await this.timeEntryRepository.find({
-          where: projectIds.map(id => ({ projectId: id })),
+          where: { projectId: In(projectIds) },
           relations: ['user', 'task', 'project'],
         });
       }
