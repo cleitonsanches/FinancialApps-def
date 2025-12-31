@@ -53,7 +53,6 @@ export default function ProjectDetailsPage() {
   const [showEditProjectModal, setShowEditProjectModal] = useState(false)
   const [editingProject, setEditingProject] = useState<any>(null)
   const [savingProject, setSavingProject] = useState(false)
-  const [savingProject, setSavingProject] = useState(false)
   
   // Form states
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
@@ -1753,6 +1752,107 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
         )}
+
+      {/* Modal de Edição do Projeto */}
+      {showEditProjectModal && editingProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">Editar Informações do Projeto</h2>
+                <button
+                  onClick={() => {
+                    setShowEditProjectModal(false)
+                    setEditingProject(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                {/* Nome */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome do Projeto <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editingProject.name}
+                    onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    placeholder="Digite o nome do projeto"
+                    required
+                  />
+                </div>
+
+                {/* Descrição */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={editingProject.description}
+                    onChange={(e) => setEditingProject({ ...editingProject, description: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    placeholder="Digite a descrição do projeto"
+                    rows={4}
+                  />
+                </div>
+
+                {/* Data de Início */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Data de Início
+                  </label>
+                  <input
+                    type="date"
+                    value={editingProject.dataInicio}
+                    onChange={(e) => setEditingProject({ ...editingProject, dataInicio: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  />
+                </div>
+
+                {/* Data de Conclusão */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Data de Conclusão
+                  </label>
+                  <input
+                    type="date"
+                    value={editingProject.dataFim}
+                    onChange={(e) => setEditingProject({ ...editingProject, dataFim: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+              <button
+                onClick={() => {
+                  setShowEditProjectModal(false)
+                  setEditingProject(null)
+                }}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                disabled={savingProject}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveProject}
+                disabled={savingProject || !editingProject.name.trim()}
+                className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {savingProject ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )
