@@ -450,7 +450,11 @@ export default function ProjetosPage() {
                 {filteredProjects.map((project) => {
                   const projectData = getProjectData(project)
                   return (
-                    <tr key={project.id} className="hover:bg-gray-50">
+                    <tr 
+                      key={project.id} 
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/projetos/${project.id}`)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{project.name}</div>
                         {project.description && (
@@ -474,13 +478,22 @@ export default function ProjetosPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {projectData.loggedHours > 0 ? `${projectData.loggedHours.toFixed(2)}h` : '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Link
-                          href={`/projetos/${project.id}`}
-                          className="text-primary-600 hover:text-primary-900"
-                        >
-                          Ver Detalhes
-                        </Link>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-2">
+                          <Link
+                            href={`/projetos/${project.id}`}
+                            className="text-primary-600 hover:text-primary-900"
+                          >
+                            Ver Detalhes
+                          </Link>
+                          <span className="text-gray-300">|</span>
+                          <Link
+                            href={`/projetos/${project.id}`}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            Editar
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   )
