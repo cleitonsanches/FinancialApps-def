@@ -139,11 +139,14 @@ echo ""
 step "6. Compilando aplicação..."
 
 cd "$BASE_DIR"
-info "Executando npm run build..."
+
+info "Compilando apenas a API (backend)..."
+cd "$API_DIR"
 npm run build
 
 if [ ! -f "$API_DIR/dist/main.js" ]; then
     error "dist/main.js não foi criado!"
+    error "Verifique os erros de compilação acima"
     exit 1
 fi
 
