@@ -47,9 +47,33 @@ cd "$BASE_DIR"
 echo ""
 
 # ==========================================
-# 2. CLONAR REPOSITÓRIO
+# 2. VERIFICAR/ATUALIZAR NODE.JS (Opcional)
 # ==========================================
-step "2. Clonando repositório Git..."
+step "2. Verificando versão do Node.js..."
+
+NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 20 ]; then
+    warn "Node.js $(node --version) detectado. Alguns pacotes Azure requerem Node.js 20+."
+    warn "A aplicação pode funcionar, mas recomenda-se atualizar."
+    echo ""
+    read -p "Deseja tentar atualizar Node.js agora? (s/N): " update_node
+    if [ "$update_node" = "s" ] || [ "$update_node" = "S" ]; then
+        info "Atualizando Node.js para versão 20 LTS..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+        info "✅ Node.js atualizado: $(node --version)"
+    else
+        warn "Continuando com Node.js $(node --version)..."
+    fi
+else
+    info "✅ Node.js $(node --version) - Versão adequada!"
+fi
+echo ""
+
+# ==========================================
+# 3. CLONAR REPOSITÓRIO
+# ==========================================
+step "3. Clonando repositório Git..."
 
 info "Clonando de $GIT_REPO..."
 git clone "$GIT_REPO" .
@@ -63,9 +87,12 @@ info "✅ Repositório clonado!"
 echo ""
 
 # ==========================================
-# 3. INSTALAR DEPENDÊNCIAS
+# 4. INSTALAR DEPENDÊNCIAS
 # ==========================================
-step "3. Instalando dependências..."
+step "4. Instalando dependências..."
+
+warn "Avisos sobre Node.js 20+ são normais e podem ser ignorados se você estiver usando Node.js 18+"
+echo ""
 
 cd "$BASE_DIR"
 info "Instalando dependências do projeto..."
@@ -80,9 +107,9 @@ info "✅ Dependências instaladas!"
 echo ""
 
 # ==========================================
-# 4. CONFIGURAR .ENV.LOCAL
+# 5. CONFIGURAR .ENV.LOCAL
 # ==========================================
-step "4. Configurando .env.local para Azure SQL Database..."
+step "5. Configurando .env.local para Azure SQL Database..."
 
 cat > "$API_DIR/.env.local" << 'ENVEOF'
 DB_TYPE=mssql
@@ -99,9 +126,9 @@ info ".env.local criado com configurações do Azure SQL Database"
 echo ""
 
 # ==========================================
-# 5. COMPILAR
+# 6. COMPILAR
 # ==========================================
-step "5. Compilando aplicação..."
+step "6. Compilando aplicação..."
 
 cd "$BASE_DIR"
 info "Executando npm run build..."
@@ -116,9 +143,9 @@ info "✅ Compilação concluída!"
 echo ""
 
 # ==========================================
-# 6. CONFIGURAR NGINX LIMPO
+# 7. CONFIGURAR NGINX LIMPO
 # ==========================================
-step "6. Configurando Nginx..."
+step "7. Configurando Nginx..."
 
 info "Removendo configurações antigas..."
 rm -f /etc/nginx/sites-enabled/financialapps 2>/dev/null || true
@@ -188,9 +215,9 @@ fi
 echo ""
 
 # ==========================================
-# 7. INICIAR PM2
+# 8. INICIAR PM2
 # ==========================================
-step "7. Iniciando aplicação com PM2..."
+step "8. Iniciando aplicação com PM2..."
 
 cd "$API_DIR"
 
@@ -211,9 +238,9 @@ pm2 save
 echo ""
 
 # ==========================================
-# 8. VERIFICAR
+# 9. VERIFICAR
 # ==========================================
-step "8. Verificando instalação..."
+step "9. Verificando instalação..."
 
 sleep 5
 
