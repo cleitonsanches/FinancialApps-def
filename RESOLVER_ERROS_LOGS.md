@@ -23,13 +23,22 @@ Incorrect syntax near 'IX_invoices_conta_corrente_id'
 ### Passo 1: Descobrir IP da VPS
 
 ```bash
-# Na VPS
-curl ifconfig.me
+# Na VPS - Obter IPv4 (Azure precisa de IPv4, não IPv6)
+curl -4 ifconfig.me
 # ou
-wget -qO- ifconfig.me
+curl -4 https://api.ipify.org
+# ou
+ip addr show | grep "inet " | grep -v 127.0.0.1
 ```
 
-**Anote o IP que aparece!**
+**⚠️ IMPORTANTE:** Azure SQL Database precisa de **IPv4** (formato XXX.XXX.XXX.XXX), não IPv6!
+
+**Anote o IPv4 que aparece!**
+
+**Se retornar IPv6 (formato com :), tente:**
+```bash
+curl -4 ifconfig.me
+```
 
 ### Passo 2: Adicionar IP no Azure Portal
 
