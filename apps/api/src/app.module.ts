@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { join } from 'path';
+import { existsSync } from 'fs';
 import { DatabaseConfig } from './config/database.config';
 import { ensureProposalNumeroColumn } from './database/ensure-proposal-numero';
 import { ensureProposalStatusDatesColumns } from './database/ensure-proposal-status-dates';
@@ -53,11 +55,25 @@ import { AccountsPayableModule } from './modules/accounts-payable/accounts-payab
 import { ReimbursementsModule } from './modules/reimbursements/reimbursements.module';
 import { PhasesModule } from './modules/phases/phases.module';
 
+// Função para encontrar o arquivo .env.local em múltiplos locais
+function findEnvFile(): string[] {
+  const possiblePaths = [
+    join(process.cwd(), 'apps', 'api', '.env.local'), // apps/api/.env.local (quando cwd é raiz)
+    join(process.cwd(), '.env.local'), // .env.local no diretório atual
+    join(__dirname, '..', '..', '..', '.env.local'), // .env.local na raiz (relativo a dist)
+    join(__dirname, '..', '.env.local'), // apps/api/.env.local (relativo a dist)
+  ];
+  
+  // Retorna apenas os caminhos que existem
+  return possiblePaths.filter(path => existsSync(path));
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env.local',
+      envFilePath: findEnvFile().length > 0 ? findEnvFile() : ['.env.local'],
+      // Se não encontrar arquivo, ainda tenta carregar de variáveis de ambiente do sistema
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
