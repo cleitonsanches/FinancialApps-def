@@ -14,59 +14,82 @@ export async function ensureProjectTaskTipoFields(dataSource: DataSource): Promi
       return;
     }
     
+    const existingColumns = table.columns.map(col => col.name);
+    
+    const dbType = dataSource.options.type;
+    
     // Verificar e adicionar coluna tipo
-    const tipoColumn = await queryRunner.query(`
-      SELECT name FROM pragma_table_info('project_tasks') WHERE name = 'tipo'
-    `);
-    if (tipoColumn.length === 0) {
-      await queryRunner.query(`
-        ALTER TABLE project_tasks ADD COLUMN tipo VARCHAR(20) DEFAULT 'ATIVIDADE'
-      `);
-      console.log('✓ Coluna tipo adicionada à tabela project_tasks');
+    if (!existingColumns.includes('tipo')) {
+      try {
+        await queryRunner.query(`
+          ALTER TABLE project_tasks ADD tipo VARCHAR(20) DEFAULT 'ATIVIDADE'
+        `);
+        console.log('✓ Coluna tipo adicionada à tabela project_tasks');
+      } catch (error: any) {
+        if (!error.message.includes('duplicate column') && !error.message.includes('already exists') && !error.message.includes('duplicate column name')) {
+          console.error('Erro ao adicionar coluna tipo:', error.message);
+        }
+      }
     }
 
     // Verificar e adicionar coluna hora_inicio
-    const horaInicioColumn = await queryRunner.query(`
-      SELECT name FROM pragma_table_info('project_tasks') WHERE name = 'hora_inicio'
-    `);
-    if (horaInicioColumn.length === 0) {
-      await queryRunner.query(`
-        ALTER TABLE project_tasks ADD COLUMN hora_inicio VARCHAR(10) NULL
-      `);
-      console.log('✓ Coluna hora_inicio adicionada à tabela project_tasks');
+    if (!existingColumns.includes('hora_inicio')) {
+      try {
+        await queryRunner.query(`
+          ALTER TABLE project_tasks ADD hora_inicio VARCHAR(10) NULL
+        `);
+        console.log('✓ Coluna hora_inicio adicionada à tabela project_tasks');
+      } catch (error: any) {
+        if (!error.message.includes('duplicate column') && !error.message.includes('already exists') && !error.message.includes('duplicate column name')) {
+          console.error('Erro ao adicionar coluna hora_inicio:', error.message);
+        }
+      }
     }
 
     // Verificar e adicionar coluna hora_fim
-    const horaFimColumn = await queryRunner.query(`
-      SELECT name FROM pragma_table_info('project_tasks') WHERE name = 'hora_fim'
-    `);
-    if (horaFimColumn.length === 0) {
-      await queryRunner.query(`
-        ALTER TABLE project_tasks ADD COLUMN hora_fim VARCHAR(10) NULL
-      `);
-      console.log('✓ Coluna hora_fim adicionada à tabela project_tasks');
+    if (!existingColumns.includes('hora_fim')) {
+      try {
+        await queryRunner.query(`
+          ALTER TABLE project_tasks ADD hora_fim VARCHAR(10) NULL
+        `);
+        console.log('✓ Coluna hora_fim adicionada à tabela project_tasks');
+      } catch (error: any) {
+        if (!error.message.includes('duplicate column') && !error.message.includes('already exists') && !error.message.includes('duplicate column name')) {
+          console.error('Erro ao adicionar coluna hora_fim:', error.message);
+        }
+      }
     }
 
     // Verificar e adicionar coluna sem_prazo_definido
-    const semPrazoColumn = await queryRunner.query(`
-      SELECT name FROM pragma_table_info('project_tasks') WHERE name = 'sem_prazo_definido'
-    `);
-    if (semPrazoColumn.length === 0) {
-      await queryRunner.query(`
-        ALTER TABLE project_tasks ADD COLUMN sem_prazo_definido BOOLEAN DEFAULT 0
-      `);
-      console.log('✓ Coluna sem_prazo_definido adicionada à tabela project_tasks');
+    if (!existingColumns.includes('sem_prazo_definido')) {
+      try {
+        // SQL Server usa BIT ao invés de BOOLEAN
+        const columnType = dbType === 'mssql' ? 'BIT DEFAULT 0' : 'BOOLEAN DEFAULT 0';
+        await queryRunner.query(`
+          ALTER TABLE project_tasks ADD sem_prazo_definido ${columnType}
+        `);
+        console.log('✓ Coluna sem_prazo_definido adicionada à tabela project_tasks');
+      } catch (error: any) {
+        if (!error.message.includes('duplicate column') && !error.message.includes('already exists') && !error.message.includes('duplicate column name')) {
+          console.error('Erro ao adicionar coluna sem_prazo_definido:', error.message);
+        }
+      }
     }
 
     // Verificar e adicionar coluna dia_inteiro
-    const diaInteiroColumn = await queryRunner.query(`
-      SELECT name FROM pragma_table_info('project_tasks') WHERE name = 'dia_inteiro'
-    `);
-    if (diaInteiroColumn.length === 0) {
-      await queryRunner.query(`
-        ALTER TABLE project_tasks ADD COLUMN dia_inteiro BOOLEAN DEFAULT 0
-      `);
-      console.log('✓ Coluna dia_inteiro adicionada à tabela project_tasks');
+    if (!existingColumns.includes('dia_inteiro')) {
+      try {
+        // SQL Server usa BIT ao invés de BOOLEAN
+        const columnType = dbType === 'mssql' ? 'BIT DEFAULT 0' : 'BOOLEAN DEFAULT 0';
+        await queryRunner.query(`
+          ALTER TABLE project_tasks ADD dia_inteiro ${columnType}
+        `);
+        console.log('✓ Coluna dia_inteiro adicionada à tabela project_tasks');
+      } catch (error: any) {
+        if (!error.message.includes('duplicate column') && !error.message.includes('already exists') && !error.message.includes('duplicate column name')) {
+          console.error('Erro ao adicionar coluna dia_inteiro:', error.message);
+        }
+      }
     }
   } catch (error) {
     console.error('Erro ao garantir campos de tipo em project_tasks:', error);
