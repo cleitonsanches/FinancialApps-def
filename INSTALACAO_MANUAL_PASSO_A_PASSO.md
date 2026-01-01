@@ -76,18 +76,35 @@ ls -la node_modules | head -5
 ```bash
 cd /var/www/FinancialApps-def/apps/api
 
-# Instalar driver mssql
+# Verificar se node_modules existe (pode estar no root do workspace)
+ls -la node_modules 2>/dev/null || echo "node_modules não existe aqui (normal em workspace)"
+
+# Em workspace, dependências podem estar no root
+# Verificar no root
+ls -la /var/www/FinancialApps-def/node_modules | grep mssql || echo "mssql não encontrado no root"
+ls -la /var/www/FinancialApps-def/node_modules/@types 2>/dev/null | grep node || echo "@types/node não encontrado"
+
+# Instalar driver mssql (workspace installa no root, mas registra no package.json da API)
 npm install mssql --save --legacy-peer-deps
 
 # Garantir @types/node
 npm install --save-dev @types/node --legacy-peer-deps
 
-# Verificar
-ls node_modules | grep mssql
-ls node_modules/@types | grep node
+# Verificar no root (workspace centraliza dependências)
+ls -la /var/www/FinancialApps-def/node_modules | grep mssql
+ls -la /var/www/FinancialApps-def/node_modules/@types | grep node
+
+# Verificar package.json da API (deve ter mssql e @types/node listados)
+cat package.json | grep -A 5 "dependencies"
+cat package.json | grep -A 5 "devDependencies"
 ```
 
-**Verificar:** `mssql` e `@types/node` devem estar instalados
+**Verificar:** 
+- `mssql` deve aparecer em `/var/www/FinancialApps-def/node_modules` (root)
+- `@types/node` deve aparecer em `/var/www/FinancialApps-def/node_modules/@types`
+- `package.json` da API deve listar `mssql` em dependencies e `@types/node` em devDependencies
+
+**Nota:** Em workspace (monorepo), dependências são instaladas no root, não no subdiretório!
 
 ---
 
