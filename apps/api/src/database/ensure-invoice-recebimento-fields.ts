@@ -36,14 +36,32 @@ export async function ensureInvoiceRecebimentoFields(dataSource: DataSource): Pr
       }
     }
     
-    // Criar índice para conta_corrente_id
+    // Criar índice para conta_corrente_id (se não existir)
     try {
-      await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS IX_invoices_conta_corrente_id ON invoices(conta_corrente_id)
-      `);
-      console.log('✅ Índice IX_invoices_conta_corrente_id criado ou já existe');
+      const table = await queryRunner.getTable('invoices');
+      const indexExists = table?.indices?.some(idx => idx.name === 'IX_invoices_conta_corrente_id');
+      
+      if (!indexExists) {
+        const dbType = dataSource.options.type;
+        if (dbType === 'mssql') {
+          // SQL Server: verifica se existe antes de criar
+          await queryRunner.query(`
+            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_invoices_conta_corrente_id' AND object_id = OBJECT_ID('invoices'))
+            CREATE INDEX IX_invoices_conta_corrente_id ON invoices(conta_corrente_id)
+          `);
+        } else {
+          // SQLite/PostgreSQL: usa IF NOT EXISTS
+          await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS IX_invoices_conta_corrente_id ON invoices(conta_corrente_id)
+          `);
+        }
+        console.log('✅ Índice IX_invoices_conta_corrente_id criado');
+      } else {
+        console.log('✅ Índice IX_invoices_conta_corrente_id já existe');
+      }
     } catch (error: any) {
-      if (!error.message.includes('already exists')) {
+      // Ignora se já existe
+      if (!error.message.includes('already exists') && !error.message.includes('duplicate') && !error.message.includes('There is already an index')) {
         console.error('Erro ao criar índice:', error.message);
       }
     }
