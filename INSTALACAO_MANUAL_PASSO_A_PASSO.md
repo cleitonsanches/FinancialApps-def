@@ -138,16 +138,37 @@ cat .env.local
 ```bash
 cd /var/www/FinancialApps-def/apps/api
 
+# Limpar dist anterior (se existir)
+rm -rf dist
+
 # Compilar
 npm run build
 
-# Verificar se compilou
+# Verificar se compilou (tamanho deve ser > 50KB, não apenas 804 bytes)
 ls -lh dist/main.js
+
+# Verificar conteúdo (deve ter código JavaScript, não estar vazio)
+head -20 dist/main.js
+
+# Verificar se há outros arquivos compilados
+ls -la dist/ | head -10
 ```
 
-**Verificar:** `dist/main.js` deve existir
+**Verificar:** 
+- ✅ `dist/main.js` deve existir
+- ✅ Tamanho deve ser **> 50KB** (não apenas 804 bytes)
+- ✅ Deve conter código JavaScript (não vazio)
+- ✅ Deve haver outros arquivos em `dist/` (módulos, controllers, etc.)
 
-**Erro comum:** Erros TypeScript - verificar logs detalhados
+**Erro comum:** 
+- ❌ Tamanho muito pequeno (804 bytes) = Build falhou ou incompleto
+- ❌ Erros TypeScript = Verificar dependências e código
+- ❌ Arquivo vazio = Verificar permissões e logs do build
+
+**Se o arquivo tiver menos de 50KB:**
+- Execute: `npm run build -- --verbose` para ver erros detalhados
+- Execute: `npx tsc --noEmit` para verificar erros TypeScript
+- Verifique se `@nestjs/cli` está instalado: `npm list @nestjs/cli`
 
 ---
 
