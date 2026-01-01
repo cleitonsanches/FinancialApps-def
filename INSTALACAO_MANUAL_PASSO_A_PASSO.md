@@ -286,12 +286,12 @@ netstat -tlnp | grep 3002
 
 ---
 
-## Passo 11: Iniciar PM2
+## Passo 11: Iniciar PM2 (API)
 
 ```bash
 cd /var/www/FinancialApps-def/apps/api
 
-# Iniciar PM2
+# Iniciar PM2 - API
 pm2 start node --name "financial-app" -- dist/main.js
 pm2 save
 
@@ -302,6 +302,27 @@ pm2 list
 **Verificar:** Status deve ser "online" (não "errored" ou "stopped")
 
 **Erro comum:** "Cannot find module" - verificar se compilou corretamente
+
+---
+
+## Passo 11.5: Iniciar Frontend (Opcional, se precisar do frontend)
+
+```bash
+cd /var/www/FinancialApps-def/apps/web
+
+# Compilar frontend (se ainda não compilou)
+npm run build
+
+# Iniciar frontend com PM2
+pm2 start npm --name "financial-web" -- start
+pm2 save
+
+# Verificar ambos
+pm2 list
+# Deve mostrar: financial-app (API) e financial-web (Frontend)
+```
+
+**Nota:** Frontend só é necessário se você for usar a interface web. A API funciona sozinha.
 
 ---
 
