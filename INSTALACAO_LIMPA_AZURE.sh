@@ -232,6 +232,24 @@ step "8. Iniciando aplicação com PM2..."
 
 cd "$API_DIR"
 
+info "Liberando porta $PORT (se estiver em uso)..."
+
+# Parar PM2 se já estiver rodando
+pm2 delete financial-app 2>/dev/null || true
+sleep 2
+
+# Matar processo na porta 3002 se existir
+PID=$(lsof -ti:$PORT 2>/dev/null || netstat -tlnp 2>/dev/null | grep :$PORT | awk '{print $7}' | cut -d'/' -f1 | head -1 || echo "")
+if [ ! -z "$PID" ] && [ "$PID" != "-" ]; then
+    warn "Processo $PID está usando a porta $PORT. Finalizando..."
+    kill -9 $PID 2>/dev/null || true
+    sleep 2
+fi
+
+# Tentar liberar porta usando fuser (se disponível)
+fuser -k $PORT/tcp 2>/dev/null || true
+sleep 1
+
 info "Iniciando PM2 com Azure SQL Database..."
 
 DB_TYPE=mssql \
@@ -245,6 +263,9 @@ PORT=$PORT \
 pm2 start node --name "financial-app" -- dist/main.js
 
 pm2 save
+
+# Aguardar aplicação iniciar
+sleep 3
 
 echo ""
 
