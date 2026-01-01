@@ -21,7 +21,7 @@ export class ServiceType {
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string; // Automações, Consultoria, etc.
 
-  @Column({ name: 'active', type: 'boolean', default: true })
+  @Column({ name: 'active', default: true })
   active: boolean;
 
   @CreateDateColumn({ name: 'created_at' })

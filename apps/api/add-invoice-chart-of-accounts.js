@@ -50,3 +50,5 @@ db.run('ALTER TABLE invoices ADD COLUMN chart_of_accounts_id VARCHAR(36)', (err)
 
 
 
+
+

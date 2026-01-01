@@ -140,3 +140,5 @@ Para começar, recomendo a **Opção 1** (múltiplas instâncias), pois:
 - ✅ Se uma instância tiver problema, não afeta a outra
 - ✅ Mais simples de implementar
 
+
+

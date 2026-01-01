@@ -1,0 +1,54 @@
+Exportação Completa para SQL Server - FinancialApps
+Data: 2025-12-31T20:08:01Z
+Banco de origem: /var/www/FinancialApps-def/database.sqlite
+VPS: srv1134236
+
+Tabelas exportadas: 24
+Total de registros: 116
+
+INSTRUÇÕES PARA IMPORTAÇÃO NO SQL SERVER:
+1. Baixe a pasta export-sqlserver da VPS para sua máquina local
+2. Certifique-se de que todas as tabelas foram criadas no SQL Server (use migrations do TypeORM)
+3. Verifique a ordem de importação para respeitar foreign keys
+4. Importe primeiro tabelas sem dependências (companies, users, etc.)
+5. Depois importe tabelas dependentes (proposals, invoices, etc.)
+
+ORDEM RECOMENDADA DE IMPORTAÇÃO:
+1. companies
+2. users
+3. service_types
+4. chart_of_accounts
+5. bank_accounts
+6. clients
+7. contacts
+8. subscription_products
+9. proposal_templates
+10. project_templates
+11. project_template_phases
+12. project_template_tasks
+13. proposals
+14. proposal_aditivos
+15. projects
+16. phases
+17. project_tasks
+18. invoices
+19. invoice_tax
+20. invoice_history
+21. account_payables
+22. invoice_account_payable
+23. reimbursements
+24. time_entries
+
+NOTA: Algumas tabelas podem precisar de ajustes de tipos de dados entre SQLite e SQL Server.
+
+COMO BAIXAR OS ARQUIVOS DA VPS:
+# Opção 1: SCP
+scp -r usuario@vps-ip:/var/www/FinancialApps-def/export-sqlserver ./
+
+# Opção 2: SFTP
+# Conecte via SFTP e navegue até /var/www/FinancialApps-def/export-sqlserver
+
+# Opção 3: Criar ZIP na VPS
+cd /var/www/FinancialApps-def
+zip -r export-sqlserver.zip export-sqlserver/
+# Depois baixe o ZIP

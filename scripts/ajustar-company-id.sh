@@ -99,3 +99,5 @@ echo ""
 echo "✅ Company IDs ajustados!"
 echo "📦 Próximo passo: Execute ./scripts/import-data.sh"
 
+
+

@@ -175,10 +175,10 @@ export class Proposal {
   @Column({ name: 'data_fim_contrato', type: 'date', nullable: true })
   dataFimContrato?: Date;
 
-  @Column({ name: 'tem_manutencao_vinculada', type: 'boolean', default: false, nullable: true })
+  @Column({ name: 'tem_manutencao_vinculada', default: false, nullable: true })
   temManutencaoVinculada?: boolean;
 
-  @Column({ name: 'proposta_manutencao_id', type: 'varchar', length: 36, nullable: true })
+  @Column({ name: 'proposta_manutencao_id', nullable: true })
   propostaManutencaoId?: string;
 
   // Parcelas (armazenado como JSON string)

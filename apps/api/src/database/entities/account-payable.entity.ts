@@ -55,14 +55,14 @@ export class AccountPayable {
   @Column({ name: 'payment_date', type: 'date', nullable: true })
   paymentDate?: Date;
 
-  @Column({ name: 'bank_account_id', type: 'varchar', length: 36, nullable: true })
+  @Column({ name: 'bank_account_id', nullable: true })
   bankAccountId?: string;
 
   @ManyToOne(() => BankAccount, { nullable: true })
   @JoinColumn({ name: 'bank_account_id' })
   bankAccount?: BankAccount;
 
-  @Column({ name: 'is_reembolsavel', type: 'boolean', default: false })
+  @Column({ name: 'is_reembolsavel', default: false })
   isReembolsavel: boolean;
 
   @Column({ name: 'valor_reembolsar', type: 'decimal', precision: 15, scale: 2, nullable: true })
@@ -74,7 +74,7 @@ export class AccountPayable {
   @Column({ name: 'data_status_reembolso', type: 'date', nullable: true })
   dataStatusReembolso?: Date;
 
-  @Column({ name: 'destinatario_fatura_reembolso_id', type: 'varchar', length: 36, nullable: true })
+  @Column({ name: 'destinatario_fatura_reembolso_id', nullable: true })
   destinatarioFaturaReembolsoId?: string;
 
   @ManyToOne(() => Client, { nullable: true })

@@ -68,3 +68,5 @@ DATABASE_PATH=apps/api/database.sqlite
 3. **Tornar init-database.ts seguro**
 4. **Configurar DATABASE_PATH corretamente**
 
+
+

@@ -82,3 +82,5 @@ echo "    tar -xzf $BACKUP_DIR/${BACKUP_NAME}_projeto.tar.gz -C $PROJECT_DIR"
 echo "    cp $BACKUP_DIR/${BACKUP_NAME}_database.sqlite $DB_PATH"
 echo "==================================================="
 
+
+

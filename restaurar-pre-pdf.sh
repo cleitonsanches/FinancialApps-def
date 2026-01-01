@@ -93,3 +93,5 @@ echo ""
 echo "Verifique se os dados estão acessíveis agora."
 echo "Se houver problemas, você pode restaurar o backup."
 
+
+

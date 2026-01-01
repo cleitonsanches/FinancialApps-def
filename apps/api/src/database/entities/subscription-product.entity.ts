@@ -21,7 +21,7 @@ export class SubscriptionProduct {
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
-  @Column({ name: 'active', type: 'boolean', default: true })
+  @Column({ name: 'active', default: true })
   active: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
@@ -30,6 +30,8 @@ export class SubscriptionProduct {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
+
+
 
 
 

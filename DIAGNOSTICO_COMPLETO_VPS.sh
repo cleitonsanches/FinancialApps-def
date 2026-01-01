@@ -110,3 +110,5 @@ echo "2. Os registros têm company_id correto"
 echo "3. A API está retornando dados (ou erro)"
 echo "4. Há erros nos logs do PM2"
 
+
+

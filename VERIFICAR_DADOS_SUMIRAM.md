@@ -116,3 +116,5 @@ curl -H "Authorization: Bearer SEU_TOKEN" http://localhost:3001/invoices | jq le
 Se retornar `0`, os dados estão sendo filtrados pela API.
 Se retornar `null` ou erro, há problema na API.
 
+
+

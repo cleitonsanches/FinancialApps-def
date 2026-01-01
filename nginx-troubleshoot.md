@@ -83,3 +83,5 @@ sudo nginx -t
 
 Se funcionar, adicione as outras configurações gradualmente.
 
+
+

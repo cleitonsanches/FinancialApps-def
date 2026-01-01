@@ -144,3 +144,5 @@ SELECT 'service_types', COUNT(*) FROM service_types;
 Para começar rápido: **DB Browser for SQLite** (opção 2)
 Para uso profissional: **DBeaver** (opção 3)
 
+
+

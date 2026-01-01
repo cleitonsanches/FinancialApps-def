@@ -34,3 +34,5 @@ sqlite3 database.sqlite "SELECT * FROM users LIMIT 5;"
 3. **Erro no código da API** - Problema na lógica de autenticação
 4. **Dependências faltando** - Algum módulo não instalado
 
+
+

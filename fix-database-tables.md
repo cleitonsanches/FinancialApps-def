@@ -56,3 +56,5 @@ curl -X POST http://localhost:3001/auth/login \
   -d '{"email":"admin@financeapp.com","password":"admin123"}'
 ```
 
+
+

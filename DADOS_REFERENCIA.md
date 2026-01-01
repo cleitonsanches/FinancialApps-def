@@ -189,3 +189,5 @@ Se preferir, podemos criar scripts de seed para os dados mais importantes:
 
 Qual abordagem você prefere?
 
+
+

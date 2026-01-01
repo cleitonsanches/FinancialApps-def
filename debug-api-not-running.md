@@ -65,3 +65,5 @@ cat /var/www/FinancialApps-def/apps/api/.env
 cat /var/www/FinancialApps-def/apps/web/.env.local
 ```
 
+
+

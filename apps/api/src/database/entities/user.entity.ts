@@ -30,10 +30,10 @@ export class User {
   @JoinColumn({ name: 'contact_id' })
   contact?: Contact;
 
-  @Column({ name: 'is_admin', type: 'boolean', default: false })
+  @Column({ name: 'is_admin', default: false })
   isAdmin: boolean;
 
-  @Column({ name: 'is_active', type: 'boolean', default: true })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })

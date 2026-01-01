@@ -138,3 +138,5 @@ npm install -g sqlite3
 
 **Pronto! Siga esses passos na ordem e tudo deve funcionar!** ✅
 
+
+

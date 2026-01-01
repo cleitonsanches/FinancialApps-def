@@ -80,14 +80,14 @@ export class Invoice {
   @Column({ name: 'acrescimo', type: 'decimal', precision: 15, scale: 2, default: 0 })
   acrescimo?: number;
 
-  @Column({ name: 'conta_corrente_id', type: 'varchar', length: 36, nullable: true })
+  @Column({ name: 'conta_corrente_id', nullable: true })
   contaCorrenteId?: string;
 
   @ManyToOne(() => BankAccount, { nullable: true })
   @JoinColumn({ name: 'conta_corrente_id' })
   contaCorrente?: BankAccount;
 
-  @Column({ name: 'chart_of_accounts_id', type: 'varchar', length: 36, nullable: true })
+  @Column({ name: 'chart_of_accounts_id', nullable: true })
   chartOfAccountsId?: string;
 
   @ManyToOne(() => ChartOfAccounts, { nullable: true })

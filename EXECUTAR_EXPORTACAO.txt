@@ -56,3 +56,5 @@ dir export
 
 Se aparecer arquivos .csv, funcionou! ✅
 
+
+

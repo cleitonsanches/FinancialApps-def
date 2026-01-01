@@ -90,3 +90,5 @@ Possíveis mensagens:
 - "No such file or directory"
 - "Não é reconhecido como um cmdlet"
 
+
+

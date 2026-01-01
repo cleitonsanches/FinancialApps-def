@@ -12,7 +12,7 @@ export class ProjectTemplateTask {
   @Column({ name: 'template_id' })
   templateId: string;
 
-  @ManyToOne(() => ProjectTemplate, template => template.tasks, { onDelete: 'CASCADE' })
+  @ManyToOne(() => ProjectTemplate, template => template.tasks, { onDelete: 'NO ACTION' })
   @JoinColumn({ name: 'template_id' })
   template: ProjectTemplate;
 

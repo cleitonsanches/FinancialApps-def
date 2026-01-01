@@ -69,3 +69,5 @@ npm run migrate:proposal-observacoes --workspace=apps/api
 pm2 restart financial-api
 ```
 
+
+

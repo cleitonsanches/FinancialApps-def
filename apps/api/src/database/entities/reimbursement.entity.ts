@@ -49,7 +49,7 @@ export class Reimbursement {
   status: string; // SOLICITADO, APROVADO, PAGO, CANCELADO
 
   // Vinculação com Contas a Pagar (origem)
-  @Column({ name: 'account_payable_id', type: 'varchar', length: 36, nullable: true })
+  @Column({ name: 'account_payable_id', nullable: true })
   accountPayableId?: string;
 
   @ManyToOne(() => AccountPayable, { nullable: true })
@@ -57,7 +57,7 @@ export class Reimbursement {
   accountPayable?: AccountPayable;
 
   // Vinculação com Contas a Receber (solicitação de reembolso pelo cliente)
-  @Column({ name: 'invoice_id', type: 'varchar', length: 36, nullable: true })
+  @Column({ name: 'invoice_id', nullable: true })
   invoiceId?: string;
 
   @ManyToOne(() => Invoice, { nullable: true })

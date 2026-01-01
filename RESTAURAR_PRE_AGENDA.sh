@@ -154,3 +154,5 @@ echo "     - Restaurar do backup: cp $BACKUP_DIR/database.sqlite.backup_$TIMESTA
 echo "     - Ou recriar: npm run init:db && npm run seed:admin"
 echo "==================================================="
 
+
+

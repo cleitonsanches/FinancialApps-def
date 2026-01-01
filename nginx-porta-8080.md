@@ -120,3 +120,5 @@ Depois de configurar, acesse:
 
 Se quiser usar o Traefik como proxy reverso principal (usando porta 80 sem conflito), podemos configurar o Traefik para rotear para o Nginx ou diretamente para as aplicações. Mas por enquanto, a porta 8080 funciona perfeitamente!
 
+
+

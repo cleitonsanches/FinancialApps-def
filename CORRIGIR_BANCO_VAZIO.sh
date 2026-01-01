@@ -152,3 +152,5 @@ if [[ $REPLY =~ ^[Ss]$ ]]; then
     echo "Se houver erros, execute: pm2 logs financial-api"
 fi
 
+
+

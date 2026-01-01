@@ -84,7 +84,7 @@ export class ProjectTask {
   @Column({ name: 'project_id', nullable: true })
   projectId?: string;
 
-  @ManyToOne(() => Project, project => project.tasks, { onDelete: 'CASCADE', nullable: true })
+  @ManyToOne(() => Project, project => project.tasks, { onDelete: 'NO ACTION', nullable: true })
   @JoinColumn({ name: 'project_id' })
   project?: Project;
 
@@ -153,13 +153,13 @@ export class ProjectTask {
   @Column({ name: 'hora_fim', type: 'varchar', length: 10, nullable: true })
   horaFim?: string; // Para eventos: formato HH:MM
 
-  @Column({ name: 'sem_prazo_definido', type: 'boolean', default: false })
+  @Column({ name: 'sem_prazo_definido', default: false })
   semPrazoDefinido?: boolean; // Para atividades: se true, só precisa dataInicio
 
-  @Column({ name: 'dia_inteiro', type: 'boolean', default: false })
+  @Column({ name: 'dia_inteiro', default: false })
   diaInteiro?: boolean; // Para eventos: se true, oculta horários e trata como bloqueio de dia
 
-  @Column({ name: 'exigir_lancamento_horas', type: 'boolean', default: false })
+  @Column({ name: 'exigir_lancamento_horas', default: false })
   exigirLancamentoHoras?: boolean; // Se true, exige lançamento de horas ao concluir
 
   @CreateDateColumn({ name: 'created_at' })
