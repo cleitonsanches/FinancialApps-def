@@ -91,16 +91,24 @@ echo ""
 # ==========================================
 step "4. Instalando dependências..."
 
-warn "Avisos sobre Node.js 20+ são normais e podem ser ignorados se você estiver usando Node.js 18+"
+warn "Avisos sobre Node.js 20+ e TAR_ENTRY_ERROR são normais e podem ser ignorados"
 echo ""
 
 cd "$BASE_DIR"
-info "Instalando dependências do projeto..."
-npm install
 
+info "Limpando node_modules e package-lock.json (se existirem)..."
+rm -rf node_modules apps/*/node_modules 2>/dev/null || true
+rm -f package-lock.json apps/*/package-lock.json 2>/dev/null || true
+
+info "Instalando dependências na raiz do projeto (workspaces)..."
+npm install --legacy-peer-deps || npm install
+
+info "Instalando dependências específicas da API..."
 cd "$API_DIR"
-info "Instalando driver mssql..."
-npm install mssql --save
+npm install mssql --save --legacy-peer-deps || npm install mssql --save
+
+info "Garantindo que @types/node está instalado..."
+npm install --save-dev @types/node --legacy-peer-deps || npm install --save-dev @types/node
 
 cd "$BASE_DIR"
 info "✅ Dependências instaladas!"
