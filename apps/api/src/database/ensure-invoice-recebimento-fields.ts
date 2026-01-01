@@ -44,24 +44,35 @@ export async function ensureInvoiceRecebimentoFields(dataSource: DataSource): Pr
       if (!indexExists) {
         const dbType = dataSource.options.type;
         if (dbType === 'mssql') {
-          // SQL Server: verifica se existe antes de criar
-          await queryRunner.query(`
-            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_invoices_conta_corrente_id' AND object_id = OBJECT_ID('invoices'))
-            CREATE INDEX IX_invoices_conta_corrente_id ON invoices(conta_corrente_id)
+          // SQL Server: verifica se existe antes de criar (usando EXEC para permitir IF)
+          const indexCheck = await queryRunner.query(`
+            SELECT COUNT(*) as count
+            FROM sys.indexes 
+            WHERE name = 'IX_invoices_conta_corrente_id' 
+            AND object_id = OBJECT_ID('invoices')
           `);
+          
+          if (indexCheck[0]?.count === 0) {
+            await queryRunner.query(`
+              CREATE INDEX IX_invoices_conta_corrente_id ON invoices(conta_corrente_id)
+            `);
+            console.log('✅ Índice IX_invoices_conta_corrente_id criado');
+          } else {
+            console.log('✅ Índice IX_invoices_conta_corrente_id já existe');
+          }
         } else {
           // SQLite/PostgreSQL: usa IF NOT EXISTS
           await queryRunner.query(`
             CREATE INDEX IF NOT EXISTS IX_invoices_conta_corrente_id ON invoices(conta_corrente_id)
           `);
+          console.log('✅ Índice IX_invoices_conta_corrente_id criado');
         }
-        console.log('✅ Índice IX_invoices_conta_corrente_id criado');
       } else {
         console.log('✅ Índice IX_invoices_conta_corrente_id já existe');
       }
     } catch (error: any) {
       // Ignora se já existe
-      if (!error.message.includes('already exists') && !error.message.includes('duplicate') && !error.message.includes('There is already an index')) {
+      if (!error.message.includes('already exists') && !error.message.includes('duplicate') && !error.message.includes('There is already an index') && !error.message.includes('is already an index')) {
         console.error('Erro ao criar índice:', error.message);
       }
     }
