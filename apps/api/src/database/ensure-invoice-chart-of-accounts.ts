@@ -23,10 +23,25 @@ export async function ensureInvoiceChartOfAccounts(dataSource: DataSource): Prom
         ALTER TABLE invoices ADD COLUMN chart_of_accounts_id VARCHAR(36)
       `);
       
-      // Criar índice
-      await queryRunner.query(`
-        CREATE INDEX IF NOT EXISTS IX_invoices_chart_of_accounts_id ON invoices(chart_of_accounts_id)
-      `);
+      // Criar índice (verificar se existe primeiro para SQL Server)
+      const dbType = dataSource.options.type;
+      if (dbType === 'mssql') {
+        const indexCheck = await queryRunner.query(`
+          SELECT COUNT(*) as count
+          FROM sys.indexes 
+          WHERE name = 'IX_invoices_chart_of_accounts_id' 
+          AND object_id = OBJECT_ID('invoices')
+        `);
+        if (indexCheck[0]?.count === 0) {
+          await queryRunner.query(`
+            CREATE INDEX IX_invoices_chart_of_accounts_id ON invoices(chart_of_accounts_id)
+          `);
+        }
+      } else {
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS IX_invoices_chart_of_accounts_id ON invoices(chart_of_accounts_id)
+        `);
+      }
       
       console.log('✅ Coluna chart_of_accounts_id adicionada com sucesso!');
     } else {
