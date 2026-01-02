@@ -321,6 +321,7 @@ export default function AgendaPage() {
   const [filterProject, setFilterProject] = useState<string>('')
   const [filterClient, setFilterClient] = useState<string>('')
   const [sortBy, setSortBy] = useState<'data' | 'cliente' | 'projeto' | 'status'>('data')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [showSortDropdown, setShowSortDropdown] = useState(false)
 
   const handleClearFilters = () => {
@@ -331,6 +332,7 @@ export default function AgendaPage() {
     setStartDate('')
     setEndDate('')
     setSortBy('data')
+    setSortOrder('desc')
   }
   const [tasksWithHours, setTasksWithHours] = useState<Record<string, any[]>>({})
   const [clients, setClients] = useState<any[]>([])
@@ -340,6 +342,7 @@ export default function AgendaPage() {
   const [showRegisterHoursModal, setShowRegisterHoursModal] = useState(false)
   const [showEditTaskModal, setShowEditTaskModal] = useState(false)
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+  const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<any>(null)
   const [desiredStatus, setDesiredStatus] = useState<string | null>(null) // Status que o usuário deseja aplicar após lançar horas
   const [projects, setProjects] = useState<any[]>([])
@@ -716,18 +719,21 @@ export default function AgendaPage() {
     const dateToCheck = task.dataConclusao || task.dataFimPrevista
     if (!dateToCheck) return false
     
+    // Criar data de hoje sem hora
     const today = new Date()
-    today.setHours(0, 0, 0, 0) // Zerar hora para comparar apenas a data
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
     
-    let taskDate: Date
+    // Converter data da tarefa para string YYYY-MM-DD
+    let taskDateStr: string
     if (typeof dateToCheck === 'string') {
-      taskDate = new Date(dateToCheck.split('T')[0])
+      taskDateStr = dateToCheck.split('T')[0].split(' ')[0]
     } else {
-      taskDate = new Date(dateToCheck)
+      const taskDate = new Date(dateToCheck)
+      taskDateStr = `${taskDate.getFullYear()}-${String(taskDate.getMonth() + 1).padStart(2, '0')}-${String(taskDate.getDate()).padStart(2, '0')}`
     }
-    taskDate.setHours(0, 0, 0, 0) // Zerar hora para comparar apenas a data
     
-    return taskDate < today
+    // Comparar strings (YYYY-MM-DD) para evitar problemas de timezone
+    return taskDateStr < todayStr
   }
 
   // Filtrar tarefas
@@ -794,6 +800,10 @@ export default function AgendaPage() {
 
   // Ordenar tarefas conforme a opção selecionada
   const sortedFilteredTasks = [...filteredTasks].sort((a, b) => {
+    const applyOrder = (comparison: number) => {
+      return sortOrder === 'desc' ? -comparison : comparison
+    }
+    
     switch (sortBy) {
       case 'data': {
         const getDate = (task: any): Date => {
@@ -806,13 +816,13 @@ export default function AgendaPage() {
         }
         const dateA = getDate(a)
         const dateB = getDate(b)
-        return dateB.getTime() - dateA.getTime() // Descendente
+        return applyOrder(dateB.getTime() - dateA.getTime())
       }
       case 'cliente': {
         const clientNameA = (a.client?.name || a.client?.razaoSocial || a.project?.client?.name || a.project?.client?.razaoSocial || '').toLowerCase()
         const clientNameB = (b.client?.name || b.client?.razaoSocial || b.project?.client?.name || b.project?.client?.razaoSocial || '').toLowerCase()
-        if (clientNameA < clientNameB) return -1
-        if (clientNameA > clientNameB) return 1
+        if (clientNameA < clientNameB) return applyOrder(-1)
+        if (clientNameA > clientNameB) return applyOrder(1)
         // Se clientes iguais, ordenar por data
         const getDate = (task: any): Date => {
           const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
@@ -824,13 +834,13 @@ export default function AgendaPage() {
         }
         const dateA = getDate(a)
         const dateB = getDate(b)
-        return dateB.getTime() - dateA.getTime()
+        return dateB.getTime() - dateA.getTime() // Sempre descendente para data secundária
       }
       case 'projeto': {
         const projectNameA = (a.project?.name || '').toLowerCase()
         const projectNameB = (b.project?.name || '').toLowerCase()
-        if (projectNameA < projectNameB) return -1
-        if (projectNameA > projectNameB) return 1
+        if (projectNameA < projectNameB) return applyOrder(-1)
+        if (projectNameA > projectNameB) return applyOrder(1)
         // Se projetos iguais, ordenar por data
         const getDate = (task: any): Date => {
           const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
@@ -842,14 +852,14 @@ export default function AgendaPage() {
         }
         const dateA = getDate(a)
         const dateB = getDate(b)
-        return dateB.getTime() - dateA.getTime()
+        return dateB.getTime() - dateA.getTime() // Sempre descendente para data secundária
       }
       case 'status': {
         const statusOrder = ['PENDENTE', 'EM_PROGRESSO', 'BLOQUEADA', 'CONCLUIDA', 'CANCELADA']
         const statusIndexA = statusOrder.indexOf(a.status) !== -1 ? statusOrder.indexOf(a.status) : 999
         const statusIndexB = statusOrder.indexOf(b.status) !== -1 ? statusOrder.indexOf(b.status) : 999
-        if (statusIndexA < statusIndexB) return -1
-        if (statusIndexA > statusIndexB) return 1
+        if (statusIndexA < statusIndexB) return applyOrder(-1)
+        if (statusIndexA > statusIndexB) return applyOrder(1)
         // Se status iguais, ordenar por data
         const getDate = (task: any): Date => {
           const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
@@ -861,7 +871,7 @@ export default function AgendaPage() {
         }
         const dateA = getDate(a)
         const dateB = getDate(b)
-        return dateB.getTime() - dateA.getTime()
+        return dateB.getTime() - dateA.getTime() // Sempre descendente para data secundária
       }
       default:
         return 0
@@ -1127,39 +1137,62 @@ export default function AgendaPage() {
               {sortedFilteredTasks.length} Atividade(s) encontrada(s)
             </span>
             <div className="flex gap-2">
-              <div className="relative sort-dropdown-container">
+              <div className="flex gap-2">
+                <div className="relative sort-dropdown-container">
+                  <button
+                    onClick={() => setShowSortDropdown(!showSortDropdown)}
+                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium flex items-center gap-2"
+                  >
+                    <span>Ordenar por: {sortBy === 'data' ? 'Data' : sortBy === 'cliente' ? 'Cliente' : sortBy === 'projeto' ? 'Projeto' : 'Status'}</span>
+                    <svg className={`w-4 h-4 text-gray-500 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showSortDropdown && (
+                    <div className="absolute right-0 z-10 mt-1 w-48 bg-white border border-gray-300 rounded-lg shadow-lg">
+                      {[
+                        { value: 'data', label: 'Data' },
+                        { value: 'cliente', label: 'Cliente' },
+                        { value: 'projeto', label: 'Projeto' },
+                        { value: 'status', label: 'Status' },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            setSortBy(option.value as any)
+                            setShowSortDropdown(false)
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                            sortBy === option.value ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
-                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                   className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium flex items-center gap-2"
+                  title={sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
                 >
-                  <span>Ordenar por: {sortBy === 'data' ? 'Data' : sortBy === 'cliente' ? 'Cliente' : sortBy === 'projeto' ? 'Projeto' : 'Status'}</span>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  {sortOrder === 'asc' ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                      <span>Asc</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <span>Desc</span>
+                    </>
+                  )}
                 </button>
-                {showSortDropdown && (
-                  <div className="absolute right-0 z-10 mt-1 w-48 bg-white border border-gray-300 rounded-lg shadow-lg">
-                    {[
-                      { value: 'data', label: 'Data' },
-                      { value: 'cliente', label: 'Cliente' },
-                      { value: 'projeto', label: 'Projeto' },
-                      { value: 'status', label: 'Status' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => {
-                          setSortBy(option.value as any)
-                          setShowSortDropdown(false)
-                        }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                          sortBy === option.value ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
               <button
                 onClick={handleClearFilters}
@@ -1455,18 +1488,7 @@ export default function AgendaPage() {
             view={calendarView}
             onTaskClick={(task: any) => {
               setSelectedTask(task)
-              setEditTaskData({
-                description: task.description || '',
-                dataInicio: task.dataInicio ? (typeof task.dataInicio === 'string' ? task.dataInicio.split('T')[0] : new Date(task.dataInicio).toISOString().split('T')[0]) : '',
-                dataFimPrevista: task.dataFimPrevista ? (typeof task.dataFimPrevista === 'string' ? task.dataFimPrevista.split('T')[0] : new Date(task.dataFimPrevista).toISOString().split('T')[0]) : '',
-                usuarioResponsavelId: task.usuarioResponsavelId || '',
-                tipo: task.tipo || 'ATIVIDADE',
-                horaInicio: task.horaInicio || '',
-                horaFim: task.horaFim || '',
-                semPrazoDefinido: task.semPrazoDefinido || false,
-                diaInteiro: task.diaInteiro || false,
-              })
-              setShowEditTaskModal(true)
+              setShowTaskDetailsModal(true)
             }}
             onRegisterHours={(task: any) => {
               setSelectedTask(task)
@@ -1603,6 +1625,189 @@ export default function AgendaPage() {
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
                   Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Detalhes da Tarefa (Calendário) */}
+        {showTaskDetailsModal && selectedTask && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg p-4 md:p-6 max-w-2xl w-full mx-4 my-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                {selectedTask.name}
+              </h2>
+              
+              {/* Tags de Status e Tipo */}
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
+                  {selectedTask.tipo === 'EVENTO' ? 'Evento' : 'Atividade'}
+                </span>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getTaskStatusColor(selectedTask.status)}`}>
+                  {getTaskStatusLabel(selectedTask.status)}
+                </span>
+                {isTaskOverdue(selectedTask) && (
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-red-100 text-red-800 border border-red-300">
+                    Atrasada
+                  </span>
+                )}
+              </div>
+
+              {/* Vínculos */}
+              <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:gap-4 text-sm text-gray-500 mb-4">
+                {selectedTask.project && (
+                  <div className="break-words">
+                    <span className="font-semibold">Projeto:</span>{' '}
+                    <Link
+                      href={`/projetos/${selectedTask.project.id}`}
+                      className="text-primary-600 hover:text-primary-700 underline break-all"
+                    >
+                      {selectedTask.project.name || '-'}
+                    </Link>
+                  </div>
+                )}
+                {selectedTask.proposal && (
+                  <div className="break-words">
+                    <span className="font-semibold">Negociação:</span>{' '}
+                    <Link
+                      href={`/negociacoes/${selectedTask.proposal.id}`}
+                      className="text-primary-600 hover:text-primary-700 underline break-all"
+                    >
+                      {selectedTask.proposal.numero ? `${selectedTask.proposal.numero} - ` : ''}{selectedTask.proposal.title || selectedTask.proposal.titulo || '-'}
+                    </Link>
+                  </div>
+                )}
+                {selectedTask.client && (
+                  <div className="break-words">
+                    <span className="font-semibold">Cliente:</span>{' '}
+                    {selectedTask.client.name || selectedTask.client.razaoSocial || '-'}
+                  </div>
+                )}
+                {!selectedTask.client && selectedTask.project?.client && (
+                  <div className="break-words">
+                    <span className="font-semibold">Cliente:</span>{' '}
+                    {selectedTask.project.client.name || selectedTask.project.client.razaoSocial || '-'}
+                  </div>
+                )}
+                {selectedTask.usuarioResponsavel && (
+                  <div className="break-words">
+                    <span className="font-semibold">Envolvidos:</span>{' '}
+                    {selectedTask.usuarioResponsavel.name}
+                  </div>
+                )}
+              </div>
+
+              {/* Datas e Horas */}
+              <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:gap-4 text-sm text-gray-500 mb-4">
+                {selectedTask.dataInicio && (
+                  <div>
+                    <span className="font-semibold">Data de Início:</span>{' '}
+                    {formatDate(selectedTask.dataInicio)}
+                  </div>
+                )}
+                {(selectedTask.dataFimPrevista || selectedTask.dataConclusao) && (
+                  <div>
+                    <span className="font-semibold">Prazo:</span>{' '}
+                    {formatDate(selectedTask.dataConclusao || selectedTask.dataFimPrevista)}
+                  </div>
+                )}
+                {selectedTask.horasEstimadas && (
+                  <div>
+                    <span className="font-semibold">Horas Estimadas:</span>{' '}
+                    {selectedTask.horasEstimadas}h
+                  </div>
+                )}
+                {tasksWithHours[selectedTask.id] && tasksWithHours[selectedTask.id].length > 0 && (
+                  <div>
+                    <span className="font-semibold">Horas Lançadas:</span>{' '}
+                    <span className="text-blue-600 font-semibold">
+                      {tasksWithHours[selectedTask.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0).toFixed(2)}h
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Descrição */}
+              <div className="mt-4 p-3 bg-gray-50 rounded border border-gray-200 mb-4">
+                <h4 className="font-semibold text-sm text-gray-900 mb-2">
+                  Descrição da tarefa
+                </h4>
+                <p className="text-sm text-gray-700 break-words">{selectedTask.description || 'Sem descrição'}</p>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowTaskDetailsModal(false)
+                    const formatDateForInput = (date: string | Date | null | undefined): string => {
+                      if (!date) return ''
+                      if (typeof date === 'string') {
+                        return date.split('T')[0]
+                      }
+                      const dateObj = date as Date
+                      const year = dateObj.getFullYear()
+                      const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+                      const day = String(dateObj.getDate()).padStart(2, '0')
+                      return `${year}-${month}-${day}`
+                    }
+                    setEditTaskData({
+                      description: selectedTask.description || '',
+                      dataInicio: formatDateForInput(selectedTask.dataInicio),
+                      dataFimPrevista: formatDateForInput(selectedTask.dataConclusao || selectedTask.dataFimPrevista),
+                      usuarioResponsavelId: selectedTask.usuarioResponsavelId || '',
+                      tipo: selectedTask.tipo || 'ATIVIDADE',
+                      horaInicio: selectedTask.horaInicio || '',
+                      horaFim: selectedTask.horaFim || '',
+                      semPrazoDefinido: selectedTask.semPrazoDefinido || false,
+                      diaInteiro: selectedTask.diaInteiro || false,
+                    })
+                    setShowEditTaskModal(true)
+                  }}
+                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTaskDetailsModal(false)
+                    setUpdateTaskData({
+                      status: selectedTask.status || '',
+                      percentual: selectedTask.percentual?.toString() || '',
+                    })
+                    setShowUpdateStatusModal(true)
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                >
+                  Alterar Status
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTaskDetailsModal(false)
+                    setNewTimeEntry({
+                      projectId: selectedTask.project?.id || '',
+                      proposalId: selectedTask.proposalId || '',
+                      clientId: selectedTask.clientId || '',
+                      taskId: selectedTask.id,
+                      horas: '',
+                      data: new Date().toISOString().split('T')[0],
+                      descricao: '',
+                    })
+                    setShowRegisterHoursModal(true)
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+                >
+                  ⏱️ Lançar Horas
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTaskDetailsModal(false)
+                    setSelectedTask(null)
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-sm font-medium"
+                >
+                  Fechar
                 </button>
               </div>
             </div>
