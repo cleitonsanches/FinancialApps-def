@@ -1237,18 +1237,8 @@ export default function NegotiationDetailsPage() {
   const getProjectData = (project: any) => {
     const projectTasks = tasks.filter(t => t.projectId === project.id)
     
-    let calculatedStatus = project.status || 'PENDENTE'
-    if (projectTasks.length > 0) {
-      const allCompleted = projectTasks.every(t => t.status === 'CONCLUIDA')
-      if (allCompleted) {
-        calculatedStatus = 'CONCLUIDO'
-      } else {
-        const hasInProgressOrCompleted = projectTasks.some(t => t.status === 'EM_ANDAMENTO' || t.status === 'CONCLUIDA')
-        if (hasInProgressOrCompleted) {
-          calculatedStatus = 'EM_ANDAMENTO'
-        }
-      }
-    }
+    // Usar o status real do projeto do banco de dados, não calcular baseado nas tarefas
+    const projectStatus = project.status || 'PENDENTE'
 
     let startDate = project.dataInicio || null
     if (projectTasks.length > 0) {
@@ -1279,7 +1269,7 @@ export default function NegotiationDetailsPage() {
     }
 
     return {
-      calculatedStatus,
+      calculatedStatus: projectStatus, // Usar status real do projeto
       startDate,
       endDate,
     }
@@ -2169,12 +2159,21 @@ export default function NegotiationDetailsPage() {
                   <div className="text-sm text-gray-100">Criar projeto com dados da negociação (número, cliente, tipo de serviço). As tarefas podem ser adicionadas posteriormente na aba de Projetos.</div>
                 </button>
               </div>
-              <div className="flex gap-2 justify-end">
+              <div className="space-y-3 mb-6">
                 <button
                   onClick={handleSkipProject}
+                  className="w-full px-4 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-left"
+                >
+                  <div className="font-semibold">Não vincular projeto no momento e criar manualmente</div>
+                  <div className="text-sm text-gray-600">Fechar a negociação sem criar projeto. Você poderá criar o projeto manualmente depois na seção de Projetos.</div>
+                </button>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setShowProjectChoiceModal(false)}
                   className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
-                  Pular
+                  Cancelar
                 </button>
               </div>
             </div>
