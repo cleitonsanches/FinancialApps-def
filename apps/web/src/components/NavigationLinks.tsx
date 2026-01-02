@@ -121,7 +121,7 @@ export default function NavigationLinks() {
               Conciliação
             </Link>
             <Link
-              href="/analise"
+              href="/analise-financeira"
               onClick={() => setShowMobileMenu(false)}
               className="block px-6 py-2 text-sm text-gray-600 hover:bg-gray-100"
             >
@@ -169,7 +169,7 @@ export default function NavigationLinks() {
                   Conciliação
                 </Link>
                 <Link
-                  href="/analise"
+                  href="/analise-financeira"
                   onClick={() => setShowFinanceMenu(false)}
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >

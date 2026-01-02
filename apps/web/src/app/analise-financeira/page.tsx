@@ -267,115 +267,119 @@ export default function AnaliseFinanceiraPage() {
           <h1 className="text-3xl font-bold text-gray-900">Análise Financeira</h1>
         </div>
 
-        {/* Cards Principais */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Card 1: Fluxo de Caixa */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Fluxo de Caixa</h2>
-              <div className="flex gap-2">
-                <select
-                  value={periodFilter}
-                  onChange={(e) => setPeriodFilter(e.target.value as any)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
-                >
-                  <option value="current">Mês Atual</option>
-                  <option value="next30">Próximos 30 dias</option>
-                  <option value="custom">Personalizado</option>
-                </select>
-              </div>
-            </div>
-
-            {periodFilter === 'custom' && (
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
-                />
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
-                />
-              </div>
-            )}
-
-            {analysis && analysis.fluxoCaixa.length > 0 ? (
-              <div className="h-64 overflow-x-auto">
-                <SimpleChart data={analysis.fluxoCaixa} />
-              </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                Não há dados para o período selecionado
-              </div>
-            )}
-          </div>
-
-          {/* Card 2: Previsão Distribuição */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Valor a Distribuir (BTG Pactual)</h2>
-            
-            <div className="space-y-3 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Saldo inicial BTG:</span>
-                <span className="font-medium">{analysis ? formatCurrency(analysis.saldoInicialBTG) : 'R$ 0,00'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-green-600">+ Contas a receber:</span>
-                <span className="font-medium text-green-600">
-                  {analysis ? formatCurrency(analysis.fluxoCaixa.reduce((sum, item) => sum + item.contasReceber, 0)) : 'R$ 0,00'}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-red-600">- Contas a pagar:</span>
-                <span className="font-medium text-red-600">
-                  {analysis ? formatCurrency(analysis.fluxoCaixa.reduce((sum, item) => sum + item.contasPagar, 0)) : 'R$ 0,00'}
-                </span>
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <div className="text-center">
-                <div className="text-sm text-gray-600 mb-1">Valor a Distribuir</div>
-                <div className="text-3xl font-bold text-primary-600">
-                  {analysis ? formatCurrency(analysis.valorDistribuir) : 'R$ 0,00'}
-                </div>
-              </div>
+        {/* Card 1: Fluxo de Caixa - Full Width */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Fluxo de Caixa</h2>
+            <div className="flex gap-2">
+              <select
+                value={periodFilter}
+                onChange={(e) => setPeriodFilter(e.target.value as any)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+              >
+                <option value="current">Mês Atual</option>
+                <option value="next30">Próximos 30 dias</option>
+                <option value="custom">Personalizado</option>
+              </select>
             </div>
           </div>
 
-          {/* Card 3: Valor Disponível */}
-          <div className="lg:col-span-1 bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Valor Disponível</h2>
-            
-            <div className="space-y-3 mb-4">
-              <div className="text-sm text-gray-600">
-                <div className="mb-2">Saldo atual BTG:</div>
-                <div className="text-lg font-semibold text-gray-900">
-                  {analysis ? formatCurrency(analysis.saldoInicialBTG) : 'R$ 0,00'}
+          {periodFilter === 'custom' && (
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+              />
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+          )}
+
+          {analysis && analysis.fluxoCaixa.length > 0 ? (
+            <div className="h-80 w-full">
+              <SimpleChart data={analysis.fluxoCaixa} />
+            </div>
+          ) : (
+            <div className="h-80 flex items-center justify-center text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+              Não há dados para o período selecionado
+            </div>
+          )}
+        </div>
+
+        {/* Card 2: Resultado do Fluxo de Caixa */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Resultado do Fluxo de Caixa</h2>
+          
+          {analysis && (
+            <>
+              <div className="space-y-3 mb-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-green-600">Contas a receber:</span>
+                  <span className="font-medium text-green-600">
+                    {formatCurrency(analysis.fluxoCaixa.reduce((sum, item) => sum + item.contasReceber, 0))}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-red-600">Contas a pagar:</span>
+                  <span className="font-medium text-red-600">
+                    {formatCurrency(analysis.fluxoCaixa.reduce((sum, item) => sum + item.contasPagar, 0))}
+                  </span>
                 </div>
               </div>
-              
-              {analysis?.proximoRecebimento && (
+
+              <div className="border-t pt-4">
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-1">Resultado</div>
+                  <div className="text-3xl font-bold text-primary-600">
+                    {formatCurrency(
+                      analysis.fluxoCaixa.reduce((sum, item) => sum + item.contasReceber, 0) -
+                      analysis.fluxoCaixa.reduce((sum, item) => sum + item.contasPagar, 0)
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Card 3: Valor Disponível */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Valor Disponível para Distribuição</h2>
+          
+          {analysis && (
+            <>
+              <div className="space-y-3 mb-4">
                 <div className="text-sm text-gray-600">
-                  <div className="mb-1">Próximo recebimento:</div>
-                  <div className="font-medium">{formatDate(analysis.proximoRecebimento)}</div>
+                  <div className="mb-2">Saldo atual BTG:</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {formatCurrency(analysis.saldoInicialBTG)}
+                  </div>
                 </div>
-              )}
-            </div>
+                
+                {analysis.proximoRecebimento && (
+                  <div className="text-sm text-gray-600">
+                    <div className="mb-1">Próximo recebimento:</div>
+                    <div className="font-medium">{formatDate(analysis.proximoRecebimento)}</div>
+                  </div>
+                )}
+              </div>
 
-            <div className="border-t pt-4">
-              <div className="text-center">
-                <div className="text-sm text-gray-600 mb-1">Valor disponível para distribuição hoje</div>
-                <div className="text-3xl font-bold text-green-600">
-                  {analysis ? formatCurrency(analysis.valorDisponivel) : 'R$ 0,00'}
+              <div className="border-t pt-4">
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-1">Valor disponível para distribuição hoje</div>
+                  <div className="text-3xl font-bold text-green-600">
+                    {formatCurrency(analysis.valorDisponivel)}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>
