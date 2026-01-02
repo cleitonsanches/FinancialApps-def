@@ -91,70 +91,78 @@ export class ProjectsService {
     }
   }
 
+  // Função helper para limpar campos UUID: converter strings vazias para null
+  private cleanUuidFields(data: any): any {
+    const uuidFields = ['projectId', 'proposalId', 'clientId', 'phaseId', 'usuarioResponsavelId', 'usuarioExecutorId'];
+    const cleaned = { ...data };
+    
+    for (const field of uuidFields) {
+      if (cleaned[field] !== undefined && cleaned[field] !== null) {
+        // Se for string vazia ou apenas espaços, converter para null
+        if (typeof cleaned[field] === 'string' && cleaned[field].trim() === '') {
+          cleaned[field] = null;
+        }
+      } else if (cleaned[field] === undefined) {
+        // Se for undefined, não incluir no objeto (deixar TypeORM usar default)
+        delete cleaned[field];
+      }
+    }
+    
+    return cleaned;
+  }
+
   async createTask(projectId: string, taskData: Partial<ProjectTask>): Promise<ProjectTask> {
     // Limpar campos UUID: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)
-    const cleanTaskData: Partial<ProjectTask> = {
+    const cleanProjectId = projectId && typeof projectId === 'string' && projectId.trim() !== '' ? projectId : null;
+    const cleanedTaskData = this.cleanUuidFields({
       ...taskData,
-      projectId: projectId && projectId.trim() !== '' ? projectId : null,
-      proposalId: taskData.proposalId && taskData.proposalId.trim() !== '' ? taskData.proposalId : null,
-      clientId: taskData.clientId && taskData.clientId.trim() !== '' ? taskData.clientId : null,
-      phaseId: taskData.phaseId && taskData.phaseId.trim() !== '' ? taskData.phaseId : null,
-      usuarioResponsavelId: taskData.usuarioResponsavelId && taskData.usuarioResponsavelId.trim() !== '' ? taskData.usuarioResponsavelId : null,
-      usuarioExecutorId: taskData.usuarioExecutorId && taskData.usuarioExecutorId.trim() !== '' ? taskData.usuarioExecutorId : null,
-    };
+      projectId: cleanProjectId,
+    });
     
     const task = this.projectTaskRepository.create({
-      ...cleanTaskData,
-      status: cleanTaskData.status || 'PENDENTE',
+      ...cleanedTaskData,
+      status: cleanedTaskData.status || 'PENDENTE',
     });
     return this.projectTaskRepository.save(task);
   }
 
   async createTaskStandalone(taskData: Partial<ProjectTask>): Promise<ProjectTask> {
     // Limpar campos UUID: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)
-    const cleanTaskData: Partial<ProjectTask> = {
-      ...taskData,
-      projectId: taskData.projectId && taskData.projectId.trim() !== '' ? taskData.projectId : null,
-      proposalId: taskData.proposalId && taskData.proposalId.trim() !== '' ? taskData.proposalId : null,
-      clientId: taskData.clientId && taskData.clientId.trim() !== '' ? taskData.clientId : null,
-      phaseId: taskData.phaseId && taskData.phaseId.trim() !== '' ? taskData.phaseId : null,
-      usuarioResponsavelId: taskData.usuarioResponsavelId && taskData.usuarioResponsavelId.trim() !== '' ? taskData.usuarioResponsavelId : null,
-      usuarioExecutorId: taskData.usuarioExecutorId && taskData.usuarioExecutorId.trim() !== '' ? taskData.usuarioExecutorId : null,
-    };
+    const cleanedTaskData = this.cleanUuidFields(taskData);
     
     // Validar que pelo menos um vínculo existe
-    if (!cleanTaskData.projectId && !cleanTaskData.proposalId && !cleanTaskData.clientId) {
+    if (!cleanedTaskData.projectId && !cleanedTaskData.proposalId && !cleanedTaskData.clientId) {
       throw new Error('É necessário vincular a um Projeto, Negociação ou Cliente');
     }
     
     // Se não foi especificado, verificar se deve exigir lançamento de horas
-    if (cleanTaskData.exigirLancamentoHoras === undefined) {
+    if (cleanedTaskData.exigirLancamentoHoras === undefined) {
       // Se está vinculado a uma negociação, verificar se é "Por Horas"
-      if (cleanTaskData.proposalId) {
+      if (cleanedTaskData.proposalId) {
         const proposal = await this.proposalRepository.findOne({
-          where: { id: cleanTaskData.proposalId },
+          where: { id: cleanedTaskData.proposalId },
           select: ['tipoContratacao']
         });
         if (proposal && proposal.tipoContratacao === 'HORAS') {
-          cleanTaskData.exigirLancamentoHoras = true;
+          cleanedTaskData.exigirLancamentoHoras = true;
         }
       }
       // Se está vinculado a um projeto, verificar se o projeto está vinculado a uma negociação "Por Horas"
-      else if (cleanTaskData.projectId) {
+      else if (cleanedTaskData.projectId) {
         const project = await this.projectRepository.findOne({
-          where: { id: cleanTaskData.projectId },
+          where: { id: cleanedTaskData.projectId },
           relations: ['proposal'],
           select: ['id', 'proposal']
         });
         if (project?.proposal?.tipoContratacao === 'HORAS') {
-          cleanTaskData.exigirLancamentoHoras = true;
+          cleanedTaskData.exigirLancamentoHoras = true;
         }
       }
     }
     
     const task = this.projectTaskRepository.create({
-      ...cleanTaskData,
-      status: cleanTaskData.status || 'PENDENTE',
+      ...cleanedTaskData,
+      status: cleanedTaskData.status || 'PENDENTE',
     });
     return this.projectTaskRepository.save(task);
   }
@@ -228,30 +236,13 @@ export class ProjectsService {
     }
     
     // Limpar campos UUID: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)
-    if (updateData.projectId !== undefined) {
-      updateData.projectId = updateData.projectId && updateData.projectId.trim() !== '' ? updateData.projectId : null;
-    }
-    if (updateData.proposalId !== undefined) {
-      updateData.proposalId = updateData.proposalId && updateData.proposalId.trim() !== '' ? updateData.proposalId : null;
-    }
-    if (updateData.clientId !== undefined) {
-      updateData.clientId = updateData.clientId && updateData.clientId.trim() !== '' ? updateData.clientId : null;
-    }
-    if (updateData.phaseId !== undefined) {
-      updateData.phaseId = updateData.phaseId && updateData.phaseId.trim() !== '' ? updateData.phaseId : null;
-    }
-    if (updateData.usuarioResponsavelId !== undefined) {
-      updateData.usuarioResponsavelId = updateData.usuarioResponsavelId && updateData.usuarioResponsavelId.trim() !== '' ? updateData.usuarioResponsavelId : null;
-    }
-    if (updateData.usuarioExecutorId !== undefined) {
-      updateData.usuarioExecutorId = updateData.usuarioExecutorId && updateData.usuarioExecutorId.trim() !== '' ? updateData.usuarioExecutorId : null;
-    }
+    const cleanedUpdateData = this.cleanUuidFields(updateData);
     
     // Se projectId for null/undefined, usar apenas taskId no update
     if (projectId) {
-      await this.projectTaskRepository.update({ id: taskId, projectId }, updateData);
+      await this.projectTaskRepository.update({ id: taskId, projectId }, cleanedUpdateData);
     } else {
-      await this.projectTaskRepository.update({ id: taskId }, updateData);
+      await this.projectTaskRepository.update({ id: taskId }, cleanedUpdateData);
     }
     
     return this.projectTaskRepository.findOne({ where: { id: taskId }, relations: ['usuarioExecutor', 'usuarioResponsavel'] });
