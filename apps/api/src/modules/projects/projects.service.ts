@@ -92,48 +92,69 @@ export class ProjectsService {
   }
 
   async createTask(projectId: string, taskData: Partial<ProjectTask>): Promise<ProjectTask> {
-    const task = this.projectTaskRepository.create({
+    // Limpar campos UUID: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)
+    const cleanTaskData: Partial<ProjectTask> = {
       ...taskData,
-      projectId,
-      status: taskData.status || 'PENDENTE',
+      projectId: projectId && projectId.trim() !== '' ? projectId : null,
+      proposalId: taskData.proposalId && taskData.proposalId.trim() !== '' ? taskData.proposalId : null,
+      clientId: taskData.clientId && taskData.clientId.trim() !== '' ? taskData.clientId : null,
+      phaseId: taskData.phaseId && taskData.phaseId.trim() !== '' ? taskData.phaseId : null,
+      usuarioResponsavelId: taskData.usuarioResponsavelId && taskData.usuarioResponsavelId.trim() !== '' ? taskData.usuarioResponsavelId : null,
+      usuarioExecutorId: taskData.usuarioExecutorId && taskData.usuarioExecutorId.trim() !== '' ? taskData.usuarioExecutorId : null,
+    };
+    
+    const task = this.projectTaskRepository.create({
+      ...cleanTaskData,
+      status: cleanTaskData.status || 'PENDENTE',
     });
     return this.projectTaskRepository.save(task);
   }
 
   async createTaskStandalone(taskData: Partial<ProjectTask>): Promise<ProjectTask> {
+    // Limpar campos UUID: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)
+    const cleanTaskData: Partial<ProjectTask> = {
+      ...taskData,
+      projectId: taskData.projectId && taskData.projectId.trim() !== '' ? taskData.projectId : null,
+      proposalId: taskData.proposalId && taskData.proposalId.trim() !== '' ? taskData.proposalId : null,
+      clientId: taskData.clientId && taskData.clientId.trim() !== '' ? taskData.clientId : null,
+      phaseId: taskData.phaseId && taskData.phaseId.trim() !== '' ? taskData.phaseId : null,
+      usuarioResponsavelId: taskData.usuarioResponsavelId && taskData.usuarioResponsavelId.trim() !== '' ? taskData.usuarioResponsavelId : null,
+      usuarioExecutorId: taskData.usuarioExecutorId && taskData.usuarioExecutorId.trim() !== '' ? taskData.usuarioExecutorId : null,
+    };
+    
     // Validar que pelo menos um vínculo existe
-    if (!taskData.projectId && !taskData.proposalId && !taskData.clientId) {
+    if (!cleanTaskData.projectId && !cleanTaskData.proposalId && !cleanTaskData.clientId) {
       throw new Error('É necessário vincular a um Projeto, Negociação ou Cliente');
     }
     
     // Se não foi especificado, verificar se deve exigir lançamento de horas
-    if (taskData.exigirLancamentoHoras === undefined) {
+    if (cleanTaskData.exigirLancamentoHoras === undefined) {
       // Se está vinculado a uma negociação, verificar se é "Por Horas"
-      if (taskData.proposalId) {
+      if (cleanTaskData.proposalId) {
         const proposal = await this.proposalRepository.findOne({
-          where: { id: taskData.proposalId },
+          where: { id: cleanTaskData.proposalId },
           select: ['tipoContratacao']
         });
         if (proposal && proposal.tipoContratacao === 'HORAS') {
-          taskData.exigirLancamentoHoras = true;
+          cleanTaskData.exigirLancamentoHoras = true;
         }
       }
       // Se está vinculado a um projeto, verificar se o projeto está vinculado a uma negociação "Por Horas"
-      else if (taskData.projectId) {
+      else if (cleanTaskData.projectId) {
         const project = await this.projectRepository.findOne({
-          where: { id: taskData.projectId },
+          where: { id: cleanTaskData.projectId },
           relations: ['proposal'],
           select: ['id', 'proposal']
         });
         if (project?.proposal?.tipoContratacao === 'HORAS') {
-          taskData.exigirLancamentoHoras = true;
+          cleanTaskData.exigirLancamentoHoras = true;
         }
       }
     }
     
     const task = this.projectTaskRepository.create({
-      ...taskData,
-      status: taskData.status || 'PENDENTE',
+      ...cleanTaskData,
+      status: cleanTaskData.status || 'PENDENTE',
     });
     return this.projectTaskRepository.save(task);
   }
@@ -204,6 +225,26 @@ export class ProjectsService {
     if ('dataFimPrevista' in updateData) {
       updateData.dataConclusao = updateData.dataFimPrevista;
       delete updateData.dataFimPrevista;
+    }
+    
+    // Limpar campos UUID: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)
+    if (updateData.projectId !== undefined) {
+      updateData.projectId = updateData.projectId && updateData.projectId.trim() !== '' ? updateData.projectId : null;
+    }
+    if (updateData.proposalId !== undefined) {
+      updateData.proposalId = updateData.proposalId && updateData.proposalId.trim() !== '' ? updateData.proposalId : null;
+    }
+    if (updateData.clientId !== undefined) {
+      updateData.clientId = updateData.clientId && updateData.clientId.trim() !== '' ? updateData.clientId : null;
+    }
+    if (updateData.phaseId !== undefined) {
+      updateData.phaseId = updateData.phaseId && updateData.phaseId.trim() !== '' ? updateData.phaseId : null;
+    }
+    if (updateData.usuarioResponsavelId !== undefined) {
+      updateData.usuarioResponsavelId = updateData.usuarioResponsavelId && updateData.usuarioResponsavelId.trim() !== '' ? updateData.usuarioResponsavelId : null;
+    }
+    if (updateData.usuarioExecutorId !== undefined) {
+      updateData.usuarioExecutorId = updateData.usuarioExecutorId && updateData.usuarioExecutorId.trim() !== '' ? updateData.usuarioExecutorId : null;
     }
     
     // Se projectId for null/undefined, usar apenas taskId no update
