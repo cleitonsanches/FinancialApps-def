@@ -137,19 +137,11 @@ export default function NovaContaPagarPage() {
     })
   }
 
-  const handleQuantidadeParcelasChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const quantidade = parseInt(e.target.value) || 0
-    const valorTotal = getValorAsNumber(formData.totalValue) || 0
-    
+  const generateParcelas = (quantidade: number, valorTotal: number) => {
     const novasParcelas: Array<{ numero: number; valor: string; dueDate: string }> = []
     
     if (quantidade <= 0 || valorTotal <= 0) {
-      setFormData({
-        ...formData,
-        quantidadeParcelas: e.target.value,
-        parcelas: [],
-      })
-      return
+      return []
     }
     
     const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
@@ -171,6 +163,15 @@ export default function NovaContaPagarPage() {
         dueDate: dataVencimento.toISOString().split('T')[0],
       })
     }
+    
+    return novasParcelas
+  }
+
+  const handleQuantidadeParcelasChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const quantidade = parseInt(e.target.value) || 0
+    const valorTotal = getValorAsNumber(formData.totalValue) || 0
+    
+    const novasParcelas = generateParcelas(quantidade, valorTotal)
 
     setFormData({
       ...formData,
@@ -486,13 +487,15 @@ export default function NovaContaPagarPage() {
               {formData.parcelas.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Parcelas
+                    Parcelas ({formData.parcelas.length} parcela{formData.parcelas.length > 1 ? 's' : ''})
                   </label>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
                     {formData.parcelas.map((parcela, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 bg-gray-50 rounded-lg">
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-2 p-3 bg-white rounded-lg border border-gray-200">
                         <div>
-                          <label className="block text-xs text-gray-600 mb-1">Parcela {parcela.numero}</label>
+                          <label className="block text-xs text-gray-600 mb-1 font-medium">
+                            Parcela {parcela.numero} - Valor
+                          </label>
                           <input
                             type="text"
                             value={parcela.valor}
@@ -502,17 +505,36 @@ export default function NovaContaPagarPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 mb-1">Vencimento</label>
+                          <label className="block text-xs text-gray-600 mb-1 font-medium">
+                            Data de Vencimento
+                          </label>
                           <input
                             type="date"
                             value={parcela.dueDate}
                             onChange={(e) => handleParcelaDueDateChange(index, e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-sm"
+                            required
                           />
                         </div>
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+              
+              {formData.quantidadeParcelas && !formData.totalValue && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ Preencha o campo "Valor a Pagar" acima primeiro para gerar as parcelas automaticamente.
+                  </p>
+                </div>
+              )}
+              
+              {formData.quantidadeParcelas && formData.totalValue && formData.parcelas.length === 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    💡 As parcelas serão geradas automaticamente quando você preencher a quantidade de parcelas e o valor.
+                  </p>
                 </div>
               )}
             </div>
@@ -581,7 +603,16 @@ export default function NovaContaPagarPage() {
               value={formData.totalValue}
               onChange={(e) => {
                 const formatted = formatCurrency(e.target.value)
-                setFormData({ ...formData, totalValue: formatted })
+                const novoValorTotal = getValorAsNumber(formatted)
+                
+                // Se for parcelado e já tiver quantidade de parcelas, recalcular parcelas
+                let novasParcelas = formData.parcelas
+                if (formData.tipoPagamento === 'PARCELADO' && formData.quantidadeParcelas) {
+                  const quantidade = parseInt(formData.quantidadeParcelas) || 0
+                  novasParcelas = generateParcelas(quantidade, novoValorTotal)
+                }
+                
+                setFormData({ ...formData, totalValue: formatted, parcelas: novasParcelas })
               }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
               placeholder="0,00"
