@@ -194,21 +194,24 @@ export class ProposalsService {
     const proposal = this.proposalRepository.create(cleanedData);
     const saved = await this.proposalRepository.save(proposal);
     
-    console.log('ProposalsService.create - Proposta salva:', saved);
-    console.log('ProposalsService.create - Parcelas salvas (string):', saved.parcelas);
+    // TypeORM save() pode retornar T ou T[], garantir que temos um único objeto
+    const savedProposal = Array.isArray(saved) ? saved[0] : saved;
+    
+    console.log('ProposalsService.create - Proposta salva:', savedProposal);
+    console.log('ProposalsService.create - Parcelas salvas (string):', savedProposal.parcelas);
     
     // Converter parcelas de volta para array ao retornar
-    if (saved.parcelas) {
+    if (savedProposal.parcelas) {
       try {
-        (saved as any).parcelas = JSON.parse(saved.parcelas);
-        console.log('ProposalsService.create - Parcelas parseadas de volta:', (saved as any).parcelas);
+        (savedProposal as any).parcelas = JSON.parse(savedProposal.parcelas);
+        console.log('ProposalsService.create - Parcelas parseadas de volta:', (savedProposal as any).parcelas);
       } catch (e) {
         console.error('ProposalsService.create - Erro ao fazer parse das parcelas:', e);
         // Se não for JSON válido, manter como está
       }
     }
     
-    return saved;
+    return savedProposal;
   }
 
   async update(id: string, proposalData: any): Promise<Proposal> {
