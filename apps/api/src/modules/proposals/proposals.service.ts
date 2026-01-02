@@ -324,7 +324,7 @@ export class ProposalsService {
 
       // Se status mudou de FECHADA para outro (RASCUNHO, ENVIADA, etc.), deletar projetos e tarefas
       if (existingProposal.status === 'FECHADA' && 
-          ['RASCUNHO', 'ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(updateData.status)) {
+          ['RASCUNHO', 'ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(cleanedUpdateData.status)) {
         for (const project of linkedProjects) {
           if (project.tasks) {
             // Deletar time_entries primeiro (foreign key constraint)
@@ -340,7 +340,7 @@ export class ProposalsService {
       }
 
       // Se status mudou para DECLINADA, deletar projetos e tarefas
-      if (updateData.status === 'DECLINADA') {
+      if (cleanedUpdateData.status === 'DECLINADA') {
         for (const project of linkedProjects) {
           if (project.tasks) {
             // Deletar time_entries primeiro (foreign key constraint)
@@ -356,7 +356,7 @@ export class ProposalsService {
       }
 
       // Se status mudou para CANCELADA, alterar status dos projetos e tarefas
-      if (updateData.status === 'CANCELADA') {
+      if (cleanedUpdateData.status === 'CANCELADA') {
         for (const project of linkedProjects) {
           await this.projectRepository.update(project.id, { status: 'NEGOCIACAO_CANCELADA' });
           if (project.tasks) {
