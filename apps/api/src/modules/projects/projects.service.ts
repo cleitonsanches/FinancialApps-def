@@ -95,6 +95,7 @@ export class ProjectsService {
   private cleanUuidFields(data: any): any {
     const uuidFields = ['projectId', 'proposalId', 'clientId', 'phaseId', 'usuarioResponsavelId', 'usuarioExecutorId'];
     const numericFields = ['ordem']; // Campos numéricos que não podem receber strings vazias
+    const stringFields = ['horasEstimadas']; // Campos string que podem receber números do frontend
     const cleaned = { ...data };
     
     // Limpar campos UUID
