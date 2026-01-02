@@ -710,6 +710,26 @@ export default function AgendaPage() {
     return labels[status] || status
   }
 
+  // Verificar se a tarefa está atrasada (status PENDENTE e data de conclusão < hoje)
+  const isTaskOverdue = (task: any): boolean => {
+    if (task.status !== 'PENDENTE') return false
+    const dateToCheck = task.dataConclusao || task.dataFimPrevista
+    if (!dateToCheck) return false
+    
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Zerar hora para comparar apenas a data
+    
+    let taskDate: Date
+    if (typeof dateToCheck === 'string') {
+      taskDate = new Date(dateToCheck.split('T')[0])
+    } else {
+      taskDate = new Date(dateToCheck)
+    }
+    taskDate.setHours(0, 0, 0, 0) // Zerar hora para comparar apenas a data
+    
+    return taskDate < today
+  }
+
   // Filtrar tarefas
   const filteredTasks = tasks.filter((task) => {
     if (filterTipo) {
@@ -1200,6 +1220,11 @@ export default function AgendaPage() {
                               <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getTaskStatusColor(task.status)}`}>
                                 {getTaskStatusLabel(task.status)}
                               </span>
+                              {isTaskOverdue(task) && (
+                                <span className="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-red-100 text-red-800 border border-red-300">
+                                  Atrasada
+                                </span>
+                              )}
                               {timeDisplay && (
                                 <span className="text-xs text-gray-600 font-medium whitespace-nowrap">
                                   {timeDisplay}
