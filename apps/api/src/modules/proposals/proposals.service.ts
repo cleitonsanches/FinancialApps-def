@@ -168,27 +168,30 @@ export class ProposalsService {
   }
 
   async create(proposalData: Partial<Proposal>): Promise<Proposal> {
+    // Limpar campos: converter strings vazias para null, validar tipos
+    const cleanedData = this.cleanProposalFields(proposalData);
+    
     // Garantir que status seja RASCUNHO ao criar
-    proposalData.status = 'RASCUNHO';
+    cleanedData.status = 'RASCUNHO';
     
     // Gerar número sequencial no formato: sequencial/ano
-    if (!proposalData.numero) {
+    if (!cleanedData.numero) {
       const currentYear = new Date().getFullYear();
       const count = await this.proposalRepository.count({
-        where: { companyId: proposalData.companyId },
+        where: { companyId: cleanedData.companyId },
       });
       const sequencial = count + 1;
-      proposalData.numero = `${sequencial}/${currentYear}`;
+      cleanedData.numero = `${sequencial}/${currentYear}`;
     }
     
     // Converter parcelas para JSON string se existir
-    if ((proposalData as any).parcelas && Array.isArray((proposalData as any).parcelas)) {
-      console.log('ProposalsService.create - Parcelas recebidas:', (proposalData as any).parcelas);
-      (proposalData as any).parcelas = JSON.stringify((proposalData as any).parcelas);
-      console.log('ProposalsService.create - Parcelas convertidas para JSON:', (proposalData as any).parcelas);
+    if ((cleanedData as any).parcelas && Array.isArray((cleanedData as any).parcelas)) {
+      console.log('ProposalsService.create - Parcelas recebidas:', (cleanedData as any).parcelas);
+      (cleanedData as any).parcelas = JSON.stringify((cleanedData as any).parcelas);
+      console.log('ProposalsService.create - Parcelas convertidas para JSON:', (cleanedData as any).parcelas);
     }
     
-    const proposal = this.proposalRepository.create(proposalData);
+    const proposal = this.proposalRepository.create(cleanedData);
     const saved = await this.proposalRepository.save(proposal);
     
     console.log('ProposalsService.create - Proposta salva:', saved);
@@ -277,6 +280,9 @@ export class ProposalsService {
       console.log('ProposalsService.update - Parcelas (não array):', updateData.parcelas);
     }
     
+    // Limpar campos: converter strings vazias para null, validar tipos
+    const cleanedUpdateData = this.cleanProposalFields(updateData);
+    
     const existingProposal = await this.findOne(id);
     if (!existingProposal) {
       throw new Error('Proposta não encontrada');
@@ -287,24 +293,24 @@ export class ProposalsService {
       const today = new Date()
       
       // Registrar data da mudança de status
-      switch (updateData.status) {
+      switch (cleanedUpdateData.status) {
         case 'ENVIADA':
-          updateData.dataEnvio = today
+          cleanedUpdateData.dataEnvio = today
           break
         case 'RE_ENVIADA':
-          updateData.dataReEnvio = today
+          cleanedUpdateData.dataReEnvio = today
           break
         case 'REVISADA':
-          updateData.dataRevisao = today
+          cleanedUpdateData.dataRevisao = today
           break
         case 'FECHADA':
-          updateData.dataFechamento = today
+          cleanedUpdateData.dataFechamento = today
           break
         case 'DECLINADA':
-          updateData.dataDeclinio = today
+          cleanedUpdateData.dataDeclinio = today
           break
         case 'CANCELADA':
-          updateData.dataCancelamento = today
+          cleanedUpdateData.dataCancelamento = today
           break
       }
 
@@ -363,8 +369,8 @@ export class ProposalsService {
       }
     }
 
-    console.log('ProposalsService.update - Dados para atualizar:', updateData);
-    await this.proposalRepository.update(id, updateData);
+    console.log('ProposalsService.update - Dados para atualizar:', cleanedUpdateData);
+    await this.proposalRepository.update(id, cleanedUpdateData);
     const updated = await this.findOne(id);
     console.log('ProposalsService.update - Proposta atualizada:', updated);
     return updated;
