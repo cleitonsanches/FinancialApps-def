@@ -629,9 +629,15 @@ export default function NovaNegociacaoPage() {
           dataFaturamento = dataBase.toISOString().split('T')[0]
         }
         
-        // Calcular vencimento baseado em vencimento (dias após faturamento)
+        // Calcular vencimento baseado em dataVencimento (mensal - somar meses a partir da data base)
         let dataVencimento = ''
-        if (dataFaturamento && formData.vencimento) {
+        if (formData.dataVencimento) {
+          // Se tem dataVencimento, usar como data base e somar meses
+          const dataBase = new Date(formData.dataVencimento)
+          dataBase.setMonth(dataBase.getMonth() + (i - 1))
+          dataVencimento = dataBase.toISOString().split('T')[0]
+        } else if (dataFaturamento && formData.vencimento) {
+          // Fallback: se não tem dataVencimento, usar vencimento como dias (compatibilidade)
           const vencimentoDias = parseInt(formData.vencimento.toString()) || 30
           const dataBase = new Date(dataFaturamento)
           dataBase.setDate(dataBase.getDate() + vencimentoDias)
