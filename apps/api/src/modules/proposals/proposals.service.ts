@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Proposal } from '../../database/entities/proposal.entity';
 import { Project, ProjectTask } from '../../database/entities/project.entity';
 import { ProjectTemplate } from '../../database/entities/project-template.entity';
@@ -8,6 +8,7 @@ import { ProjectTemplateTask } from '../../database/entities/project-template-ta
 import { Phase } from '../../database/entities/phase.entity';
 import { Client } from '../../database/entities/client.entity';
 import { ServiceType } from '../../database/entities/service-type.entity';
+import { TimeEntry } from '../../database/entities/time-entry.entity';
 
 @Injectable()
 export class ProposalsService {
@@ -28,6 +29,8 @@ export class ProposalsService {
     private clientRepository: Repository<Client>,
     @InjectRepository(ServiceType)
     private serviceTypeRepository: Repository<ServiceType>,
+    @InjectRepository(TimeEntry)
+    private timeEntryRepository: Repository<TimeEntry>,
   ) {}
 
   async findAll(companyId?: string, status?: string): Promise<Proposal[]> {
@@ -236,6 +239,12 @@ export class ProposalsService {
           ['RASCUNHO', 'ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(updateData.status)) {
         for (const project of linkedProjects) {
           if (project.tasks) {
+            // Deletar time_entries primeiro (foreign key constraint)
+            const taskIds = project.tasks.map(task => task.id);
+            if (taskIds.length > 0) {
+              await this.timeEntryRepository.delete({ taskId: In(taskIds) });
+            }
+            // Depois deletar as tarefas
             await this.projectTaskRepository.delete({ projectId: project.id });
           }
           await this.projectRepository.delete(project.id);
@@ -246,6 +255,12 @@ export class ProposalsService {
       if (updateData.status === 'DECLINADA') {
         for (const project of linkedProjects) {
           if (project.tasks) {
+            // Deletar time_entries primeiro (foreign key constraint)
+            const taskIds = project.tasks.map(task => task.id);
+            if (taskIds.length > 0) {
+              await this.timeEntryRepository.delete({ taskId: In(taskIds) });
+            }
+            // Depois deletar as tarefas
             await this.projectTaskRepository.delete({ projectId: project.id });
           }
           await this.projectRepository.delete(project.id);
