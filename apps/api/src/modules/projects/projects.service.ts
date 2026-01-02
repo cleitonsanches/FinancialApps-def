@@ -91,11 +91,13 @@ export class ProjectsService {
     }
   }
 
-  // Função helper para limpar campos UUID: converter strings vazias para null
+  // Função helper para limpar campos UUID e numéricos: converter strings vazias para null/0
   private cleanUuidFields(data: any): any {
     const uuidFields = ['projectId', 'proposalId', 'clientId', 'phaseId', 'usuarioResponsavelId', 'usuarioExecutorId'];
+    const numericFields = ['ordem']; // Campos numéricos que não podem receber strings vazias
     const cleaned = { ...data };
     
+    // Limpar campos UUID
     for (const field of uuidFields) {
       // Se o campo existe no objeto (mesmo que seja undefined/null/string vazia)
       if (field in cleaned) {
@@ -117,6 +119,40 @@ export class ProjectsService {
         else if (typeof value === 'string' && value.trim() !== '') {
           // Manter o valor, mas garantir que não seja apenas espaços
           cleaned[field] = value.trim();
+        }
+      }
+    }
+    
+    // Limpar campos numéricos
+    for (const field of numericFields) {
+      if (field in cleaned) {
+        const value = cleaned[field];
+        
+        // Se for undefined, remover do objeto (deixar TypeORM usar default)
+        if (value === undefined) {
+          delete cleaned[field];
+        }
+        // Se for null, manter null
+        else if (value === null) {
+          // Manter null
+        }
+        // Se for string vazia ou apenas espaços, converter para 0 (ou remover para usar default)
+        else if (typeof value === 'string' && value.trim() === '') {
+          delete cleaned[field]; // Remover para usar valor default (0)
+        }
+        // Se for string numérica, converter para número
+        else if (typeof value === 'string' && value.trim() !== '') {
+          const numValue = parseInt(value.trim(), 10);
+          if (!isNaN(numValue)) {
+            cleaned[field] = numValue;
+          } else {
+            // Se não for número válido, remover para usar default
+            delete cleaned[field];
+          }
+        }
+        // Se já for número, garantir que não seja NaN
+        else if (typeof value === 'number' && isNaN(value)) {
+          delete cleaned[field];
         }
       }
     }
