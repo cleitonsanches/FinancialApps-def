@@ -418,8 +418,8 @@ function SimpleChart({ data }: { data: Array<{ data: string; contasReceber: numb
           tick={{ fontSize: 12 }}
         />
         <Tooltip 
-          formatter={(value: number) => 
-            new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+          formatter={(value: number | undefined) => 
+            value !== undefined ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value) : ''
           }
           contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
         />
