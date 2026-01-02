@@ -1455,7 +1455,7 @@ export default function AgendaPage() {
                                 setEditTaskData({
                                   description: task.description || '',
                                   dataInicio: formatDateForInput(task.dataInicio),
-                                  dataFimPrevista: formatDateForInput(task.dataConclusao || task.dataFimPrevista),
+                                  dataFimPrevista: formatDateForInput(task.dataConclusao || task.dataFimPrevista || ''),
                                   usuarioResponsavelId: task.usuarioResponsavelId || '',
                                   tipo: task.tipo || 'ATIVIDADE',
                                   horaInicio: task.horaInicio || '',
@@ -1784,7 +1784,7 @@ export default function AgendaPage() {
                     setEditTaskData({
                       description: selectedTask.description || '',
                       dataInicio: formatDateForInput(selectedTask.dataInicio),
-                      dataFimPrevista: formatDateForInput(selectedTask.dataConclusao || selectedTask.dataFimPrevista),
+                      dataFimPrevista: formatDateForInput(selectedTask.dataConclusao || selectedTask.dataFimPrevista || ''),
                       usuarioResponsavelId: selectedTask.usuarioResponsavelId || '',
                       tipo: selectedTask.tipo || 'ATIVIDADE',
                       horaInicio: selectedTask.horaInicio || '',

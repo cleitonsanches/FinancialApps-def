@@ -91,11 +91,12 @@ export class ProjectsService {
     }
   }
 
-  // Função helper para limpar campos UUID e numéricos: converter strings vazias para null/0
+  // Função helper para limpar campos UUID, numéricos e datas: converter strings vazias para null/0
   private cleanUuidFields(data: any): any {
     const uuidFields = ['projectId', 'proposalId', 'clientId', 'phaseId', 'usuarioResponsavelId', 'usuarioExecutorId'];
     const numericFields = ['ordem']; // Campos numéricos que não podem receber strings vazias
     const stringFields = ['horasEstimadas']; // Campos string que podem receber números do frontend
+    const dateFields = ['dataInicio', 'dataConclusao', 'dataFimPrevista']; // Campos de data
     const cleaned = { ...data };
     
     // Limpar campos UUID
@@ -186,6 +187,41 @@ export class ProjectsService {
         // Se for string não vazia, manter (mas trim)
         else if (typeof value === 'string' && value.trim() !== '') {
           cleaned[field] = value.trim();
+        }
+      }
+    }
+    
+    // Limpar campos de data
+    for (const field of dateFields) {
+      if (field in cleaned) {
+        const value = cleaned[field];
+        
+        // Se for undefined, remover do objeto
+        if (value === undefined) {
+          delete cleaned[field];
+        }
+        // Se for null, manter null
+        else if (value === null) {
+          // Manter null
+        }
+        // Se for string vazia ou apenas espaços, converter para null
+        else if (typeof value === 'string' && value.trim() === '') {
+          cleaned[field] = null;
+        }
+        // Se for string não vazia, converter para Date
+        else if (typeof value === 'string' && value.trim() !== '') {
+          const dateValue = new Date(value.trim());
+          if (!isNaN(dateValue.getTime())) {
+            cleaned[field] = dateValue;
+          } else {
+            cleaned[field] = null;
+          }
+        }
+        // Se já for Date, garantir que não seja inválido
+        else if (value instanceof Date) {
+          if (isNaN(value.getTime())) {
+            cleaned[field] = null;
+          }
         }
       }
     }
@@ -312,14 +348,14 @@ export class ProjectsService {
       }
     }
     
-    // Mapear dataFimPrevista para dataConclusao se necessário
+    // Mapear dataFimPrevista para dataConclusao se necessário (o frontend usa dataFimPrevista, mas o banco tem dataConclusao)
     const updateData: any = { ...taskData };
     if ('dataFimPrevista' in updateData) {
       updateData.dataConclusao = updateData.dataFimPrevista;
       delete updateData.dataFimPrevista;
     }
     
-    // Limpar campos UUID: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)
+    // Limpar campos UUID, numéricos e datas: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)
     const cleanedUpdateData = this.cleanUuidFields(updateData);
     
     // Se projectId for null/undefined, usar apenas taskId no update
