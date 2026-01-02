@@ -313,7 +313,7 @@ export default function AgendaPage() {
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
-  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month')
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('day')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
   // Estado inicial: excluir CANCELADA e CONCLUIDA (incluir PENDENTE, EM_PROGRESSO, BLOQUEADA)
@@ -400,7 +400,19 @@ export default function AgendaPage() {
     loadProjects()
     loadCurrentUser()
     loadClients()
+    loadNegotiations()
   }, [])
+  
+  const loadNegotiations = async () => {
+    try {
+      const companyId = getCompanyIdFromToken()
+      const url = companyId ? `/negotiations?companyId=${companyId}` : '/negotiations'
+      const response = await api.get(url)
+      setNegotiations(response.data || [])
+    } catch (error) {
+      console.error('Erro ao carregar negociações:', error)
+    }
+  }
 
   // Fechar dropdown de status ao clicar fora
   useEffect(() => {
@@ -1093,16 +1105,35 @@ export default function AgendaPage() {
                               )}
                             </div>
                             <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:gap-4 text-sm text-gray-500 mb-2">
-                              <div className="break-words">
-                                <span className="font-semibold">Projeto:</span>{' '}
-                                <Link
-                                  href={`/projetos/${task.project?.id}`}
-                                  className="text-primary-600 hover:text-primary-700 underline break-all"
-                                >
-                                  {task.project?.name || '-'}
-                                </Link>
-                              </div>
-                              {task.project?.client && (
+                              {task.project && (
+                                <div className="break-words">
+                                  <span className="font-semibold">Projeto:</span>{' '}
+                                  <Link
+                                    href={`/projetos/${task.project.id}`}
+                                    className="text-primary-600 hover:text-primary-700 underline break-all"
+                                  >
+                                    {task.project.name || '-'}
+                                  </Link>
+                                </div>
+                              )}
+                              {task.proposal && (
+                                <div className="break-words">
+                                  <span className="font-semibold">Negociação:</span>{' '}
+                                  <Link
+                                    href={`/negociacoes/${task.proposal.id}`}
+                                    className="text-primary-600 hover:text-primary-700 underline break-all"
+                                  >
+                                    {task.proposal.numero ? `${task.proposal.numero} - ` : ''}{task.proposal.title || task.proposal.titulo || '-'}
+                                  </Link>
+                                </div>
+                              )}
+                              {task.client && (
+                                <div className="break-words">
+                                  <span className="font-semibold">Cliente:</span>{' '}
+                                  {task.client.name || task.client.razaoSocial || '-'}
+                                </div>
+                              )}
+                              {!task.client && task.project?.client && (
                                 <div className="break-words">
                                   <span className="font-semibold">Cliente:</span>{' '}
                                   {task.project.client.name || task.project.client.razaoSocial || '-'}
