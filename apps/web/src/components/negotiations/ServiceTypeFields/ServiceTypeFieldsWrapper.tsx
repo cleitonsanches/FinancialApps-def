@@ -43,6 +43,8 @@ export default function ServiceTypeFieldsWrapper({
             valorUnitarioUsuario: formData.valorUnitarioUsuario || '',
             dataInicioAssinatura: formData.dataInicioAssinatura || '',
             vencimentoAssinatura: formData.vencimentoAssinatura || '',
+            inicioFaturamento: formData.inicioFaturamento || '',
+            vencimento: formData.vencimento || '',
             valorProposta: formData.valorProposta || '',
           }}
           onChange={handleChange}
