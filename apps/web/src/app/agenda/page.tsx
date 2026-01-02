@@ -320,6 +320,8 @@ export default function AgendaPage() {
   const [filterTipo, setFilterTipo] = useState<string>('')
   const [filterProject, setFilterProject] = useState<string>('')
   const [filterClient, setFilterClient] = useState<string>('')
+  const [sortBy, setSortBy] = useState<'data' | 'cliente' | 'projeto' | 'status'>('data')
+  const [showSortDropdown, setShowSortDropdown] = useState(false)
 
   const handleClearFilters = () => {
     setFilterTipo('')
@@ -328,6 +330,7 @@ export default function AgendaPage() {
     setFilterClient('')
     setStartDate('')
     setEndDate('')
+    setSortBy('data')
   }
   const [tasksWithHours, setTasksWithHours] = useState<Record<string, any[]>>({})
   const [clients, setClients] = useState<any[]>([])
@@ -400,6 +403,20 @@ export default function AgendaPage() {
     loadClients()
     loadNegotiations()
   }, [])
+  
+  // Fechar dropdown de ordenação ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (showSortDropdown && !target.closest('.sort-dropdown-container')) {
+        setShowSortDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSortDropdown])
   
   const loadNegotiations = async () => {
     try {
@@ -755,19 +772,80 @@ export default function AgendaPage() {
     return true
   })
 
-  // Ordenar tarefas por data descendente (mais recentes primeiro)
+  // Ordenar tarefas conforme a opção selecionada
   const sortedFilteredTasks = [...filteredTasks].sort((a, b) => {
-    const getDate = (task: any): Date => {
-      const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
-      if (!dateToUse) return new Date(0) // Sem data vai para o final
-      if (typeof dateToUse === 'string') {
-        return new Date(dateToUse.split('T')[0])
+    switch (sortBy) {
+      case 'data': {
+        const getDate = (task: any): Date => {
+          const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+          if (!dateToUse) return new Date(0) // Sem data vai para o final
+          if (typeof dateToUse === 'string') {
+            return new Date(dateToUse.split('T')[0])
+          }
+          return new Date(dateToUse)
+        }
+        const dateA = getDate(a)
+        const dateB = getDate(b)
+        return dateB.getTime() - dateA.getTime() // Descendente
       }
-      return new Date(dateToUse)
+      case 'cliente': {
+        const clientNameA = (a.client?.name || a.client?.razaoSocial || a.project?.client?.name || a.project?.client?.razaoSocial || '').toLowerCase()
+        const clientNameB = (b.client?.name || b.client?.razaoSocial || b.project?.client?.name || b.project?.client?.razaoSocial || '').toLowerCase()
+        if (clientNameA < clientNameB) return -1
+        if (clientNameA > clientNameB) return 1
+        // Se clientes iguais, ordenar por data
+        const getDate = (task: any): Date => {
+          const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+          if (!dateToUse) return new Date(0)
+          if (typeof dateToUse === 'string') {
+            return new Date(dateToUse.split('T')[0])
+          }
+          return new Date(dateToUse)
+        }
+        const dateA = getDate(a)
+        const dateB = getDate(b)
+        return dateB.getTime() - dateA.getTime()
+      }
+      case 'projeto': {
+        const projectNameA = (a.project?.name || '').toLowerCase()
+        const projectNameB = (b.project?.name || '').toLowerCase()
+        if (projectNameA < projectNameB) return -1
+        if (projectNameA > projectNameB) return 1
+        // Se projetos iguais, ordenar por data
+        const getDate = (task: any): Date => {
+          const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+          if (!dateToUse) return new Date(0)
+          if (typeof dateToUse === 'string') {
+            return new Date(dateToUse.split('T')[0])
+          }
+          return new Date(dateToUse)
+        }
+        const dateA = getDate(a)
+        const dateB = getDate(b)
+        return dateB.getTime() - dateA.getTime()
+      }
+      case 'status': {
+        const statusOrder = ['PENDENTE', 'EM_PROGRESSO', 'BLOQUEADA', 'CONCLUIDA', 'CANCELADA']
+        const statusIndexA = statusOrder.indexOf(a.status) !== -1 ? statusOrder.indexOf(a.status) : 999
+        const statusIndexB = statusOrder.indexOf(b.status) !== -1 ? statusOrder.indexOf(b.status) : 999
+        if (statusIndexA < statusIndexB) return -1
+        if (statusIndexA > statusIndexB) return 1
+        // Se status iguais, ordenar por data
+        const getDate = (task: any): Date => {
+          const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+          if (!dateToUse) return new Date(0)
+          if (typeof dateToUse === 'string') {
+            return new Date(dateToUse.split('T')[0])
+          }
+          return new Date(dateToUse)
+        }
+        const dateA = getDate(a)
+        const dateB = getDate(b)
+        return dateB.getTime() - dateA.getTime()
+      }
+      default:
+        return 0
     }
-    const dateA = getDate(a)
-    const dateB = getDate(b)
-    return dateB.getTime() - dateA.getTime() // Descendente
   })
 
   // Agrupar tarefas por data (usando data de término para agrupamento também)
@@ -1029,6 +1107,40 @@ export default function AgendaPage() {
               {sortedFilteredTasks.length} Atividade(s) encontrada(s)
             </span>
             <div className="flex gap-2">
+              <div className="relative sort-dropdown-container">
+                <button
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium flex items-center gap-2"
+                >
+                  <span>Ordenar por: {sortBy === 'data' ? 'Data' : sortBy === 'cliente' ? 'Cliente' : sortBy === 'projeto' ? 'Projeto' : 'Status'}</span>
+                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showSortDropdown && (
+                  <div className="absolute right-0 z-10 mt-1 w-48 bg-white border border-gray-300 rounded-lg shadow-lg">
+                    {[
+                      { value: 'data', label: 'Data' },
+                      { value: 'cliente', label: 'Cliente' },
+                      { value: 'projeto', label: 'Projeto' },
+                      { value: 'status', label: 'Status' },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setSortBy(option.value as any)
+                          setShowSortDropdown(false)
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                          sortBy === option.value ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleClearFilters}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
