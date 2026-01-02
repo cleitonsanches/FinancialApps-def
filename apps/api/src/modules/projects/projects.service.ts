@@ -123,7 +123,8 @@ export class ProjectsService {
       ...cleanedTaskData,
       status: cleanedTaskData.status || 'PENDENTE',
     });
-    return await this.projectTaskRepository.save(task) as ProjectTask;
+    const saved = await this.projectTaskRepository.save(task);
+    return Array.isArray(saved) ? saved[0] : saved;
   }
 
   async createTaskStandalone(taskData: Partial<ProjectTask>): Promise<ProjectTask> {
