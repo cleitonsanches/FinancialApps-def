@@ -15,7 +15,6 @@ export default function NovaContaPagarPage() {
   const [clients, setClients] = useState<any[]>([])
   
   const [formData, setFormData] = useState({
-    codigo: '',
     supplierId: '',
     description: '',
     chartOfAccountsId: '',
@@ -30,6 +29,12 @@ export default function NovaContaPagarPage() {
     statusReembolso: '',
     dataStatusReembolso: '',
     destinatarioFaturaReembolsoId: '',
+    tipoPagamento: 'UNICO' as 'UNICO' | 'PARCELADO' | 'RECORRENTE',
+    quantidadeParcelas: '',
+    parcelas: [] as Array<{ numero: number; valor: string; dueDate: string }>,
+    periodoRecorrencia: 'MENSAL' as 'MENSAL' | 'TRIMESTRAL' | 'SEMESTRAL' | 'ANUAL',
+    quantidadePeriodos: '',
+    dataInicioRecorrencia: '',
   })
 
   useEffect(() => {
@@ -121,6 +126,71 @@ export default function NovaContaPagarPage() {
     return parseFloat(numbers) / 100
   }
 
+  const handleTipoPagamentoChange = (tipo: 'UNICO' | 'PARCELADO' | 'RECORRENTE') => {
+    setFormData({
+      ...formData,
+      tipoPagamento: tipo,
+      quantidadeParcelas: '',
+      parcelas: [],
+      quantidadePeriodos: '',
+      dataInicioRecorrencia: '',
+    })
+  }
+
+  const handleQuantidadeParcelasChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const quantidade = parseInt(e.target.value) || 0
+    const valorTotal = getValorAsNumber(formData.totalValue) || 0
+    
+    const novasParcelas: Array<{ numero: number; valor: string; dueDate: string }> = []
+    
+    if (quantidade <= 0 || valorTotal <= 0) {
+      setFormData({
+        ...formData,
+        quantidadeParcelas: e.target.value,
+        parcelas: [],
+      })
+      return
+    }
+    
+    const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
+    const valorFormatado = valorPorParcela.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    
+    // Usar data de emissão como base para calcular parcelas
+    const dataBase = formData.emissionDate ? new Date(formData.emissionDate) : new Date()
+    
+    for (let i = 1; i <= quantidade; i++) {
+      const dataVencimento = new Date(dataBase)
+      dataVencimento.setMonth(dataVencimento.getMonth() + (i - 1))
+      
+      novasParcelas.push({
+        numero: i,
+        valor: valorFormatado,
+        dueDate: dataVencimento.toISOString().split('T')[0],
+      })
+    }
+
+    setFormData({
+      ...formData,
+      quantidadeParcelas: e.target.value,
+      parcelas: novasParcelas,
+    })
+  }
+
+  const handleParcelaValorChange = (index: number, valor: string) => {
+    const novasParcelas = [...formData.parcelas]
+    novasParcelas[index].valor = formatCurrency(valor)
+    setFormData({ ...formData, parcelas: novasParcelas })
+  }
+
+  const handleParcelaDueDateChange = (index: number, dueDate: string) => {
+    const novasParcelas = [...formData.parcelas]
+    novasParcelas[index].dueDate = dueDate
+    setFormData({ ...formData, parcelas: novasParcelas })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -145,10 +215,13 @@ export default function NovaContaPagarPage() {
         return
       }
 
-      if (!formData.dueDate) {
-        alert('Por favor, preencha a data de vencimento.')
-        setLoading(false)
-        return
+      // Validações condicionais
+      if (formData.tipoPagamento === 'UNICO') {
+        if (!formData.dueDate) {
+          alert('Por favor, preencha a data de vencimento.')
+          setLoading(false)
+          return
+        }
       }
 
       if (!formData.totalValue) {
@@ -157,15 +230,40 @@ export default function NovaContaPagarPage() {
         return
       }
 
-      const payload: any = {
+      // Validações para parcelamento
+      if (formData.tipoPagamento === 'PARCELADO') {
+        if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+          alert('Por favor, informe a quantidade de parcelas.')
+          setLoading(false)
+          return
+        }
+        if (formData.parcelas.length === 0) {
+          alert('Por favor, configure as parcelas.')
+          setLoading(false)
+          return
+        }
+      }
+
+      // Validações para recorrência
+      if (formData.tipoPagamento === 'RECORRENTE') {
+        if (!formData.quantidadePeriodos || parseInt(formData.quantidadePeriodos) <= 0) {
+          alert('Por favor, informe a quantidade de períodos.')
+          setLoading(false)
+          return
+        }
+        if (!formData.dataInicioRecorrencia) {
+          alert('Por favor, informe a data de início da recorrência.')
+          setLoading(false)
+          return
+        }
+      }
+
+      const basePayload = {
         companyId: companyId,
-        codigo: formData.codigo || null,
         supplierId: formData.supplierId,
         description: formData.description,
         chartOfAccountsId: formData.chartOfAccountsId || null,
         emissionDate: formData.emissionDate,
-        dueDate: formData.dueDate,
-        totalValue: getValorAsNumber(formData.totalValue),
         status: formData.status,
         paymentDate: formData.paymentDate || null,
         bankAccountId: formData.bankAccountId || null,
@@ -176,9 +274,70 @@ export default function NovaContaPagarPage() {
         destinatarioFaturaReembolsoId: formData.isReembolsavel && formData.destinatarioFaturaReembolsoId ? formData.destinatarioFaturaReembolsoId : null,
       }
 
-      await api.post('/accounts-payable', payload)
+      let accountsToCreate: any[] = []
 
-      alert('Conta a pagar criada com sucesso!')
+      if (formData.tipoPagamento === 'UNICO') {
+        // Criar uma única conta
+        accountsToCreate.push({
+          ...basePayload,
+          dueDate: formData.dueDate,
+          totalValue: getValorAsNumber(formData.totalValue),
+        })
+      } else if (formData.tipoPagamento === 'PARCELADO') {
+        // Criar múltiplas contas baseadas nas parcelas
+        accountsToCreate = formData.parcelas.map((parcela) => ({
+          ...basePayload,
+          description: `${formData.description} - Parcela ${parcela.numero}/${formData.parcelas.length}`,
+          dueDate: parcela.dueDate,
+          totalValue: getValorAsNumber(parcela.valor),
+        }))
+      } else if (formData.tipoPagamento === 'RECORRENTE') {
+        // Criar múltiplas contas para recorrência
+        const quantidadePeriodos = parseInt(formData.quantidadePeriodos) || 0
+        const valorPorPeriodo = getValorAsNumber(formData.totalValue)
+        const dataInicio = new Date(formData.dataInicioRecorrencia)
+        
+        for (let i = 0; i < quantidadePeriodos; i++) {
+          const dataVencimento = new Date(dataInicio)
+          
+          // Calcular data de vencimento baseada no período
+          switch (formData.periodoRecorrencia) {
+            case 'MENSAL':
+              dataVencimento.setMonth(dataVencimento.getMonth() + i)
+              break
+            case 'TRIMESTRAL':
+              dataVencimento.setMonth(dataVencimento.getMonth() + (i * 3))
+              break
+            case 'SEMESTRAL':
+              dataVencimento.setMonth(dataVencimento.getMonth() + (i * 6))
+              break
+            case 'ANUAL':
+              dataVencimento.setFullYear(dataVencimento.getFullYear() + i)
+              break
+          }
+          
+          const periodoLabels: Record<string, string> = {
+            'MENSAL': 'Mensal',
+            'TRIMESTRAL': 'Trimestral',
+            'SEMESTRAL': 'Semestral',
+            'ANUAL': 'Anual',
+          }
+          
+          accountsToCreate.push({
+            ...basePayload,
+            description: `${formData.description} - ${periodoLabels[formData.periodoRecorrencia]} ${i + 1}/${quantidadePeriodos}`,
+            dueDate: dataVencimento.toISOString().split('T')[0],
+            totalValue: valorPorPeriodo,
+          })
+        }
+      }
+
+      // Criar todas as contas
+      for (const accountPayload of accountsToCreate) {
+        await api.post('/accounts-payable', accountPayload)
+      }
+
+      alert(`${accountsToCreate.length} conta(s) a pagar criada(s) com sucesso!`)
       router.push('/contas-pagar')
     } catch (error: any) {
       console.error('Erro ao criar conta a pagar:', error)
@@ -205,20 +364,6 @@ export default function NovaContaPagarPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 space-y-6">
-          {/* Código */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Código
-            </label>
-            <input
-              type="text"
-              value={formData.codigo}
-              onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-              placeholder="Código da conta a pagar (opcional)"
-            />
-          </div>
-
           {/* Fornecedor */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -273,20 +418,39 @@ export default function NovaContaPagarPage() {
             </select>
           </div>
 
-          {/* Data de Emissão e Data de Vencimento */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data de Emissão <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.emissionDate}
-                onChange={(e) => setFormData({ ...formData, emissionDate: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
-                required
-              />
-            </div>
+          {/* Tipo de Pagamento */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo de Pagamento <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.tipoPagamento}
+              onChange={(e) => handleTipoPagamentoChange(e.target.value as 'UNICO' | 'PARCELADO' | 'RECORRENTE')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              required
+            >
+              <option value="UNICO">Único</option>
+              <option value="PARCELADO">Parcelado</option>
+              <option value="RECORRENTE">Recorrente (Assinatura)</option>
+            </select>
+          </div>
+
+          {/* Data de Emissão */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Data de Emissão <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={formData.emissionDate}
+              onChange={(e) => setFormData({ ...formData, emissionDate: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+              required
+            />
+          </div>
+
+          {/* Campos específicos para Único */}
+          {formData.tipoPagamento === 'UNICO' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Data de Vencimento <span className="text-red-500">*</span>
@@ -299,7 +463,113 @@ export default function NovaContaPagarPage() {
                 required
               />
             </div>
-          </div>
+          )}
+
+          {/* Campos específicos para Parcelado */}
+          {formData.tipoPagamento === 'PARCELADO' && (
+            <div className="space-y-4 border-l-2 border-primary-200 pl-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantidade de Parcelas <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="2"
+                  value={formData.quantidadeParcelas}
+                  onChange={handleQuantidadeParcelasChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  placeholder="Ex: 3"
+                  required
+                />
+              </div>
+              
+              {formData.parcelas.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Parcelas
+                  </label>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {formData.parcelas.map((parcela, index) => (
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Parcela {parcela.numero}</label>
+                          <input
+                            type="text"
+                            value={parcela.valor}
+                            onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-sm"
+                            placeholder="0,00"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Vencimento</label>
+                          <input
+                            type="date"
+                            value={parcela.dueDate}
+                            onChange={(e) => handleParcelaDueDateChange(index, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-sm"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Campos específicos para Recorrente */}
+          {formData.tipoPagamento === 'RECORRENTE' && (
+            <div className="space-y-4 border-l-2 border-primary-200 pl-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Período <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.periodoRecorrencia}
+                    onChange={(e) => setFormData({ ...formData, periodoRecorrencia: e.target.value as 'MENSAL' | 'TRIMESTRAL' | 'SEMESTRAL' | 'ANUAL' })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    required
+                  >
+                    <option value="MENSAL">Mensal</option>
+                    <option value="TRIMESTRAL">Trimestral</option>
+                    <option value="SEMESTRAL">Semestral</option>
+                    <option value="ANUAL">Anual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantidade de Períodos <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.quantidadePeriodos}
+                    onChange={(e) => setFormData({ ...formData, quantidadePeriodos: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    placeholder="Ex: 12"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Data de Início da Recorrência <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.dataInicioRecorrencia}
+                  onChange={(e) => setFormData({ ...formData, dataInicioRecorrencia: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  A primeira conta será criada com vencimento nesta data
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Valor a Pagar */}
           <div>
