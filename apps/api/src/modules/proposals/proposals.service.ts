@@ -33,6 +33,88 @@ export class ProposalsService {
     private timeEntryRepository: Repository<TimeEntry>,
   ) {}
 
+  // Função helper para limpar campos: UUID, numéricos e datas
+  private cleanProposalFields(data: any): any {
+    const uuidFields = ['clientId', 'companyId', 'userId', 'propostaManutencaoId'];
+    const numericFields = ['valorTotal', 'valorProposta', 'valorPorHora', 'horasEstimadas'];
+    const dateFields = [
+      'dataEnvio', 'dataReEnvio', 'dataRevisao', 'dataFechamento', 'dataDeclinio', 'dataCancelamento',
+      'dataValidade', 'dataLimiteAceite', 'previsaoConclusao', 'inicioFaturamento', 'dataEntregaHomologacao',
+      'dataEntregaProducao', 'dataInicioTrabalho', 'dataFaturamento', 'dataVencimento', 'dataInicio'
+    ];
+    const cleaned = { ...data };
+    
+    // Limpar campos UUID
+    for (const field of uuidFields) {
+      if (field in cleaned) {
+        const value = cleaned[field];
+        if (value === undefined) {
+          delete cleaned[field];
+        } else if (value === null) {
+          // Manter null
+        } else if (typeof value === 'string' && value.trim() === '') {
+          cleaned[field] = null;
+        } else if (typeof value === 'string' && value.trim() !== '') {
+          cleaned[field] = value.trim();
+        }
+      }
+    }
+    
+    // Limpar campos numéricos
+    for (const field of numericFields) {
+      if (field in cleaned) {
+        const value = cleaned[field];
+        if (value === undefined) {
+          delete cleaned[field];
+        } else if (value === null) {
+          // Manter null
+        } else if (typeof value === 'string' && value.trim() === '') {
+          cleaned[field] = null;
+        } else if (typeof value === 'string' && value.trim() !== '') {
+          const numValue = parseFloat(value.trim());
+          if (!isNaN(numValue)) {
+            cleaned[field] = numValue;
+          } else {
+            cleaned[field] = null;
+          }
+        } else if (typeof value === 'number' && isNaN(value)) {
+          cleaned[field] = null;
+        }
+      }
+    }
+    
+    // Limpar campos de data
+    for (const field of dateFields) {
+      if (field in cleaned) {
+        const value = cleaned[field];
+        if (value === undefined) {
+          delete cleaned[field];
+        } else if (value === null) {
+          // Manter null
+        } else if (typeof value === 'string' && value.trim() === '') {
+          cleaned[field] = null;
+        } else if (typeof value === 'string' && value.trim() !== '') {
+          // Tentar converter string para Date
+          const dateValue = new Date(value.trim());
+          if (!isNaN(dateValue.getTime())) {
+            cleaned[field] = dateValue;
+          } else {
+            cleaned[field] = null;
+          }
+        }
+        // Se já for Date, manter (mas validar)
+        else if (value instanceof Date) {
+          if (isNaN(value.getTime())) {
+            cleaned[field] = null;
+          }
+          // Senão, manter o Date
+        }
+      }
+    }
+    
+    return cleaned;
+  }
+
   async findAll(companyId?: string, status?: string): Promise<Proposal[]> {
     const where: any = {};
     if (companyId) {
