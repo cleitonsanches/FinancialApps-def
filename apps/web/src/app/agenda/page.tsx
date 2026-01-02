@@ -713,9 +713,9 @@ export default function AgendaPage() {
     return labels[status] || status
   }
 
-  // Verificar se a tarefa está atrasada (status PENDENTE e data de conclusão < hoje)
+  // Verificar se a tarefa está atrasada (status PENDENTE, EM_PROGRESSO ou BLOQUEADA e data de conclusão < hoje)
   const isTaskOverdue = (task: any): boolean => {
-    if (task.status !== 'PENDENTE') return false
+    if (task.status !== 'PENDENTE' && task.status !== 'EM_PROGRESSO' && task.status !== 'BLOQUEADA') return false
     const dateToCheck = task.dataConclusao || task.dataFimPrevista
     if (!dateToCheck) return false
     
@@ -878,7 +878,7 @@ export default function AgendaPage() {
     }
   })
 
-  // Agrupar tarefas por data (usando data de término para agrupamento também)
+  // Agrupar tarefas por data (as tarefas já estão ordenadas em sortedFilteredTasks)
   const tasksByDate = sortedFilteredTasks.reduce((acc: any, task: any) => {
     // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
     let date: string = 'sem-data'
@@ -902,7 +902,36 @@ export default function AgendaPage() {
     return acc
   }, {})
 
-  const sortedDates = Object.keys(tasksByDate).sort().reverse() // Reverso para mais recentes primeiro
+  // Ordenar as datas - se sortBy for 'data', manter a ordem já aplicada em sortedFilteredTasks
+  // Para outros critérios de ordenação, ordenar as datas normalmente
+  let sortedDates: string[]
+  if (sortBy === 'data') {
+    // Para ordenação por data, manter a ordem das datas conforme a ordenação aplicada
+    // As tarefas já estão ordenadas em sortedFilteredTasks, então pegamos as datas na ordem que aparecem
+    const dateOrder: string[] = []
+    sortedFilteredTasks.forEach((task: any) => {
+      let date: string = 'sem-data'
+      const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+      if (dateToUse) {
+        if (typeof dateToUse === 'string') {
+          date = dateToUse.split('T')[0]
+        } else {
+          const dateObj = dateToUse as Date
+          const year = dateObj.getFullYear()
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+          const day = String(dateObj.getDate()).padStart(2, '0')
+          date = `${year}-${month}-${day}`
+        }
+      }
+      if (!dateOrder.includes(date)) {
+        dateOrder.push(date)
+      }
+    })
+    sortedDates = dateOrder
+  } else {
+    // Para outras ordenações, ordenar datas normalmente (descendente)
+    sortedDates = Object.keys(tasksByDate).sort().reverse()
+  }
 
   if (loading) {
     return (
