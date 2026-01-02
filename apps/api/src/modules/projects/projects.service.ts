@@ -97,14 +97,27 @@ export class ProjectsService {
     const cleaned = { ...data };
     
     for (const field of uuidFields) {
-      if (cleaned[field] !== undefined && cleaned[field] !== null) {
+      // Se o campo existe no objeto (mesmo que seja undefined/null/string vazia)
+      if (field in cleaned) {
+        const value = cleaned[field];
+        
+        // Se for undefined, remover do objeto
+        if (value === undefined) {
+          delete cleaned[field];
+        }
+        // Se for null, manter null (já está correto)
+        else if (value === null) {
+          // Manter null, não fazer nada
+        }
         // Se for string vazia ou apenas espaços, converter para null
-        if (typeof cleaned[field] === 'string' && cleaned[field].trim() === '') {
+        else if (typeof value === 'string' && value.trim() === '') {
           cleaned[field] = null;
         }
-      } else if (cleaned[field] === undefined) {
-        // Se for undefined, não incluir no objeto (deixar TypeORM usar default)
-        delete cleaned[field];
+        // Se for string não vazia, verificar se é UUID válido (opcional, apenas para debug)
+        else if (typeof value === 'string' && value.trim() !== '') {
+          // Manter o valor, mas garantir que não seja apenas espaços
+          cleaned[field] = value.trim();
+        }
       }
     }
     
