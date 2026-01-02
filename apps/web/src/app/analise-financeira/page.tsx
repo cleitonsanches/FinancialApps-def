@@ -386,53 +386,56 @@ export default function AnaliseFinanceiraPage() {
   )
 }
 
-// Componente de gráfico simples (sem recharts por enquanto)
+// Componente de gráfico com Recharts
 function SimpleChart({ data }: { data: Array<{ data: string; contasReceber: number; contasPagar: number; saldo: number }> }) {
-  const maxValue = Math.max(...data.map(d => Math.max(d.contasReceber, d.contasPagar, Math.abs(d.saldo))))
+  const chartData = data.map(item => ({
+    data: new Date(item.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+    'Contas a Receber': item.contasReceber,
+    'Contas a Pagar': item.contasPagar,
+    'Saldo': item.saldo,
+    dataFull: item.data
+  }))
+
   const today = new Date().toISOString().split('T')[0]
 
   return (
-    <div className="relative h-full">
-      <div className="absolute inset-0 flex items-end justify-between gap-1">
-        {data.map((item, index) => {
-          const receberHeight = (item.contasReceber / maxValue) * 100
-          const pagarHeight = (item.contasPagar / maxValue) * 100
-          const isToday = item.data === today
-
-          return (
-            <div key={index} className="flex-1 flex flex-col items-center gap-1 relative">
-              {isToday && (
-                <div className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10" />
-              )}
-              <div className="w-full flex flex-col items-center justify-end gap-0.5" style={{ height: '90%' }}>
-                {/* Contas a Receber (verde) */}
-                {item.contasReceber > 0 && (
-                  <div
-                    className="w-full bg-green-500 rounded-t hover:bg-green-600 transition-colors"
-                    style={{ height: `${receberHeight}%` }}
-                    title={`Receber: ${item.contasReceber.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
-                  />
-                )}
-                {/* Contas a Pagar (vermelho) */}
-                {item.contasPagar > 0 && (
-                  <div
-                    className="w-full bg-red-500 hover:bg-red-600 transition-colors"
-                    style={{ height: `${pagarHeight}%` }}
-                    title={`Pagar: ${item.contasPagar.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
-                  />
-                )}
-              </div>
-              {/* Data */}
-              <div className="text-xs text-gray-600 transform -rotate-45 origin-top-left whitespace-nowrap" style={{ fontSize: '10px' }}>
-                {new Date(item.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      {/* Linha de saldo */}
-      <div className="absolute bottom-0 left-0 right-0 border-t-2 border-dashed border-blue-400 opacity-50" />
-    </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <XAxis 
+          dataKey="data" 
+          angle={-45} 
+          textAnchor="end" 
+          height={80}
+          tick={{ fontSize: 12 }}
+        />
+        <YAxis 
+          tickFormatter={(value) => {
+            if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`
+            if (value >= 1000) return `R$ ${(value / 1000).toFixed(0)}k`
+            return `R$ ${value.toFixed(0)}`
+          }}
+          tick={{ fontSize: 12 }}
+        />
+        <Tooltip 
+          formatter={(value: number) => 
+            new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+          }
+          contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+        />
+        <Legend />
+        <Bar dataKey="Contas a Receber" fill="#10b981" name="Contas a Receber" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Contas a Pagar" fill="#ef4444" name="Contas a Pagar" radius={[4, 4, 0, 0]} />
+        <Line 
+          type="monotone" 
+          dataKey="Saldo" 
+          stroke="#3b82f6" 
+          strokeWidth={2}
+          name="Saldo"
+          dot={{ fill: '#3b82f6', r: 3 }}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
   )
 }
 
