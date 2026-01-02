@@ -158,6 +158,38 @@ export class ProjectsService {
       }
     }
     
+    // Limpar campos string (que podem receber números do frontend)
+    for (const field of stringFields) {
+      if (field in cleaned) {
+        const value = cleaned[field];
+        
+        // Se for undefined, remover do objeto
+        if (value === undefined) {
+          delete cleaned[field];
+        }
+        // Se for null, manter null
+        else if (value === null) {
+          // Manter null
+        }
+        // Se for número, converter para string (horasEstimadas é varchar no banco)
+        else if (typeof value === 'number') {
+          if (isNaN(value)) {
+            delete cleaned[field];
+          } else {
+            cleaned[field] = value.toString();
+          }
+        }
+        // Se for string vazia ou apenas espaços, converter para null
+        else if (typeof value === 'string' && value.trim() === '') {
+          cleaned[field] = null;
+        }
+        // Se for string não vazia, manter (mas trim)
+        else if (typeof value === 'string' && value.trim() !== '') {
+          cleaned[field] = value.trim();
+        }
+      }
+    }
+    
     return cleaned;
   }
 
