@@ -123,7 +123,7 @@ export class ProjectsService {
       ...cleanedTaskData,
       status: cleanedTaskData.status || 'PENDENTE',
     });
-    return this.projectTaskRepository.save(task);
+    return await this.projectTaskRepository.save(task) as ProjectTask;
   }
 
   async createTaskStandalone(taskData: Partial<ProjectTask>): Promise<ProjectTask> {
@@ -164,7 +164,7 @@ export class ProjectsService {
       ...cleanedTaskData,
       status: cleanedTaskData.status || 'PENDENTE',
     });
-    return this.projectTaskRepository.save(task);
+    return await this.projectTaskRepository.save(task) as ProjectTask;
   }
 
   async updateTask(projectId: string | null | undefined, taskId: string, taskData: Partial<ProjectTask>): Promise<ProjectTask> {
