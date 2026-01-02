@@ -316,15 +316,14 @@ export default function AgendaPage() {
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('day')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
-  // Estado inicial: excluir CANCELADA e CONCLUIDA (incluir PENDENTE, EM_PROGRESSO, BLOQUEADA)
-  const [filterStatus, setFilterStatus] = useState<string[]>(['PENDENTE', 'EM_PROGRESSO', 'BLOQUEADA'])
+  const [selectedTab, setSelectedTab] = useState<'TODAS' | 'PENDENTES' | 'EM_PROGRESSO' | 'BLOQUEADAS' | 'CONCLUIDAS' | 'CANCELADAS'>('TODAS')
   const [filterTipo, setFilterTipo] = useState<string>('')
   const [filterProject, setFilterProject] = useState<string>('')
   const [filterClient, setFilterClient] = useState<string>('')
 
   const handleClearFilters = () => {
     setFilterTipo('')
-    setFilterStatus(['PENDENTE', 'EM_PROGRESSO', 'BLOQUEADA'])
+    setSelectedTab('TODAS')
     setFilterProject('')
     setFilterClient('')
     setStartDate('')
@@ -332,7 +331,6 @@ export default function AgendaPage() {
   }
   const [tasksWithHours, setTasksWithHours] = useState<Record<string, any[]>>({})
   const [clients, setClients] = useState<any[]>([])
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   
   // Modals
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false)
@@ -414,19 +412,6 @@ export default function AgendaPage() {
     }
   }
 
-  // Fechar dropdown de status ao clicar fora
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (showStatusDropdown && !target.closest('.status-dropdown-container')) {
-        setShowStatusDropdown(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showStatusDropdown])
   
   const loadClients = async () => {
     try {
@@ -714,7 +699,17 @@ export default function AgendaPage() {
       const taskTipo = task.tipo || 'ATIVIDADE' // Default para ATIVIDADE se não tiver tipo
       if (taskTipo !== filterTipo) return false
     }
-    if (filterStatus.length > 0 && !filterStatus.includes(task.status)) return false
+    // Filtrar por aba selecionada
+    if (selectedTab !== 'TODAS') {
+      const statusMap: Record<string, string> = {
+        'PENDENTES': 'PENDENTE',
+        'EM_PROGRESSO': 'EM_PROGRESSO',
+        'BLOQUEADAS': 'BLOQUEADA',
+        'CONCLUIDAS': 'CONCLUIDA',
+        'CANCELADAS': 'CANCELADA',
+      }
+      if (task.status !== statusMap[selectedTab]) return false
+    }
     if (filterProject && task.project?.id !== filterProject) return false
     if (filterClient) {
       // Se um projeto está selecionado, verificar se o cliente do projeto corresponde
@@ -760,8 +755,23 @@ export default function AgendaPage() {
     return true
   })
 
+  // Ordenar tarefas por data descendente (mais recentes primeiro)
+  const sortedFilteredTasks = [...filteredTasks].sort((a, b) => {
+    const getDate = (task: any): Date => {
+      const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+      if (!dateToUse) return new Date(0) // Sem data vai para o final
+      if (typeof dateToUse === 'string') {
+        return new Date(dateToUse.split('T')[0])
+      }
+      return new Date(dateToUse)
+    }
+    const dateA = getDate(a)
+    const dateB = getDate(b)
+    return dateB.getTime() - dateA.getTime() // Descendente
+  })
+
   // Agrupar tarefas por data (usando data de término para agrupamento também)
-  const tasksByDate = filteredTasks.reduce((acc: any, task: any) => {
+  const tasksByDate = sortedFilteredTasks.reduce((acc: any, task: any) => {
     // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
     let date: string = 'sem-data'
     const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
@@ -784,7 +794,7 @@ export default function AgendaPage() {
     return acc
   }, {})
 
-  const sortedDates = Object.keys(tasksByDate).sort()
+  const sortedDates = Object.keys(tasksByDate).sort().reverse() // Reverso para mais recentes primeiro
 
   if (loading) {
     return (
@@ -871,9 +881,39 @@ export default function AgendaPage() {
           </div>
         </div>
 
+        {/* Abas de Status */}
+        <div className="bg-white rounded-lg shadow-md mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="flex flex-wrap -mb-px" aria-label="Tabs">
+              {[
+                { value: 'TODAS', label: 'Todas' },
+                { value: 'PENDENTES', label: 'Pendentes' },
+                { value: 'EM_PROGRESSO', label: 'Em Progresso' },
+                { value: 'BLOQUEADAS', label: 'Bloqueadas' },
+                { value: 'CONCLUIDAS', label: 'Concluídas' },
+                { value: 'CANCELADAS', label: 'Canceladas' },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setSelectedTab(tab.value as any)}
+                  className={`
+                    px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                    ${selectedTab === tab.value
+                      ? 'border-primary-600 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }
+                  `}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Filtrar por Tipo
@@ -887,56 +927,6 @@ export default function AgendaPage() {
                 <option value="ATIVIDADE">Atividades</option>
                 <option value="EVENTO">Eventos</option>
               </select>
-            </div>
-            <div className="relative status-dropdown-container">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Filtrar por Status
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-left flex items-center justify-between hover:bg-gray-50"
-                >
-                  <span className="text-sm text-gray-700">
-                    {filterStatus.length === 0 
-                      ? 'Nenhum selecionado'
-                      : filterStatus.length === 5
-                      ? 'Todos selecionados'
-                      : `${filterStatus.length} selecionado(s)`}
-                  </span>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {showStatusDropdown && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {[
-                      { value: 'PENDENTE', label: 'Pendente' },
-                      { value: 'EM_PROGRESSO', label: 'Em Progresso' },
-                      { value: 'CONCLUIDA', label: 'Concluída' },
-                      { value: 'BLOQUEADA', label: 'Bloqueada' },
-                      { value: 'CANCELADA', label: 'Cancelada' },
-                    ].map((status) => (
-                      <label key={status.value} className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-gray-50">
-                        <input
-                          type="checkbox"
-                          checked={filterStatus.includes(status.value)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFilterStatus([...filterStatus, status.value])
-                            } else {
-                              setFilterStatus(filterStatus.filter(s => s !== status.value))
-                            }
-                          }}
-                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="text-sm text-gray-700">{status.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1036,7 +1026,7 @@ export default function AgendaPage() {
           {/* Contador e botão em linha separada */}
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <span className="text-sm text-gray-600 font-medium">
-              {filteredTasks.length} Atividade(s) encontrada(s)
+              {sortedFilteredTasks.length} Atividade(s) encontrada(s)
             </span>
             <div className="flex gap-2">
               <button
