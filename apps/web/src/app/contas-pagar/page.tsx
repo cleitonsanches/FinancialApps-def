@@ -471,7 +471,19 @@ export default function ContasPagarPage() {
             </button>
             <NavigationLinks />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Contas a Pagar</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-gray-900">Contas a Pagar</h1>
+            <Link
+              href="/contas-receber"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center gap-2 transition-colors"
+              title="Ir para Contas a Receber"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Contas a Receber
+            </Link>
+          </div>
         </div>
 
         {/* Filtros */}
