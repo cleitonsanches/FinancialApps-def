@@ -2158,8 +2158,6 @@ export default function NegotiationDetailsPage() {
                   <div className="font-semibold">Criar Manualmente</div>
                   <div className="text-sm text-gray-100">Criar projeto com dados da negociação (número, cliente, tipo de serviço). As tarefas podem ser adicionadas posteriormente na aba de Projetos.</div>
                 </button>
-              </div>
-              <div className="space-y-3 mb-6">
                 <button
                   onClick={handleSkipProject}
                   className="w-full px-4 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-left"
