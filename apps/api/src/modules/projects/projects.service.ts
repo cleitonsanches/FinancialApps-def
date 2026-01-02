@@ -73,7 +73,7 @@ export class ProjectsService {
     try {
       return await this.projectTaskRepository.find({ 
         where,
-        relations: ['project', 'project.client', 'project.proposal', 'proposal', 'usuarioExecutor', 'usuarioResponsavel', 'phase'],
+        relations: ['project', 'project.client', 'project.proposal', 'proposal', 'client', 'usuarioExecutor', 'usuarioResponsavel', 'phase'],
         order: { ordem: 'ASC' },
       });
     } catch (error: any) {
