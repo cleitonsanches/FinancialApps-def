@@ -166,10 +166,14 @@ export class ProjectsController {
     @Request() req?: any,
   ): Promise<any> {
     const userId = req?.user?.id;
+    const companyId = req?.user?.companyId;
     if (!userId) {
       throw new Error('Usuário não autenticado');
     }
-    return this.projectsService.createTaskComment(taskId, userId, commentData.texto);
+    if (!companyId) {
+      throw new Error('CompanyId não encontrado');
+    }
+    return this.projectsService.createTaskComment(taskId, userId, commentData.texto, companyId);
   }
 
   @Delete('tasks/comments/:commentId')

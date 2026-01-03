@@ -1149,7 +1149,7 @@ export class ProjectsService {
     });
   }
 
-  async createTaskComment(taskId: string, userId: string, texto: string): Promise<TaskComment> {
+  async createTaskComment(taskId: string, userId: string, texto: string, companyId: string): Promise<TaskComment> {
     // Verificar se a tarefa existe
     const task = await this.projectTaskRepository.findOne({ where: { id: taskId } });
     if (!task) {
@@ -1165,6 +1165,7 @@ export class ProjectsService {
     const comment = this.taskCommentRepository.create({
       taskId,
       userId,
+      companyId,
       texto,
     });
 
