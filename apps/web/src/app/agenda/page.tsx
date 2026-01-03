@@ -354,15 +354,20 @@ export default function AgendaPage() {
     percentual: '',
   })
   const [editTaskData, setEditTaskData] = useState({
+    name: '',
     description: '',
+    status: 'PENDENTE',
     dataInicio: '',
     dataFimPrevista: '',
     usuarioResponsavelId: '',
+    usuarioExecutorId: '',
     tipo: 'ATIVIDADE',
+    horasEstimadas: '',
     horaInicio: '',
     horaFim: '',
     semPrazoDefinido: false,
     diaInteiro: false,
+    exigirLancamentoHoras: false,
   })
   const [newTimeEntry, setNewTimeEntry] = useState({
     projectId: '',
@@ -1453,15 +1458,20 @@ export default function AgendaPage() {
                                 }
                                 
                                 setEditTaskData({
+                                  name: task.name || '',
                                   description: task.description || '',
+                                  status: task.status || 'PENDENTE',
                                   dataInicio: formatDateForInput(task.dataInicio),
                                   dataFimPrevista: formatDateForInput(task.dataConclusao || task.dataFimPrevista || ''),
                                   usuarioResponsavelId: task.usuarioResponsavelId || '',
+                                  usuarioExecutorId: task.usuarioExecutorId || '',
                                   tipo: task.tipo || 'ATIVIDADE',
+                                  horasEstimadas: task.horasEstimadas || '',
                                   horaInicio: task.horaInicio || '',
                                   horaFim: task.horaFim || '',
                                   semPrazoDefinido: task.semPrazoDefinido || false,
                                   diaInteiro: task.diaInteiro || false,
+                                  exigirLancamentoHoras: task.exigirLancamentoHoras || false,
                                 })
                                 setShowEditTaskModal(true)
                               }}
@@ -1782,15 +1792,20 @@ export default function AgendaPage() {
                       return `${year}-${month}-${day}`
                     }
                     setEditTaskData({
+                      name: selectedTask.name || '',
                       description: selectedTask.description || '',
+                      status: selectedTask.status || 'PENDENTE',
                       dataInicio: formatDateForInput(selectedTask.dataInicio),
                       dataFimPrevista: formatDateForInput(selectedTask.dataConclusao || selectedTask.dataFimPrevista || ''),
                       usuarioResponsavelId: selectedTask.usuarioResponsavelId || '',
+                      usuarioExecutorId: selectedTask.usuarioExecutorId || '',
                       tipo: selectedTask.tipo || 'ATIVIDADE',
+                      horasEstimadas: selectedTask.horasEstimadas || '',
                       horaInicio: selectedTask.horaInicio || '',
                       horaFim: selectedTask.horaFim || '',
                       semPrazoDefinido: selectedTask.semPrazoDefinido || false,
                       diaInteiro: selectedTask.diaInteiro || false,
+                      exigirLancamentoHoras: selectedTask.exigirLancamentoHoras || false,
                     })
                     setShowEditTaskModal(true)
                   }}
@@ -1846,11 +1861,46 @@ export default function AgendaPage() {
         {/* Modal Editar Tarefa */}
         {showEditTaskModal && selectedTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white rounded-lg p-4 md:p-6 max-w-md w-full mx-4 my-4 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg p-4 md:p-6 max-w-2xl w-full mx-4 my-4 max-h-[90vh] overflow-y-auto">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Editar Tarefa - {selectedTask.name}
+                Editar Tarefa
               </h2>
               <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome *
+                  </label>
+                  <input
+                    type="text"
+                    value={editTaskData.name}
+                    onChange={(e) => setEditTaskData({ ...editTaskData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Registro *
+                  </label>
+                  <select
+                    value={editTaskData.tipo}
+                    onChange={(e) => {
+                      const newTipo = e.target.value
+                      setEditTaskData({ 
+                        ...editTaskData, 
+                        tipo: newTipo,
+                        horaInicio: newTipo === 'EVENTO' ? editTaskData.horaInicio : '',
+                        horaFim: newTipo === 'EVENTO' ? editTaskData.horaFim : '',
+                        semPrazoDefinido: newTipo === 'ATIVIDADE' ? editTaskData.semPrazoDefinido : false,
+                        diaInteiro: newTipo === 'EVENTO' ? editTaskData.diaInteiro : false,
+                      })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="ATIVIDADE">Atividade</option>
+                    <option value="EVENTO">Evento</option>
+                  </select>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Descrição
@@ -1859,55 +1909,218 @@ export default function AgendaPage() {
                     value={editTaskData.description}
                     onChange={(e) => setEditTaskData({ ...editTaskData, description: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    rows={4}
+                    rows={3}
                     placeholder="Digite a descrição da tarefa"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Data de Início
-                  </label>
-                  <input
-                    type="date"
-                    value={editTaskData.dataInicio}
-                    onChange={(e) => setEditTaskData({ ...editTaskData, dataInicio: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Horas Estimadas
+                    </label>
+                    <input
+                      type="text"
+                      value={editTaskData.horasEstimadas}
+                      onChange={(e) => setEditTaskData({ ...editTaskData, horasEstimadas: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Ex: 40h, 1h30min"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Status
+                    </label>
+                    <select
+                      value={editTaskData.status}
+                      onChange={(e) => setEditTaskData({ ...editTaskData, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="PENDENTE">Pendente</option>
+                      <option value="EM_PROGRESSO">Em Progresso</option>
+                      <option value="CONCLUIDA">Concluída</option>
+                      <option value="BLOQUEADA">Bloqueada</option>
+                      <option value="CANCELADA">Cancelada</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Data de Término Prevista (Prazo)
-                  </label>
-                  <input
-                    type="date"
-                    value={editTaskData.dataFimPrevista}
-                    onChange={(e) => setEditTaskData({ ...editTaskData, dataFimPrevista: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Envolvidos
-                  </label>
-                  <select
-                    value={editTaskData.usuarioResponsavelId}
-                    onChange={(e) => setEditTaskData({ ...editTaskData, usuarioResponsavelId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="">Selecione um usuário...</option>
-                    {users && users.length > 0 ? (
-                      users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name || user.email}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="" disabled>Nenhum usuário disponível</option>
+                {editTaskData.tipo === 'ATIVIDADE' ? (
+                  <>
+                    <div className="flex items-center gap-6 mb-2">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="semPrazoDefinidoEdit"
+                          checked={editTaskData.semPrazoDefinido}
+                          onChange={(e) => setEditTaskData({ ...editTaskData, semPrazoDefinido: e.target.checked })}
+                          className="mr-2"
+                        />
+                        <label htmlFor="semPrazoDefinidoEdit" className="text-sm text-gray-700">
+                          Sem prazo definido
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="exigirLancamentoHorasEdit"
+                          checked={editTaskData.exigirLancamentoHoras}
+                          onChange={(e) => setEditTaskData({ ...editTaskData, exigirLancamentoHoras: e.target.checked })}
+                          className="mr-2"
+                        />
+                        <label htmlFor="exigirLancamentoHorasEdit" className="text-sm text-gray-700">
+                          Exigir lançamento de horas ao concluir
+                        </label>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Data de Início
+                        </label>
+                        <input
+                          type="date"
+                          value={editTaskData.dataInicio}
+                          onChange={(e) => setEditTaskData({ ...editTaskData, dataInicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      {!editTaskData.semPrazoDefinido && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Data de Conclusão (Prazo)
+                          </label>
+                          <input
+                            type="date"
+                            value={editTaskData.dataFimPrevista}
+                            onChange={(e) => setEditTaskData({ ...editTaskData, dataFimPrevista: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-6 mb-2">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="diaInteiroEdit"
+                          checked={editTaskData.diaInteiro}
+                          onChange={(e) => setEditTaskData({ ...editTaskData, diaInteiro: e.target.checked })}
+                          className="mr-2"
+                        />
+                        <label htmlFor="diaInteiroEdit" className="text-sm text-gray-700">
+                          Dia inteiro
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="exigirLancamentoHorasEventoEdit"
+                          checked={editTaskData.exigirLancamentoHoras}
+                          onChange={(e) => setEditTaskData({ ...editTaskData, exigirLancamentoHoras: e.target.checked })}
+                          className="mr-2"
+                        />
+                        <label htmlFor="exigirLancamentoHorasEventoEdit" className="text-sm text-gray-700">
+                          Exigir lançamento de horas ao concluir
+                        </label>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Data de Início
+                        </label>
+                        <input
+                          type="date"
+                          value={editTaskData.dataInicio}
+                          onChange={(e) => setEditTaskData({ ...editTaskData, dataInicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Data de Término
+                        </label>
+                        <input
+                          type="date"
+                          value={editTaskData.dataFimPrevista}
+                          onChange={(e) => setEditTaskData({ ...editTaskData, dataFimPrevista: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    {!editTaskData.diaInteiro && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Hora de Início
+                          </label>
+                          <input
+                            type="time"
+                            value={editTaskData.horaInicio}
+                            onChange={(e) => setEditTaskData({ ...editTaskData, horaInicio: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Hora de Término
+                          </label>
+                          <input
+                            type="time"
+                            value={editTaskData.horaFim}
+                            onChange={(e) => setEditTaskData({ ...editTaskData, horaFim: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
                     )}
-                  </select>
-                  {users && users.length === 0 && (
-                    <p className="text-xs text-red-600 mt-1">Nenhum usuário encontrado. Verifique se há usuários cadastrados.</p>
-                  )}
+                  </>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Responsável
+                    </label>
+                    <select
+                      value={editTaskData.usuarioResponsavelId}
+                      onChange={(e) => setEditTaskData({ ...editTaskData, usuarioResponsavelId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Selecione um usuário...</option>
+                      {users && users.length > 0 ? (
+                        users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name || user.email}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>Nenhum usuário disponível</option>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Executor
+                    </label>
+                    <select
+                      value={editTaskData.usuarioExecutorId}
+                      onChange={(e) => setEditTaskData({ ...editTaskData, usuarioExecutorId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Selecione um usuário...</option>
+                      {users && users.length > 0 ? (
+                        users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name || user.email}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>Nenhum usuário disponível</option>
+                      )}
+                    </select>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
@@ -1915,8 +2128,20 @@ export default function AgendaPage() {
                   onClick={async () => {
                     try {
                       const updatePayload: any = {}
+                      if (editTaskData.name !== undefined) {
+                        updatePayload.name = editTaskData.name || null
+                      }
                       if (editTaskData.description !== undefined) {
                         updatePayload.description = editTaskData.description || null
+                      }
+                      if (editTaskData.status !== undefined) {
+                        updatePayload.status = editTaskData.status
+                      }
+                      if (editTaskData.tipo !== undefined) {
+                        updatePayload.tipo = editTaskData.tipo
+                      }
+                      if (editTaskData.horasEstimadas !== undefined) {
+                        updatePayload.horasEstimadas = editTaskData.horasEstimadas || null
                       }
                       if (editTaskData.dataInicio !== undefined && editTaskData.dataInicio !== '') {
                         updatePayload.dataInicio = editTaskData.dataInicio
@@ -1931,6 +2156,24 @@ export default function AgendaPage() {
                       if (editTaskData.usuarioResponsavelId !== undefined) {
                         updatePayload.usuarioResponsavelId = editTaskData.usuarioResponsavelId || null
                       }
+                      if (editTaskData.usuarioExecutorId !== undefined) {
+                        updatePayload.usuarioExecutorId = editTaskData.usuarioExecutorId || null
+                      }
+                      if (editTaskData.horaInicio !== undefined) {
+                        updatePayload.horaInicio = editTaskData.horaInicio || null
+                      }
+                      if (editTaskData.horaFim !== undefined) {
+                        updatePayload.horaFim = editTaskData.horaFim || null
+                      }
+                      if (editTaskData.semPrazoDefinido !== undefined) {
+                        updatePayload.semPrazoDefinido = editTaskData.semPrazoDefinido
+                      }
+                      if (editTaskData.diaInteiro !== undefined) {
+                        updatePayload.diaInteiro = editTaskData.diaInteiro
+                      }
+                      if (editTaskData.exigirLancamentoHoras !== undefined) {
+                        updatePayload.exigirLancamentoHoras = editTaskData.exigirLancamentoHoras
+                      }
                       
                       // Usar PATCH quando não houver projectId (igual ao modal de alterar status)
                       if (selectedTask.project?.id) {
@@ -1942,7 +2185,7 @@ export default function AgendaPage() {
                       alert('Tarefa atualizada com sucesso!')
                       setShowEditTaskModal(false)
                       setSelectedTask(null)
-                      setEditTaskData({ description: '', dataInicio: '', dataFimPrevista: '', usuarioResponsavelId: '', tipo: 'ATIVIDADE', horaInicio: '', horaFim: '', semPrazoDefinido: false, diaInteiro: false })
+                      setEditTaskData({ name: '', description: '', status: 'PENDENTE', dataInicio: '', dataFimPrevista: '', usuarioResponsavelId: '', usuarioExecutorId: '', tipo: 'ATIVIDADE', horasEstimadas: '', horaInicio: '', horaFim: '', semPrazoDefinido: false, diaInteiro: false, exigirLancamentoHoras: false })
                       loadTasks()
                     } catch (error: any) {
                       console.error('Erro ao atualizar tarefa:', error)
@@ -1957,7 +2200,7 @@ export default function AgendaPage() {
                   onClick={() => {
                     setShowEditTaskModal(false)
                     setSelectedTask(null)
-                    setEditTaskData({ description: '', dataInicio: '', dataFimPrevista: '', usuarioResponsavelId: '', tipo: 'ATIVIDADE', horaInicio: '', horaFim: '', semPrazoDefinido: false, diaInteiro: false })
+                    setEditTaskData({ name: '', description: '', status: 'PENDENTE', dataInicio: '', dataFimPrevista: '', usuarioResponsavelId: '', usuarioExecutorId: '', tipo: 'ATIVIDADE', horasEstimadas: '', horaInicio: '', horaFim: '', semPrazoDefinido: false, diaInteiro: false, exigirLancamentoHoras: false })
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
