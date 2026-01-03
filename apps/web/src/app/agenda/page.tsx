@@ -520,6 +520,31 @@ export default function AgendaPage() {
     }
   }
 
+  const loadTaskComments = async (taskId: string) => {
+    try {
+      const response = await api.get(`/projects/tasks/${taskId}/comments`)
+      setTaskComments(prev => ({ ...prev, [taskId]: response.data || [] }))
+    } catch (error) {
+      console.error('Erro ao carregar comentários:', error)
+    }
+  }
+
+  const handleSaveComment = async (taskId: string) => {
+    if (!newComment.trim()) {
+      alert('Digite um comentário')
+      return
+    }
+    try {
+      await api.post(`/projects/tasks/${taskId}/comments`, { texto: newComment })
+      setNewComment('')
+      setShowCommentInput(false)
+      await loadTaskComments(taskId)
+    } catch (error: any) {
+      console.error('Erro ao salvar comentário:', error)
+      alert(error.response?.data?.message || 'Erro ao salvar comentário')
+    }
+  }
+
   const loadTasks = async () => {
     try {
       setLoading(true)
