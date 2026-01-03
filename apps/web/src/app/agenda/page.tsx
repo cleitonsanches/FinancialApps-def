@@ -8,7 +8,7 @@ import NavigationLinks from '@/components/NavigationLinks'
 import { parseHoursToDecimal, formatHoursFromDecimal } from '@/utils/hourFormatter'
 
 // Componente de Visualização em Calendário
-function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
+function CalendarView({ tasks, view, onTaskClick, onRegisterHours, isTaskOverdue }: any) {
   const [currentDate, setCurrentDate] = useState(new Date())
 
   const getDaysInMonth = (date: Date) => {
@@ -43,7 +43,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
     return days
   }
 
-  const getTasksForDate = (date: Date | null) => {
+  const getTasksForDate = (date: Date | null, includeOverdue: boolean = false) => {
     if (!date) return []
     // Converter data local para string YYYY-MM-DD sem timezone
     const year = date.getFullYear()
@@ -51,7 +51,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
     const day = String(date.getDate()).padStart(2, '0')
     const dateStr = `${year}-${month}-${day}`
     
-    return tasks.filter((task: any) => {
+    const tasksForDate = tasks.filter((task: any) => {
       // Usar dataConclusao ou dataFimPrevista (prazo) para o calendário, ou dataInicio como fallback
       const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
       if (!dateToUse) return false
@@ -70,6 +70,23 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
       }
       return taskDate === dateStr
     })
+    
+    // Se includeOverdue for true e temos a função isTaskOverdue, adicionar tarefas atrasadas
+    if (includeOverdue && isTaskOverdue) {
+      const overdueTasks = tasks.filter((task: any) => {
+        // Verificar se a tarefa está atrasada e não está já na lista de tarefas do dia
+        return isTaskOverdue(task) && !tasksForDate.some((t: any) => t.id === task.id)
+      })
+      
+      // Combinar e remover duplicatas (por segurança)
+      const combinedTasks = [...tasksForDate, ...overdueTasks]
+      const uniqueTasks = combinedTasks.filter((task: any, index: number, self: any[]) => 
+        index === self.findIndex((t: any) => t.id === task.id)
+      )
+      return uniqueTasks
+    }
+    
+    return tasksForDate
   }
 
   const formatDate = (date: Date) => {
@@ -100,7 +117,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours }: any) {
   }
 
   if (view === 'day') {
-    const dayTasks = getTasksForDate(currentDate)
+    const dayTasks = getTasksForDate(currentDate, true) // true = incluir tarefas atrasadas
     return (
       <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
         <div className="flex justify-between items-center mb-4 gap-2">
