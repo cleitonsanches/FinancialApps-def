@@ -1615,6 +1615,7 @@ export default function AgendaPage() {
               })
               setShowRegisterHoursModal(true)
             }}
+            isTaskOverdue={isTaskOverdue}
           />
         )}
 
