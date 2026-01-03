@@ -1918,16 +1918,27 @@ export default function AgendaPage() {
                       if (editTaskData.description !== undefined) {
                         updatePayload.description = editTaskData.description || null
                       }
-                      if (editTaskData.dataInicio !== undefined) {
-                        updatePayload.dataInicio = editTaskData.dataInicio || null
+                      if (editTaskData.dataInicio !== undefined && editTaskData.dataInicio !== '') {
+                        updatePayload.dataInicio = editTaskData.dataInicio
+                      } else if (editTaskData.dataInicio === '') {
+                        updatePayload.dataInicio = null
                       }
-                      if (editTaskData.dataFimPrevista !== undefined) {
-                        updatePayload.dataFimPrevista = editTaskData.dataFimPrevista || null
+                      if (editTaskData.dataFimPrevista !== undefined && editTaskData.dataFimPrevista !== '') {
+                        updatePayload.dataFimPrevista = editTaskData.dataFimPrevista
+                      } else if (editTaskData.dataFimPrevista === '') {
+                        updatePayload.dataFimPrevista = null
                       }
                       if (editTaskData.usuarioResponsavelId !== undefined) {
                         updatePayload.usuarioResponsavelId = editTaskData.usuarioResponsavelId || null
                       }
-                      await api.put(`/projects/${selectedTask.project?.id}/tasks/${selectedTask.id}`, updatePayload)
+                      
+                      // Usar PATCH quando não houver projectId (igual ao modal de alterar status)
+                      if (selectedTask.project?.id) {
+                        await api.put(`/projects/${selectedTask.project.id}/tasks/${selectedTask.id}`, updatePayload)
+                      } else {
+                        await api.patch(`/projects/tasks/${selectedTask.id}`, updatePayload)
+                      }
+                      
                       alert('Tarefa atualizada com sucesso!')
                       setShowEditTaskModal(false)
                       setSelectedTask(null)
