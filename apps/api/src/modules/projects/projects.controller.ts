@@ -160,21 +160,18 @@ export class ProjectsController {
     return this.projectsService.findTaskComments(taskId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post('tasks/:taskId/comments')
   async createTaskComment(
     @Param('taskId') taskId: string,
     @Body() commentData: { texto: string },
-    @Request() req?: any,
+    @Request() req: any,
   ): Promise<any> {
     try {
       console.log('createTaskComment - req.user:', req?.user);
       console.log('createTaskComment - req.headers:', req?.headers?.authorization ? 'Token presente' : 'Token ausente');
-      const userId = req?.user?.id;
+      const userId = req.user.id;
       console.log('createTaskComment - userId:', userId);
-      if (!userId) {
-        console.error('createTaskComment - Usuário não autenticado. req.user completo:', req?.user);
-        throw new Error('Usuário não autenticado');
-      }
       if (!commentData?.texto || !commentData.texto.trim()) {
         throw new Error('Texto do comentário é obrigatório');
       }
