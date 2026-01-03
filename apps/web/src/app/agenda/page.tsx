@@ -1320,11 +1320,15 @@ export default function AgendaPage() {
                       return (
                         <div
                           key={task.id}
-                          className={`border rounded-lg p-3 md:p-4 hover:bg-gray-50 ${
+                          className={`border rounded-lg p-3 md:p-4 hover:bg-gray-50 cursor-pointer ${
                             isEvento 
                               ? 'border-blue-200 bg-blue-50' 
                               : 'border-gray-200'
                           }`}
+                          onClick={() => {
+                            setSelectedTask(task)
+                            setShowTaskDetailsModal(true)
+                          }}
                         >
                           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
                           <div className="flex-1 min-w-0">
