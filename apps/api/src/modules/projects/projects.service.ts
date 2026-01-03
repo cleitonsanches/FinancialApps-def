@@ -7,6 +7,8 @@ import { Proposal } from '../../database/entities/proposal.entity';
 import { Invoice } from '../../database/entities/invoice.entity';
 import { ChartOfAccounts } from '../../database/entities/chart-of-accounts.entity';
 import { Client } from '../../database/entities/client.entity';
+import { TaskComment } from '../../database/entities/task-comment.entity';
+import { User } from '../../database/entities/user.entity';
 
 @Injectable()
 export class ProjectsService {
@@ -25,6 +27,10 @@ export class ProjectsService {
     private chartOfAccountsRepository: Repository<ChartOfAccounts>,
     @InjectRepository(Client)
     private clientRepository: Repository<Client>,
+    @InjectRepository(TaskComment)
+    private taskCommentRepository: Repository<TaskComment>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   async findAll(companyId?: string): Promise<Project[]> {
@@ -1133,6 +1139,44 @@ export class ProjectsService {
       timeEntry: await this.timeEntryRepository.findOne({ where: { id: entryId } }),
       invoice,
     };
+  }
+
+  async findTaskComments(taskId: string): Promise<TaskComment[]> {
+    return this.taskCommentRepository.find({
+      where: { taskId },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async createTaskComment(taskId: string, userId: string, texto: string): Promise<TaskComment> {
+    // Verificar se a tarefa existe
+    const task = await this.projectTaskRepository.findOne({ where: { id: taskId } });
+    if (!task) {
+      throw new Error('Tarefa não encontrada');
+    }
+
+    // Verificar se o usuário existe
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    const comment = this.taskCommentRepository.create({
+      taskId,
+      userId,
+      texto,
+    });
+
+    const saved = await this.taskCommentRepository.save(comment);
+    return this.taskCommentRepository.findOne({
+      where: { id: saved.id },
+      relations: ['user'],
+    }) as Promise<TaskComment>;
+  }
+
+  async deleteTaskComment(commentId: string): Promise<void> {
+    await this.taskCommentRepository.delete(commentId);
   }
 }
 

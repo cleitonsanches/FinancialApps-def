@@ -153,5 +153,28 @@ export class ProjectsController {
     // Passar projectId mesmo se for null/undefined
     return this.projectsService.updateTask(task.projectId || null, taskId, taskData);
   }
+
+  @Get('tasks/:taskId/comments')
+  async getTaskComments(@Param('taskId') taskId: string): Promise<any[]> {
+    return this.projectsService.findTaskComments(taskId);
+  }
+
+  @Post('tasks/:taskId/comments')
+  async createTaskComment(
+    @Param('taskId') taskId: string,
+    @Body() commentData: { texto: string },
+    @Request() req?: any,
+  ): Promise<any> {
+    const userId = req?.user?.id;
+    if (!userId) {
+      throw new Error('Usuário não autenticado');
+    }
+    return this.projectsService.createTaskComment(taskId, userId, commentData.texto);
+  }
+
+  @Delete('tasks/comments/:commentId')
+  async deleteTaskComment(@Param('commentId') commentId: string): Promise<void> {
+    return this.projectsService.deleteTaskComment(commentId);
+  }
 }
 
