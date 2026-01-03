@@ -166,8 +166,12 @@ export class ProjectsController {
     @Request() req?: any,
   ): Promise<any> {
     try {
+      console.log('createTaskComment - req.user:', req?.user);
+      console.log('createTaskComment - req.headers:', req?.headers?.authorization ? 'Token presente' : 'Token ausente');
       const userId = req?.user?.id;
+      console.log('createTaskComment - userId:', userId);
       if (!userId) {
+        console.error('createTaskComment - Usuário não autenticado. req.user completo:', req?.user);
         throw new Error('Usuário não autenticado');
       }
       if (!commentData?.texto || !commentData.texto.trim()) {
