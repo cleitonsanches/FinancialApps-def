@@ -348,6 +348,12 @@ export default function AgendaPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [currentUser, setCurrentUser] = useState<any>(null)
   
+  // Estados para comentários
+  const [taskComments, setTaskComments] = useState<Record<string, any[]>>({})
+  const [showCommentInput, setShowCommentInput] = useState(false)
+  const [showCommentsList, setShowCommentsList] = useState(false)
+  const [newComment, setNewComment] = useState('')
+  
   // Form states
   const [updateTaskData, setUpdateTaskData] = useState({
     status: '',
@@ -1773,6 +1779,65 @@ export default function AgendaPage() {
                   Descrição da tarefa
                 </h4>
                 <p className="text-sm text-gray-700 break-words">{selectedTask.description || 'Sem descrição'}</p>
+              </div>
+
+              {/* Seção de Comentários */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <button
+                    onClick={() => {
+                      setShowCommentInput(!showCommentInput)
+                      if (!showCommentInput && selectedTask?.id) {
+                        loadTaskComments(selectedTask.id)
+                      }
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+                  >
+                    <span>+</span>
+                    <span>Adicionar comentário</span>
+                  </button>
+                  {taskComments[selectedTask?.id]?.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setShowCommentsList(true)
+                        if (selectedTask?.id) loadTaskComments(selectedTask.id)
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+                    >
+                      <span>📝 {taskComments[selectedTask?.id]?.length || 0}</span>
+                      <span>Ver comentários</span>
+                    </button>
+                  )}
+                </div>
+                
+                {showCommentInput && selectedTask?.id && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Digite o andamento/comentário..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
+                      rows={3}
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => handleSaveComment(selectedTask.id)}
+                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
+                      >
+                        Salvar
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCommentInput(false)
+                          setNewComment('')
+                        }}
+                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-sm"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Botões de Ação */}
