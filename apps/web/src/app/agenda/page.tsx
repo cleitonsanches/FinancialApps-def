@@ -1534,7 +1534,8 @@ export default function AgendaPage() {
                               Editar
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setSelectedTask(task)
                                 setUpdateTaskData({
                                   status: task.status || '',
@@ -1547,7 +1548,8 @@ export default function AgendaPage() {
                               Alterar Status
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setSelectedTask(task)
                                 const timeEntryData = {
                                   projectId: task.project?.id || '',
