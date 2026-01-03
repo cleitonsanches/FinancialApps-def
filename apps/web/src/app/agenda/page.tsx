@@ -431,6 +431,13 @@ export default function AgendaPage() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showSortDropdown])
+
+  // Carregar comentários quando o modal de detalhes abrir
+  useEffect(() => {
+    if (showTaskDetailsModal && selectedTask?.id) {
+      loadTaskComments(selectedTask.id)
+    }
+  }, [showTaskDetailsModal, selectedTask?.id])
   
   const loadNegotiations = async () => {
     try {
@@ -700,6 +707,43 @@ export default function AgendaPage() {
       hour: '2-digit',
       minute: '2-digit',
     })
+  }
+
+  const formatTimeAgo = (date: string | Date) => {
+    const now = new Date()
+    const commentDate = new Date(date)
+    const diffInSeconds = Math.floor((now.getTime() - commentDate.getTime()) / 1000)
+    
+    if (diffInSeconds < 60) return 'agora'
+    if (diffInSeconds < 3600) return `há ${Math.floor(diffInSeconds / 60)} min`
+    if (diffInSeconds < 86400) return `há ${Math.floor(diffInSeconds / 3600)}h`
+    if (diffInSeconds < 604800) return `há ${Math.floor(diffInSeconds / 86400)} dias`
+    return formatDate(date)
+  }
+
+  const loadTaskComments = async (taskId: string) => {
+    try {
+      const response = await api.get(`/projects/tasks/${taskId}/comments`)
+      setTaskComments(prev => ({ ...prev, [taskId]: response.data || [] }))
+    } catch (error) {
+      console.error('Erro ao carregar comentários:', error)
+    }
+  }
+
+  const handleSaveComment = async (taskId: string) => {
+    if (!newComment.trim()) {
+      alert('Digite um comentário')
+      return
+    }
+    try {
+      await api.post(`/projects/tasks/${taskId}/comments`, { texto: newComment })
+      setNewComment('')
+      setShowCommentInput(false)
+      await loadTaskComments(taskId)
+    } catch (error: any) {
+      console.error('Erro ao salvar comentário:', error)
+      alert(error.response?.data?.message || 'Erro ao salvar comentário')
+    }
   }
 
   const getTaskStatusColor = (status: string) => {
@@ -1913,11 +1957,58 @@ export default function AgendaPage() {
                   onClick={() => {
                     setShowTaskDetailsModal(false)
                     setSelectedTask(null)
+                    setShowCommentInput(false)
+                    setNewComment('')
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-sm font-medium"
                 >
                   Fechar
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Lista de Comentários */}
+        {showCommentsList && selectedTask && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg p-4 md:p-6 max-w-2xl w-full mx-4 my-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Comentários da atividade
+                </h2>
+                <button
+                  onClick={() => setShowCommentsList(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                {(taskComments[selectedTask.id] || []).map((comment: any) => (
+                  <div key={comment.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                      {comment.user?.name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-gray-900">
+                          {comment.user?.name || 'Usuário'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {formatTimeAgo(comment.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                        {comment.texto}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {(!taskComments[selectedTask.id] || taskComments[selectedTask.id].length === 0) && (
+                  <p className="text-center text-gray-500 py-8">Nenhum comentário ainda</p>
+                )}
               </div>
             </div>
           </div>
