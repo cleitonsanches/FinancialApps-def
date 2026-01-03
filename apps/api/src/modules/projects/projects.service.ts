@@ -1150,29 +1150,43 @@ export class ProjectsService {
   }
 
   async createTaskComment(taskId: string, userId: string, texto: string): Promise<TaskComment> {
-    // Verificar se a tarefa existe
-    const task = await this.projectTaskRepository.findOne({ where: { id: taskId } });
-    if (!task) {
-      throw new Error('Tarefa não encontrada');
+    try {
+      // Verificar se a tarefa existe
+      const task = await this.projectTaskRepository.findOne({ where: { id: taskId } });
+      if (!task) {
+        throw new Error('Tarefa não encontrada');
+      }
+
+      // Verificar se o usuário existe
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (!user) {
+        throw new Error('Usuário não encontrado');
+      }
+
+      const comment = this.taskCommentRepository.create({
+        taskId,
+        userId,
+        texto: texto.trim(),
+      });
+
+      const saved = await this.taskCommentRepository.save(comment);
+      const result = await this.taskCommentRepository.findOne({
+        where: { id: saved.id },
+        relations: ['user'],
+      });
+      
+      if (!result) {
+        throw new Error('Erro ao recuperar comentário salvo');
+      }
+      
+      return result;
+    } catch (error: any) {
+      console.error('Erro em createTaskComment:', error);
+      console.error('taskId:', taskId);
+      console.error('userId:', userId);
+      console.error('texto:', texto);
+      throw error;
     }
-
-    // Verificar se o usuário existe
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new Error('Usuário não encontrado');
-    }
-
-    const comment = this.taskCommentRepository.create({
-      taskId,
-      userId,
-      texto,
-    });
-
-    const saved = await this.taskCommentRepository.save(comment);
-    return this.taskCommentRepository.findOne({
-      where: { id: saved.id },
-      relations: ['user'],
-    }) as Promise<TaskComment>;
   }
 
   async deleteTaskComment(commentId: string): Promise<void> {

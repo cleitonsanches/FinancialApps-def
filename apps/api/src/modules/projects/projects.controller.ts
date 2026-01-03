@@ -165,11 +165,19 @@ export class ProjectsController {
     @Body() commentData: { texto: string },
     @Request() req?: any,
   ): Promise<any> {
-    const userId = req?.user?.id;
-    if (!userId) {
-      throw new Error('Usuário não autenticado');
+    try {
+      const userId = req?.user?.id;
+      if (!userId) {
+        throw new Error('Usuário não autenticado');
+      }
+      if (!commentData?.texto || !commentData.texto.trim()) {
+        throw new Error('Texto do comentário é obrigatório');
+      }
+      return await this.projectsService.createTaskComment(taskId, userId, commentData.texto);
+    } catch (error: any) {
+      console.error('Erro ao criar comentário:', error);
+      throw error;
     }
-    return this.projectsService.createTaskComment(taskId, userId, commentData.texto);
   }
 
   @Delete('tasks/comments/:commentId')
