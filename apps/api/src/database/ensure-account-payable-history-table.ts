@@ -32,27 +32,56 @@ export async function ensureAccountPayableHistoryTable(dataSource: DataSource): 
       console.log('ℹ️ Tabela account_payable_history já existe.');
       
       // Verificar e corrigir tamanho das colunas UUID se necessário
-      const columns = table.columns;
-      
-      // Verificar coluna id
-      const idColumn = columns.find(col => col.name === 'id');
-      if (idColumn && idColumn.type === 'varchar' && (!idColumn.length || idColumn.length < 36)) {
-        console.log('Corrigindo tamanho da coluna id para varchar(36)...');
-        await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "id" varchar(36) NOT NULL`);
-      }
-      
-      // Verificar coluna account_payable_id
-      const accountPayableIdColumn = columns.find(col => col.name === 'account_payable_id');
-      if (accountPayableIdColumn && accountPayableIdColumn.type === 'varchar' && (!accountPayableIdColumn.length || accountPayableIdColumn.length < 36)) {
-        console.log('Corrigindo tamanho da coluna account_payable_id para varchar(36)...');
-        await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "account_payable_id" varchar(36) NOT NULL`);
-      }
-      
-      // Verificar coluna changed_by
-      const changedByColumn = columns.find(col => col.name === 'changed_by');
-      if (changedByColumn && changedByColumn.type === 'varchar' && (!changedByColumn.length || changedByColumn.length < 36)) {
-        console.log('Corrigindo tamanho da coluna changed_by para varchar(36)...');
-        await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "changed_by" varchar(36)`);
+      try {
+        const columns = table.columns;
+        
+        // Verificar coluna id
+        const idColumn = columns.find(col => col.name === 'id');
+        if (idColumn) {
+          const currentLength = idColumn.length || 0;
+          if (idColumn.type === 'varchar' && currentLength < 36) {
+            console.log(`Corrigindo tamanho da coluna id de varchar(${currentLength || 'sem tamanho'}) para varchar(36)...`);
+            try {
+              await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "id" varchar(36) NOT NULL`);
+              console.log('✅ Coluna id corrigida com sucesso');
+            } catch (error: any) {
+              console.warn(`⚠️ Não foi possível alterar coluna id: ${error.message}`);
+            }
+          }
+        }
+        
+        // Verificar coluna account_payable_id
+        const accountPayableIdColumn = columns.find(col => col.name === 'account_payable_id');
+        if (accountPayableIdColumn) {
+          const currentLength = accountPayableIdColumn.length || 0;
+          if (accountPayableIdColumn.type === 'varchar' && currentLength < 36) {
+            console.log(`Corrigindo tamanho da coluna account_payable_id de varchar(${currentLength || 'sem tamanho'}) para varchar(36)...`);
+            try {
+              await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "account_payable_id" varchar(36) NOT NULL`);
+              console.log('✅ Coluna account_payable_id corrigida com sucesso');
+            } catch (error: any) {
+              console.warn(`⚠️ Não foi possível alterar coluna account_payable_id: ${error.message}`);
+            }
+          }
+        }
+        
+        // Verificar coluna changed_by
+        const changedByColumn = columns.find(col => col.name === 'changed_by');
+        if (changedByColumn) {
+          const currentLength = changedByColumn.length || 0;
+          if (changedByColumn.type === 'varchar' && currentLength < 36) {
+            console.log(`Corrigindo tamanho da coluna changed_by de varchar(${currentLength || 'sem tamanho'}) para varchar(36)...`);
+            try {
+              await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "changed_by" varchar(36)`);
+              console.log('✅ Coluna changed_by corrigida com sucesso');
+            } catch (error: any) {
+              console.warn(`⚠️ Não foi possível alterar coluna changed_by: ${error.message}`);
+            }
+          }
+        }
+      } catch (error: any) {
+        console.warn('⚠️ Erro ao verificar/corrigir colunas UUID:', error.message);
+        // Não bloquear a inicialização se houver erro na migração
       }
     }
   } catch (error: any) {
