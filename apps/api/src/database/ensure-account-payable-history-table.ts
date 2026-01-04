@@ -20,7 +20,7 @@ export async function ensureAccountPayableHistoryTable(dataSource: DataSource): 
           "new_value" text,
           "description" text,
           "changed_by" varchar,
-          "changed_at" datetime NOT NULL DEFAULT (datetime('now'))
+          "changed_at" datetime NOT NULL DEFAULT GETDATE()
         )
       `);
       
