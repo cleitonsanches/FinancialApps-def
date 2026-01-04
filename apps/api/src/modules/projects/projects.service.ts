@@ -534,58 +534,72 @@ export class ProjectsService {
       try {
         console.log('Buscando tarefa para obter vínculos, taskId:', timeEntryData.taskId);
         
-        // Tentar buscar com query builder primeiro (para campos select: false)
-        let task = await this.projectTaskRepository
+        // Usar query raw para buscar campos com select: false diretamente do banco
+        const queryRunner = this.projectTaskRepository.manager.connection.createQueryRunner();
+        const rawTask = await queryRunner.query(
+          `SELECT 
+            id,
+            project_id,
+            proposal_id,
+            client_id
+          FROM project_tasks 
+          WHERE id = ?`,
+          [timeEntryData.taskId]
+        );
+        await queryRunner.release();
+        
+        console.log('Dados raw da tarefa (SQL):', rawTask);
+        
+        // Buscar a tarefa completa com relações para obter dados do projeto/proposal/client
+        const task = await this.projectTaskRepository
           .createQueryBuilder('task')
           .leftJoinAndSelect('task.project', 'project')
           .leftJoinAndSelect('project.proposal', 'projectProposal')
           .leftJoinAndSelect('project.client', 'projectClient')
           .leftJoinAndSelect('task.proposal', 'proposal')
           .leftJoinAndSelect('task.client', 'client')
-          .addSelect('task.proposal_id')
-          .addSelect('task.client_id')
           .where('task.id = :taskId', { taskId: timeEntryData.taskId })
           .getOne();
         
-        // Se não encontrou, tentar com findOne simples
-        if (!task) {
-          console.log('Tarefa não encontrada com query builder, tentando findOne...');
-          task = await this.projectTaskRepository.findOne({
-            where: { id: timeEntryData.taskId },
-            relations: ['project', 'project.proposal', 'project.client', 'proposal', 'client']
-          });
-        }
+        const taskData = rawTask && rawTask.length > 0 ? rawTask[0] : null;
         
-        if (task) {
+        if (task || taskData) {
           console.log('Tarefa encontrada:', {
-            taskId: task.id,
-            projectId: task.projectId,
-            proposalId: task.proposalId,
-            clientId: task.clientId,
-            project: task.project ? { id: task.project.id, clientId: task.project.clientId, proposalId: task.project.proposalId } : null,
-            proposal: task.proposal ? { id: task.proposal.id, clientId: task.proposal.clientId } : null,
-            client: task.client ? { id: task.client.id } : null
+            taskId: task?.id || taskData?.id,
+            projectId: taskData?.project_id || task?.projectId,
+            proposalId: taskData?.proposal_id,
+            clientId: taskData?.client_id,
+            project: task?.project ? { 
+              id: task.project.id, 
+              clientId: task.project.clientId, 
+              proposalId: task.project.proposalId 
+            } : null,
+            proposal: task?.proposal ? { 
+              id: task.proposal.id, 
+              clientId: task.proposal.clientId 
+            } : null,
+            client: task?.client ? { id: task.client.id } : null
           });
           
           // Obter projectId da tarefa ou do projeto relacionado
           if (!timeEntryData.projectId) {
-            timeEntryData.projectId = task.projectId || (task.project as any)?.id || null;
+            timeEntryData.projectId = taskData?.project_id || task?.projectId || (task?.project as any)?.id || null;
             console.log('projectId obtido:', timeEntryData.projectId);
           }
           
           // Obter proposalId da tarefa, do projeto ou da negociação relacionada
           if (!timeEntryData.proposalId) {
-            const taskProposalId = (task as any).proposal_id || task.proposalId;
-            const projectProposalId = (task.project as any)?.proposalId || (task.project as any)?.proposal?.id;
+            const taskProposalId = taskData?.proposal_id;
+            const projectProposalId = task?.project?.proposalId || (task?.project as any)?.proposal?.id;
             timeEntryData.proposalId = taskProposalId || projectProposalId || null;
             console.log('proposalId obtido:', timeEntryData.proposalId);
           }
           
           // Obter clientId da tarefa, do projeto ou da negociação relacionada
           if (!timeEntryData.clientId) {
-            const taskClientId = (task as any).client_id || task.clientId;
-            const projectClientId = (task.project as any)?.clientId || (task.project as any)?.client?.id;
-            const proposalClientId = (task.proposal as any)?.clientId || (task.project as any)?.proposal?.clientId;
+            const taskClientId = taskData?.client_id;
+            const projectClientId = task?.project?.clientId || (task?.project as any)?.client?.id;
+            const proposalClientId = (task?.proposal as any)?.clientId || (task?.project as any)?.proposal?.clientId;
             timeEntryData.clientId = taskClientId || projectClientId || proposalClientId || null;
             console.log('clientId obtido:', timeEntryData.clientId);
           }
