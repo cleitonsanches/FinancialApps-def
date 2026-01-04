@@ -20,7 +20,7 @@ export async function ensureInvoiceHistoryTable(dataSource: DataSource): Promise
           "new_value" text,
           "description" text,
           "changed_by" varchar,
-          "changed_at" datetime NOT NULL DEFAULT (datetime('now'))
+          "changed_at" datetime NOT NULL DEFAULT GETDATE()
         )
       `);
       
