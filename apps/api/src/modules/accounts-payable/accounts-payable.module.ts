@@ -9,7 +9,15 @@ import { AccountPayableHistory } from '../../database/entities/account-payable-h
 import { User } from '../../database/entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AccountPayable, InvoiceAccountPayable, Invoice, AccountPayableHistory, User])],
+  imports: [
+    TypeOrmModule.forFeature([
+      AccountPayable,
+      InvoiceAccountPayable,
+      Invoice,
+      AccountPayableHistory, // Histórico de alterações
+      User, // Usuário que fez as alterações
+    ]),
+  ],
   controllers: [AccountsPayableController],
   providers: [AccountsPayableService],
   exports: [AccountsPayableService],
