@@ -748,7 +748,16 @@ export default function HorasTrabalhadasPage() {
             </button>
             <NavigationLinks />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Horas Trabalhadas</h1>
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-gray-900">Horas Trabalhadas</h1>
+            <Link
+              href="/horas-trabalhadas/analise"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
+            >
+              <span>📊</span>
+              <span>Ver Análise</span>
+            </Link>
+          </div>
         </div>
 
         {/* Abas de Status */}

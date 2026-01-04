@@ -18,6 +18,8 @@ export default function AccountPayableDetailsPage() {
   const [chartOfAccounts, setChartOfAccounts] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [relatedInvoices, setRelatedInvoices] = useState<Array<{ invoice: any; valorContribuido: number }>>([])
+  const [accountPayableHistory, setAccountPayableHistory] = useState<any[]>([])
+  const [historyExpanded, setHistoryExpanded] = useState(false)
   
   // Modal EDITAR
   const [showEditarModal, setShowEditarModal] = useState(false)
@@ -189,14 +191,21 @@ export default function AccountPayableDetailsPage() {
     }
   }
 
-  const formatDate = (dateString: string | Date | null | undefined) => {
+  const formatDate = (dateString: string | Date | null | undefined, includeTime: boolean = false) => {
     if (!dateString) return '-'
     const date = typeof dateString === 'string' 
-      ? new Date(dateString + 'T00:00:00') 
+      ? new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00') 
       : new Date(dateString)
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
+    
+    if (includeTime) {
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${day}/${month}/${year} ${hours}:${minutes}`
+    }
+    
     return `${day}/${month}/${year}`
   }
 
@@ -229,6 +238,72 @@ export default function AccountPayableDetailsPage() {
       CANCELADA: 'Cancelada',
     }
     return labels[status] || status
+  }
+
+  const getFieldDisplayName = (fieldName: string) => {
+    const fieldNames: Record<string, string> = {
+      'status': 'Status',
+      'totalValue': 'Valor Total',
+      'dueDate': 'Data de Vencimento',
+      'paymentDate': 'Data de Pagamento',
+      'description': 'Descrição',
+      'supplierId': 'Fornecedor',
+      'chartOfAccountsId': 'Plano de Contas',
+      'bankAccountId': 'Conta Corrente',
+      'emissionDate': 'Data de Emissão',
+      'isReembolsavel': 'Reembolsável',
+      'valorReembolsar': 'Valor a Reembolsar',
+      'statusReembolso': 'Status do Reembolso',
+      'dataStatusReembolso': 'Data do Status do Reembolso',
+      'destinatarioFaturaReembolsoId': 'Destinatário da Fatura de Reembolso',
+    }
+    return fieldNames[fieldName] || fieldName
+  }
+
+  const formatFieldValue = (fieldName: string, value: any) => {
+    if (value === null || value === undefined || value === '') return '-'
+    
+    // Campos de data
+    if (fieldName.includes('Date') || fieldName.includes('date')) {
+      return formatDate(value)
+    }
+    
+    // Campos de valor monetário
+    if (fieldName.includes('Value') || fieldName.includes('valor') || fieldName.includes('Valor')) {
+      return formatCurrency(value)
+    }
+    
+    // Status
+    if (fieldName === 'status') {
+      return getStatusLabel(value)
+    }
+    
+    // Boolean
+    if (typeof value === 'boolean') {
+      return value ? 'Sim' : 'Não'
+    }
+    
+    // IDs - tentar buscar nome do relacionamento
+    if (fieldName.includes('Id') && typeof value === 'string') {
+      if (fieldName === 'supplierId') {
+        const supplier = suppliers.find(s => s.id === value)
+        return supplier?.razaoSocial || supplier?.name || value
+      }
+      if (fieldName === 'chartOfAccountsId') {
+        const chart = chartOfAccounts.find(c => c.id === value)
+        return chart?.name || value
+      }
+      if (fieldName === 'bankAccountId') {
+        const account = bankAccounts.find(a => a.id === value)
+        return account ? `${account.bankName} - ${account.accountNumber}` : value
+      }
+      if (fieldName === 'destinatarioFaturaReembolsoId') {
+        const client = clients.find(c => c.id === value)
+        return client?.razaoSocial || client?.name || value
+      }
+    }
+    
+    return String(value)
   }
 
   const formatCurrencyInput = (value: string): string => {
