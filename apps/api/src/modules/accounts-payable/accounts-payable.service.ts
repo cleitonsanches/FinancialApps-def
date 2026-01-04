@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { AccountPayable } from '../../database/entities/account-payable.entity';
 import { InvoiceAccountPayable } from '../../database/entities/invoice-account-payable.entity';
 import { Invoice } from '../../database/entities/invoice.entity';
+import { AccountPayableHistory } from '../../database/entities/account-payable-history.entity';
+import { User } from '../../database/entities/user.entity';
 
 @Injectable()
 export class AccountsPayableService {
@@ -14,6 +16,10 @@ export class AccountsPayableService {
     private invoiceAccountPayableRepository: Repository<InvoiceAccountPayable>,
     @InjectRepository(Invoice)
     private invoiceRepository: Repository<Invoice>,
+    @InjectRepository(AccountPayableHistory)
+    private accountPayableHistoryRepository: Repository<AccountPayableHistory>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   async findAll(companyId?: string): Promise<AccountPayable[]> {
@@ -108,9 +114,125 @@ export class AccountsPayableService {
     return this.accountPayableRepository.save(accountPayable);
   }
 
-  async update(id: string, accountPayableData: Partial<AccountPayable>): Promise<AccountPayable> {
+  async update(id: string, accountPayableData: Partial<AccountPayable>, userId?: string): Promise<AccountPayable> {
+    // Buscar conta a pagar atual para verificar mudanças
+    const existingAccountPayable = await this.accountPayableRepository.findOne({ where: { id } });
+    
+    if (!existingAccountPayable) {
+      throw new NotFoundException(`Conta a pagar com ID ${id} não encontrada`);
+    }
+
+    // Verificar se é cancelamento
+    const isCancellation = accountPayableData.status === 'CANCELADA' && existingAccountPayable.status !== 'CANCELADA';
+    // Verificar se é pagamento
+    const isPayment = accountPayableData.status === 'PAGA' && existingAccountPayable.status !== 'PAGA';
+
+    // Registrar histórico de alterações
+    const changes: Array<{ field: string; old: any; new: any }> = [];
+    
+    // Comparar campos alterados
+    const fieldsToTrack = [
+      'totalValue', 'emissionDate', 'dueDate', 'description', 'chartOfAccountsId',
+      'supplierId', 'status', 'paymentDate', 'bankAccountId', 'codigo'
+    ];
+    
+    for (const field of fieldsToTrack) {
+      if (accountPayableData[field] !== undefined && accountPayableData[field] !== existingAccountPayable[field]) {
+        const oldVal = existingAccountPayable[field];
+        const newVal = accountPayableData[field];
+        changes.push({ field, old: oldVal, new: newVal });
+      }
+    }
+
+    // Atualizar a conta a pagar
     await this.accountPayableRepository.update(id, accountPayableData);
+
+    // Registrar histórico
+    if (isCancellation) {
+      await this.recordHistory(
+        id,
+        'CANCEL',
+        userId,
+        undefined,
+        undefined,
+        undefined,
+        'Conta a pagar cancelada.',
+      );
+    } else if (isPayment) {
+      // Registrar pagamento
+      await this.recordHistory(
+        id,
+        'PAY',
+        userId,
+        'status',
+        existingAccountPayable.status,
+        'PAGA',
+        `Conta a pagar marcada como paga${accountPayableData.paymentDate ? ` em ${accountPayableData.paymentDate}` : ''}`,
+      );
+      // Registrar outros campos alterados no pagamento (paymentDate, bankAccountId)
+      for (const change of changes) {
+        if (change.field !== 'status') {
+          await this.recordHistory(
+            id,
+            'PAY',
+            userId,
+            change.field,
+            change.old ? String(change.old) : null,
+            change.new ? String(change.new) : null,
+          );
+        }
+      }
+    } else if (changes.length > 0) {
+      // Registrar cada alteração
+      for (const change of changes) {
+        await this.recordHistory(
+          id,
+          'EDIT',
+          userId,
+          change.field,
+          change.old ? String(change.old) : null,
+          change.new ? String(change.new) : null,
+        );
+      }
+    }
+
     return this.findOne(id);
+  }
+
+  /**
+   * Registra uma entrada no histórico de alterações
+   */
+  async recordHistory(
+    accountPayableId: string,
+    action: string,
+    userId?: string,
+    fieldName?: string,
+    oldValue?: string | null,
+    newValue?: string | null,
+    description?: string,
+  ): Promise<AccountPayableHistory> {
+    const history = this.accountPayableHistoryRepository.create({
+      accountPayableId,
+      action,
+      fieldName,
+      oldValue: oldValue || null,
+      newValue: newValue || null,
+      description,
+      changedBy: userId || null,
+    });
+
+    return this.accountPayableHistoryRepository.save(history);
+  }
+
+  /**
+   * Busca o histórico de alterações de uma conta a pagar
+   */
+  async getHistory(accountPayableId: string): Promise<AccountPayableHistory[]> {
+    return this.accountPayableHistoryRepository.find({
+      where: { accountPayableId },
+      relations: ['changedByUser'],
+      order: { changedAt: 'DESC' },
+    });
   }
 
   async delete(id: string): Promise<void> {

@@ -27,8 +27,9 @@ export class AccountsPayableController {
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() accountPayableData: Partial<AccountPayable>): Promise<AccountPayable> {
-    return this.accountsPayableService.update(id, accountPayableData);
+  async update(@Param('id') id: string, @Body() accountPayableData: Partial<AccountPayable>, @Request() req?: any): Promise<AccountPayable> {
+    const userId = req?.user?.id;
+    return this.accountsPayableService.update(id, accountPayableData, userId);
   }
 
   @Delete(':id')
@@ -39,6 +40,11 @@ export class AccountsPayableController {
   @Get(':id/invoices')
   async findRelatedInvoices(@Param('id') id: string): Promise<any[]> {
     return this.accountsPayableService.findRelatedInvoices(id);
+  }
+
+  @Get(':id/history')
+  async getHistory(@Param('id') id: string) {
+    return this.accountsPayableService.getHistory(id);
   }
 }
 

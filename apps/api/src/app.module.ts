@@ -34,6 +34,7 @@ import { ensurePhasesTable } from './database/ensure-phases-table';
 import { ensureProjectClientNullable } from './database/ensure-project-client-nullable';
 import { ensureInvoiceApprovedTimeEntries } from './database/ensure-invoice-approved-time-entries';
 import { ensureInvoiceHistoryTable } from './database/ensure-invoice-history-table';
+import { ensureAccountPayableHistoryTable } from './database/ensure-account-payable-history-table';
 import { ensureProjectTemplatePhasesTable } from './database/ensure-project-template-phases-table';
 import { ensureInvoiceAccountPayableTable } from './database/ensure-invoice-account-payable-table';
 import { ensureTaskCommentsTable } from './database/ensure-task-comments-table';
