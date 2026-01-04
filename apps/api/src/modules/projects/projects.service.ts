@@ -522,6 +522,49 @@ export class ProjectsService {
   }
 
   async createTimeEntry(timeEntryData: Partial<TimeEntry>): Promise<TimeEntry> {
+    // Se houver taskId mas não houver vínculos diretos, buscar a tarefa para obter os vínculos
+    if (timeEntryData.taskId && (!timeEntryData.projectId && !timeEntryData.proposalId && !timeEntryData.clientId)) {
+      try {
+        // Buscar tarefa com select explícito para incluir campos marcados com select: false
+        const task = await this.projectTaskRepository
+          .createQueryBuilder('task')
+          .leftJoinAndSelect('task.project', 'project')
+          .leftJoinAndSelect('project.proposal', 'projectProposal')
+          .leftJoinAndSelect('project.client', 'projectClient')
+          .leftJoinAndSelect('task.proposal', 'proposal')
+          .leftJoinAndSelect('task.client', 'client')
+          .addSelect('task.proposal_id')
+          .addSelect('task.client_id')
+          .where('task.id = :taskId', { taskId: timeEntryData.taskId })
+          .getOne();
+        
+        if (task) {
+          // Obter projectId da tarefa ou do projeto relacionado
+          if (!timeEntryData.projectId) {
+            timeEntryData.projectId = task.projectId || (task.project as any)?.id || null;
+          }
+          
+          // Obter proposalId da tarefa, do projeto ou da negociação relacionada
+          if (!timeEntryData.proposalId) {
+            const taskProposalId = (task as any).proposal_id || task.proposalId;
+            const projectProposalId = (task.project as any)?.proposalId || (task.project as any)?.proposal?.id;
+            timeEntryData.proposalId = taskProposalId || projectProposalId || null;
+          }
+          
+          // Obter clientId da tarefa, do projeto ou da negociação relacionada
+          if (!timeEntryData.clientId) {
+            const taskClientId = (task as any).client_id || task.clientId;
+            const projectClientId = (task.project as any)?.clientId || (task.project as any)?.client?.id;
+            const proposalClientId = (task.proposal as any)?.clientId || (task.project as any)?.proposal?.clientId;
+            timeEntryData.clientId = taskClientId || projectClientId || proposalClientId || null;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar tarefa para obter vínculos:', error);
+        // Continuar mesmo se houver erro ao buscar a tarefa
+      }
+    }
+    
     // Validar que pelo menos um vínculo existe
     if (!timeEntryData.projectId && !timeEntryData.proposalId && !timeEntryData.clientId) {
       throw new Error('É necessário vincular a um Projeto, Negociação ou Cliente');
