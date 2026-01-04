@@ -30,6 +30,30 @@ export async function ensureAccountPayableHistoryTable(dataSource: DataSource): 
       console.log('✅ Tabela account_payable_history criada com sucesso.');
     } else {
       console.log('ℹ️ Tabela account_payable_history já existe.');
+      
+      // Verificar e corrigir tamanho das colunas UUID se necessário
+      const columns = table.columns;
+      
+      // Verificar coluna id
+      const idColumn = columns.find(col => col.name === 'id');
+      if (idColumn && idColumn.type === 'varchar' && (!idColumn.length || idColumn.length < 36)) {
+        console.log('Corrigindo tamanho da coluna id para varchar(36)...');
+        await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "id" varchar(36) NOT NULL`);
+      }
+      
+      // Verificar coluna account_payable_id
+      const accountPayableIdColumn = columns.find(col => col.name === 'account_payable_id');
+      if (accountPayableIdColumn && accountPayableIdColumn.type === 'varchar' && (!accountPayableIdColumn.length || accountPayableIdColumn.length < 36)) {
+        console.log('Corrigindo tamanho da coluna account_payable_id para varchar(36)...');
+        await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "account_payable_id" varchar(36) NOT NULL`);
+      }
+      
+      // Verificar coluna changed_by
+      const changedByColumn = columns.find(col => col.name === 'changed_by');
+      if (changedByColumn && changedByColumn.type === 'varchar' && (!changedByColumn.length || changedByColumn.length < 36)) {
+        console.log('Corrigindo tamanho da coluna changed_by para varchar(36)...');
+        await queryRunner.query(`ALTER TABLE "account_payable_history" ALTER COLUMN "changed_by" varchar(36)`);
+      }
     }
   } catch (error: any) {
     console.error('Erro ao garantir tabela account_payable_history:', error);
