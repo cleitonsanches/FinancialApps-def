@@ -77,20 +77,60 @@ export class ProjectsService {
       where.projectId = projectId;
     }
     try {
-      return await this.projectTaskRepository.find({ 
-        where,
-        relations: ['project', 'project.client', 'project.proposal', 'proposal', 'client', 'usuarioExecutor', 'usuarioResponsavel', 'phase'],
-        order: { ordem: 'ASC' },
-      });
+      // Usar query builder para incluir campos com select: false
+      const queryBuilder = this.projectTaskRepository
+        .createQueryBuilder('task')
+        .leftJoinAndSelect('task.project', 'project')
+        .leftJoinAndSelect('project.client', 'projectClient')
+        .leftJoinAndSelect('project.proposal', 'projectProposal')
+        .leftJoinAndSelect('task.proposal', 'proposal')
+        .leftJoinAndSelect('task.client', 'client')
+        .leftJoinAndSelect('task.usuarioExecutor', 'usuarioExecutor')
+        .leftJoinAndSelect('task.usuarioResponsavel', 'usuarioResponsavel')
+        .leftJoinAndSelect('task.phase', 'phase')
+        .addSelect('task.proposal_id', 'proposal_id')
+        .addSelect('task.client_id', 'client_id')
+        .orderBy('task.ordem', 'ASC');
+      
+      if (projectId) {
+        queryBuilder.where('task.project_id = :projectId', { projectId });
+      }
+      
+      const tasks = await queryBuilder.getMany();
+      
+      // Garantir que os campos proposal_id e client_id estejam disponíveis
+      // Mesmo com addSelect, eles podem não estar no objeto retornado
+      // Vamos fazer uma query raw adicional para obter esses valores
+      if (tasks.length > 0) {
+        const taskIds = tasks.map(t => t.id);
+        const queryRunner = this.projectTaskRepository.manager.connection.createQueryRunner();
+        const rawTasks = await queryRunner.query(
+          `SELECT id, proposal_id, client_id FROM project_tasks WHERE id IN (${taskIds.map(() => '?').join(',')})`,
+          taskIds
+        );
+        await queryRunner.release();
+        
+        // Mapear os valores raw para as tarefas
+        const rawMap = new Map(rawTasks.map((rt: any) => [rt.id, { proposalId: rt.proposal_id, clientId: rt.client_id }]));
+        tasks.forEach(task => {
+          const raw = rawMap.get(task.id);
+          if (raw) {
+            (task as any).proposalId = raw.proposalId;
+            (task as any).clientId = raw.clientId;
+          }
+        });
+      }
+      
+      return tasks;
     } catch (error: any) {
       // Se houver erro relacionado a colunas que não existem, tentar sem carregar project
       if (error.message && (error.message.includes('proposal_id') || error.message.includes('client_id') || error.message.includes('no such column'))) {
         console.warn('Erro ao carregar relações, tentando sem project:', error.message);
         // Tentar sem carregar project para evitar problemas com colunas que podem não existir
         return await this.projectTaskRepository.find({ 
-      where,
+          where,
           relations: ['usuarioExecutor', 'usuarioResponsavel'],
-      order: { ordem: 'ASC' },
+          order: { ordem: 'ASC' },
         });
       }
       throw error;
