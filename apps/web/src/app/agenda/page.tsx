@@ -541,10 +541,33 @@ export default function AgendaPage() {
   const loadTaskComments = async (taskId: string) => {
     try {
       const response = await api.get(`/projects/tasks/${taskId}/comments`)
-      setTaskComments(prev => ({ ...prev, [taskId]: response.data || [] }))
+      const comments = response.data || []
+      setTaskComments(prev => ({ ...prev, [taskId]: comments }))
+      setCommentsCount(prev => ({ ...prev, [taskId]: comments.length }))
     } catch (error) {
       console.error('Erro ao carregar comentários:', error)
     }
+  }
+
+  const loadCommentsCountForTasks = async (taskIds: string[]) => {
+    // Carregar contagem de comentários para múltiplas tarefas
+    const promises = taskIds.map(async (taskId) => {
+      try {
+        const response = await api.get(`/projects/tasks/${taskId}/comments`)
+        const comments = response.data || []
+        return { taskId, count: comments.length }
+      } catch (error) {
+        console.error(`Erro ao carregar comentários da tarefa ${taskId}:`, error)
+        return { taskId, count: 0 }
+      }
+    })
+    
+    const results = await Promise.all(promises)
+    const counts: Record<string, number> = {}
+    results.forEach(({ taskId, count }) => {
+      counts[taskId] = count
+    })
+    setCommentsCount(prev => ({ ...prev, ...counts }))
   }
 
   const handleSaveComment = async (taskId: string) => {
@@ -557,6 +580,11 @@ export default function AgendaPage() {
       setNewComment('')
       setShowCommentInput(false)
       await loadTaskComments(taskId)
+      // Atualizar contagem também
+      setCommentsCount(prev => {
+        const currentCount = prev[taskId] || 0
+        return { ...prev, [taskId]: currentCount + 1 }
+      })
     } catch (error: any) {
       console.error('Erro ao salvar comentário:', error)
       alert(error.response?.data?.message || 'Erro ao salvar comentário')
@@ -642,6 +670,14 @@ export default function AgendaPage() {
       
       setTasks(tasksWithProposals)
       setTasksWithHours(hoursMap)
+      
+      // Carregar contagem de comentários para todas as tarefas
+      const taskIds = tasksWithProposals.map((task: any) => task.id)
+      if (taskIds.length > 0) {
+        loadCommentsCountForTasks(taskIds).catch(error => {
+          console.error('Erro ao carregar contagem de comentários:', error)
+        })
+      }
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error)
       alert('Erro ao carregar tarefas da agenda')
@@ -1353,6 +1389,12 @@ export default function AgendaPage() {
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <span className="text-lg">{icon}</span>
                               <h3 className="text-base md:text-lg font-semibold text-gray-900 break-words">{task.name}</h3>
+                              {commentsCount[task.id] > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                  <span>📝</span>
+                                  <span>{commentsCount[task.id]}</span>
+                                </span>
+                              )}
                               <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
                                 {tipoLabel}
                               </span>
