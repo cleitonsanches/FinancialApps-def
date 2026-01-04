@@ -730,7 +730,7 @@ export default function AnaliseHorasTrabalhadasPage() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => formatHoursFromDecimal(value)} />
+                    <Tooltip formatter={(value: number | undefined) => formatHoursFromDecimal(value)} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -780,7 +780,7 @@ export default function AnaliseHorasTrabalhadasPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="status" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => formatHoursFromDecimal(value)} />
+                    <Tooltip formatter={(value: number | undefined) => formatHoursFromDecimal(value)} />
                     <Legend />
                     <Bar dataKey="horas" name="Horas">
                       {chartData.map((entry, index) => (
