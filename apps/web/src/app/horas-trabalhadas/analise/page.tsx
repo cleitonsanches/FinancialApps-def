@@ -167,7 +167,7 @@ export default function AnaliseHorasTrabalhadasPage() {
         })
         
         const projectEntries = await Promise.all(timeEntryPromises)
-        projectEntries.forEach(entries => {
+        projectEntries.forEach((entries: any[]) => {
           allTimeEntries.push(...entries)
         })
       }
@@ -192,8 +192,8 @@ export default function AnaliseHorasTrabalhadasPage() {
         })
         
         // Adicionar apenas entries que não estão duplicadas
-        directEntries.forEach(entry => {
-          if (!allTimeEntries.find(e => e.id === entry.id)) {
+        directEntries.forEach((entry: any) => {
+          if (!allTimeEntries.find((e: any) => e.id === entry.id)) {
             allTimeEntries.push(entry)
           }
         })
@@ -613,7 +613,7 @@ export default function AnaliseHorasTrabalhadasPage() {
             {(() => {
               // Agrupar por data
               const horasPorData: Record<string, number> = {}
-              filteredTimeEntries.forEach(entry => {
+              filteredTimeEntries.forEach((entry: any) => {
                 const date = new Date(entry.data)
                 const dateStr = date.toISOString().split('T')[0]
                 const horas = parseFloat(entry.horas) || 0
@@ -653,7 +653,7 @@ export default function AnaliseHorasTrabalhadasPage() {
             {(() => {
               // Agrupar por projeto
               const horasPorProjeto: Record<string, number> = {}
-              filteredTimeEntries.forEach(entry => {
+              filteredTimeEntries.forEach((entry: any) => {
                 const projetoNome = entry.projectName || 'Sem Projeto'
                 const horas = parseFloat(entry.horas) || 0
                 horasPorProjeto[projetoNome] = (horasPorProjeto[projetoNome] || 0) + horas
@@ -743,7 +743,7 @@ export default function AnaliseHorasTrabalhadasPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Distribuição por Status</h2>
             {(() => {
               const horasPorStatus: Record<string, number> = {}
-              filteredTimeEntries.forEach(entry => {
+              filteredTimeEntries.forEach((entry: any) => {
                 const status = entry.status || 'PENDENTE'
                 const horas = parseFloat(entry.horas) || 0
                 horasPorStatus[status] = (horasPorStatus[status] || 0) + horas
