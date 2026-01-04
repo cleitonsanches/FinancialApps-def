@@ -203,6 +203,12 @@ export default function AnaliseHorasTrabalhadasPage() {
         console.warn('Erro ao carregar time entries diretos:', error)
       }
       
+      // Debug: verificar estrutura dos dados
+      if (allTimeEntries.length > 0) {
+        console.log('Exemplo de entry:', allTimeEntries[0])
+        console.log('userId no exemplo:', allTimeEntries[0].userId, allTimeEntries[0].user?.id)
+      }
+      
       setTimeEntries(allTimeEntries)
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
@@ -247,8 +253,24 @@ export default function AnaliseHorasTrabalhadasPage() {
     
     // Filtro de usuário
     if (userFilter) {
-      const entryUserId = entry.userId || entry.user?.id || entry.user_id
-      if (entryUserId !== userFilter) {
+      // Verificar userId em diferentes formatos possíveis
+      const entryUserId = entry.userId || entry.user?.id || entry.user_id || (entry.user && typeof entry.user === 'object' ? entry.user.id : null)
+      // Converter ambos para string para comparação segura
+      const filterUserId = String(userFilter)
+      const entryUserIdStr = entryUserId ? String(entryUserId) : null
+      
+      // Debug apenas para primeira entrada quando filtro está ativo
+      if (timeEntries.indexOf(entry) === 0) {
+        console.log('Filtro de usuário ativo:', {
+          userFilter,
+          filterUserId,
+          entryUserId,
+          entryUserIdStr,
+          entry: { userId: entry.userId, user: entry.user }
+        })
+      }
+      
+      if (!entryUserIdStr || entryUserIdStr !== filterUserId) {
         return false
       }
     }
@@ -612,26 +634,36 @@ export default function AnaliseHorasTrabalhadasPage() {
 
         {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Gráfico: Evolução Temporal */}
+          {/* Gráfico: Horas por Cliente */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Evolução Temporal de Horas</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Horas por Cliente</h2>
             {(() => {
-              // Agrupar por data
-              const horasPorData: Record<string, number> = {}
+              // Agrupar por cliente (considerando cliente do vínculo: atividade, projeto, negociação ou cliente direto)
+              const horasPorCliente: Record<string, number> = {}
               filteredTimeEntries.forEach((entry: any) => {
-                const date = new Date(entry.data)
-                const dateStr = date.toISOString().split('T')[0]
+                // Obter cliente do vínculo: cliente direto, do projeto, da negociação ou da tarefa
+                const clienteNome = entry.clientName || 
+                                  entry.client?.name || 
+                                  entry.client?.razaoSocial ||
+                                  entry.project?.client?.name ||
+                                  entry.project?.client?.razaoSocial ||
+                                  entry.proposal?.client?.name ||
+                                  entry.proposal?.client?.razaoSocial ||
+                                  entry.task?.client?.name ||
+                                  entry.task?.client?.razaoSocial ||
+                                  'Sem Cliente'
                 const horas = parseFloat(entry.horas) || 0
-                horasPorData[dateStr] = (horasPorData[dateStr] || 0) + horas
+                horasPorCliente[clienteNome] = (horasPorCliente[clienteNome] || 0) + horas
               })
               
-              // Converter para array e ordenar por data
-              const chartData = Object.entries(horasPorData)
-                .map(([data, horas]) => ({
-                  data: new Date(data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+              // Converter para array e ordenar por horas (decrescente)
+              const chartData = Object.entries(horasPorCliente)
+                .map(([cliente, horas]) => ({
+                  cliente: cliente.length > 30 ? cliente.substring(0, 30) + '...' : cliente,
                   horas: parseFloat(horas.toFixed(2))
                 }))
-                .sort((a, b) => new Date(a.data.split('/').reverse().join('-')).getTime() - new Date(b.data.split('/').reverse().join('-')).getTime())
+                .sort((a, b) => b.horas - a.horas)
+                .slice(0, 10) // Top 10 clientes
               
               if (chartData.length === 0) {
                 return <p className="text-gray-500 text-center py-8">Nenhum dado disponível para o período selecionado</p>
@@ -639,14 +671,14 @@ export default function AnaliseHorasTrabalhadasPage() {
               
               return (
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={chartData}>
+                  <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="data" />
+                    <XAxis dataKey="cliente" angle={-45} textAnchor="end" height={100} />
                     <YAxis />
-                    <Tooltip />
+                    <Tooltip formatter={(value: number | undefined) => formatHoursFromDecimal(value)} />
                     <Legend />
-                    <Line type="monotone" dataKey="horas" stroke="#3b82f6" strokeWidth={2} name="Horas" />
-                  </LineChart>
+                    <Bar dataKey="horas" fill="#3b82f6" name="Horas" />
+                  </BarChart>
                 </ResponsiveContainer>
               )
             })()}
@@ -656,13 +688,15 @@ export default function AnaliseHorasTrabalhadasPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Distribuição por Projeto</h2>
             {(() => {
-              // Agrupar por projeto
+              // Agrupar por projeto - apenas entradas vinculadas a projetos
               const horasPorProjeto: Record<string, number> = {}
-              filteredTimeEntries.forEach((entry: any) => {
-                const projetoNome = entry.projectName || 'Sem Projeto'
-                const horas = parseFloat(entry.horas) || 0
-                horasPorProjeto[projetoNome] = (horasPorProjeto[projetoNome] || 0) + horas
-              })
+              filteredTimeEntries
+                .filter((entry: any) => entry.projectId && entry.projectName) // Filtrar apenas com projectId
+                .forEach((entry: any) => {
+                  const projetoNome = entry.projectName
+                  const horas = parseFloat(entry.horas) || 0
+                  horasPorProjeto[projetoNome] = (horasPorProjeto[projetoNome] || 0) + horas
+                })
               
               // Converter para array e ordenar por horas (decrescente)
               const chartData = Object.entries(horasPorProjeto)
@@ -683,7 +717,7 @@ export default function AnaliseHorasTrabalhadasPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="projeto" angle={-45} textAnchor="end" height={100} />
                     <YAxis />
-                    <Tooltip />
+                    <Tooltip formatter={(value: number | undefined) => formatHoursFromDecimal(value)} />
                     <Legend />
                     <Bar dataKey="horas" fill="#3b82f6" name="Horas" />
                   </BarChart>
