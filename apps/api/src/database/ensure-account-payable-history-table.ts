@@ -12,14 +12,14 @@ export async function ensureAccountPayableHistoryTable(dataSource: DataSource): 
       
       await queryRunner.query(`
         CREATE TABLE "account_payable_history" (
-          "id" varchar PRIMARY KEY NOT NULL,
-          "account_payable_id" varchar NOT NULL,
+          "id" varchar(36) PRIMARY KEY NOT NULL,
+          "account_payable_id" varchar(36) NOT NULL,
           "action" varchar(50) NOT NULL,
           "field_name" varchar(100),
           "old_value" text,
           "new_value" text,
           "description" text,
-          "changed_by" varchar,
+          "changed_by" varchar(36),
           "changed_at" datetime NOT NULL DEFAULT GETDATE()
         )
       `);
