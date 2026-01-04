@@ -38,7 +38,7 @@ export async function ensureAccountPayableHistoryTable(dataSource: DataSource): 
         // Verificar coluna id
         const idColumn = columns.find(col => col.name === 'id');
         if (idColumn) {
-          const currentLength = idColumn.length || 0;
+          const currentLength = typeof idColumn.length === 'string' ? parseInt(idColumn.length, 10) : (idColumn.length || 0);
           if (idColumn.type === 'varchar' && currentLength < 36) {
             console.log(`Corrigindo tamanho da coluna id de varchar(${currentLength || 'sem tamanho'}) para varchar(36)...`);
             try {
@@ -53,7 +53,7 @@ export async function ensureAccountPayableHistoryTable(dataSource: DataSource): 
         // Verificar coluna account_payable_id
         const accountPayableIdColumn = columns.find(col => col.name === 'account_payable_id');
         if (accountPayableIdColumn) {
-          const currentLength = accountPayableIdColumn.length || 0;
+          const currentLength = typeof accountPayableIdColumn.length === 'string' ? parseInt(accountPayableIdColumn.length, 10) : (accountPayableIdColumn.length || 0);
           if (accountPayableIdColumn.type === 'varchar' && currentLength < 36) {
             console.log(`Corrigindo tamanho da coluna account_payable_id de varchar(${currentLength || 'sem tamanho'}) para varchar(36)...`);
             try {
@@ -68,7 +68,7 @@ export async function ensureAccountPayableHistoryTable(dataSource: DataSource): 
         // Verificar coluna changed_by
         const changedByColumn = columns.find(col => col.name === 'changed_by');
         if (changedByColumn) {
-          const currentLength = changedByColumn.length || 0;
+          const currentLength = typeof changedByColumn.length === 'string' ? parseInt(changedByColumn.length, 10) : (changedByColumn.length || 0);
           if (changedByColumn.type === 'varchar' && currentLength < 36) {
             console.log(`Corrigindo tamanho da coluna changed_by de varchar(${currentLength || 'sem tamanho'}) para varchar(36)...`);
             try {
