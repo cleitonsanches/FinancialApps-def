@@ -211,7 +211,9 @@ export class AccountsPayableService {
     newValue?: string | null,
     description?: string,
   ): Promise<AccountPayableHistory> {
+    const { randomUUID } = await import('crypto');
     const history = this.accountPayableHistoryRepository.create({
+      id: randomUUID(),
       accountPayableId,
       action,
       fieldName,
