@@ -153,6 +153,7 @@ export default function AnaliseHorasTrabalhadasPage() {
                 proposalTitulo: finalProposal?.titulo || entry.proposal?.titulo || null,
                 clientId: project.clientId || finalProposal?.clientId || entry.clientId,
                 clientName: project.client?.name || project.client?.razaoSocial || finalProposal?.clientName || entry.client?.name || entry.client?.razaoSocial,
+                userId: entry.userId || entry.user?.id || entry.user_id, // Garantir que userId esteja presente
                 isFaturavel: entry.isFaturavel === true || entry.isFaturavel === 1 || entry.isFaturavel === 'true' 
                   ? true 
                   : isFaturavel({ ...entry, projectId: project.id, proposalId: project.proposalId || entry.proposalId }),
@@ -184,6 +185,7 @@ export default function AnaliseHorasTrabalhadasPage() {
             proposalTitulo: entryProposal?.titulo || entry.proposal?.titulo || null,
             clientId: entry.clientId || entryProposal?.clientId,
             clientName: entry.client?.name || entry.client?.razaoSocial || entryProposal?.clientName,
+            userId: entry.userId || entry.user?.id || entry.user_id, // Garantir que userId esteja presente
             isFaturavel: entry.isFaturavel === true || entry.isFaturavel === 1 || entry.isFaturavel === 'true' 
               ? true 
               : isFaturavel(entry),
@@ -244,8 +246,11 @@ export default function AnaliseHorasTrabalhadasPage() {
     }
     
     // Filtro de usuário
-    if (userFilter && entry.userId !== userFilter) {
-      return false
+    if (userFilter) {
+      const entryUserId = entry.userId || entry.user?.id || entry.user_id
+      if (entryUserId !== userFilter) {
+        return false
+      }
     }
     
     return true
