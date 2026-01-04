@@ -367,6 +367,7 @@ export default function AgendaPage() {
   
   // Estados para comentários
   const [taskComments, setTaskComments] = useState<Record<string, any[]>>({})
+  const [commentsCount, setCommentsCount] = useState<Record<string, number>>({})
   const [showCommentInput, setShowCommentInput] = useState(false)
   const [showCommentsList, setShowCommentsList] = useState(false)
   const [newComment, setNewComment] = useState('')
