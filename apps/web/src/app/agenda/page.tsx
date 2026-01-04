@@ -7,6 +7,60 @@ import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
 import { parseHoursToDecimal, formatHoursFromDecimal } from '@/utils/hourFormatter'
 
+// Função auxiliar para converter data para string YYYY-MM-DD
+const dateToString = (dateValue: string | Date | null | undefined): string | null => {
+  if (!dateValue) return null
+  if (typeof dateValue === 'string') {
+    return dateValue.split('T')[0]
+  }
+  const dateObj = dateValue as Date
+  const year = dateObj.getFullYear()
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+  const day = String(dateObj.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Função auxiliar para verificar se uma tarefa deve aparecer em uma data específica
+const isTaskVisibleOnDate = (task: any, dateStr: string): boolean => {
+  const dataInicio = dateToString(task.dataInicio)
+  const dataFimPrevista = dateToString(task.dataFimPrevista)
+  const dataConclusao = dateToString(task.dataConclusao)
+  
+  // Se tem data de início e data de fim, mostrar em todos os dias do intervalo
+  if (dataInicio && dataFimPrevista) {
+    return dateStr >= dataInicio && dateStr <= dataFimPrevista
+  }
+  
+  // Se tem data de início e data de conclusão, mostrar em todos os dias do intervalo
+  if (dataInicio && dataConclusao) {
+    return dateStr >= dataInicio && dateStr <= dataConclusao
+  }
+  
+  // Se só tem data de início, mostrar a partir dessa data
+  if (dataInicio) {
+    return dateStr >= dataInicio
+  }
+  
+  // Se só tem data de fim prevista, mostrar nessa data e nos dias anteriores (se estiver atrasada)
+  if (dataFimPrevista) {
+    const hoje = new Date()
+    const hojeStr = dateToString(hoje)
+    // Se a data de fim já passou, mostrar em todos os dias desde hoje até a data de fim
+    if (hojeStr && hojeStr > dataFimPrevista) {
+      return dateStr <= hojeStr && dateStr >= dataFimPrevista
+    }
+    // Se ainda não passou, mostrar só na data de fim
+    return dateStr === dataFimPrevista
+  }
+  
+  // Se só tem data de conclusão, mostrar só nesse dia (comportamento original)
+  if (dataConclusao) {
+    return dateStr === dataConclusao
+  }
+  
+  return false
+}
+
 // Componente de Visualização em Calendário
 function CalendarView({ tasks, view, onTaskClick, onRegisterHours, isTaskOverdue }: any) {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -52,23 +106,7 @@ function CalendarView({ tasks, view, onTaskClick, onRegisterHours, isTaskOverdue
     const dateStr = `${year}-${month}-${day}`
     
     const tasksForDate = tasks.filter((task: any) => {
-      // Usar dataConclusao ou dataFimPrevista (prazo) para o calendário, ou dataInicio como fallback
-      const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
-      if (!dateToUse) return false
-      
-      // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
-      let taskDate: string
-      if (typeof dateToUse === 'string') {
-        taskDate = dateToUse.split('T')[0]
-      } else {
-        // Se for Date, converter para string local
-        const dateObj = dateToUse as Date
-        const taskYear = dateObj.getFullYear()
-        const taskMonth = String(dateObj.getMonth() + 1).padStart(2, '0')
-        const taskDay = String(dateObj.getDate()).padStart(2, '0')
-        taskDate = `${taskYear}-${taskMonth}-${taskDay}`
-      }
-      return taskDate === dateStr
+      return isTaskVisibleOnDate(task, dateStr)
     })
     
     // Se includeOverdue for true e temos a função isTaskOverdue, adicionar tarefas atrasadas
@@ -988,21 +1026,13 @@ export default function AgendaPage() {
   })
 
   // Agrupar tarefas por data (as tarefas já estão ordenadas em sortedFilteredTasks)
+  // Para a lista, priorizamos dataInicio para que a tarefa apareça desde o início
   const tasksByDate = sortedFilteredTasks.reduce((acc: any, task: any) => {
-    // Extrair apenas a parte da data (YYYY-MM-DD) sem conversão de timezone
+    // Priorizar dataInicio para que a tarefa apareça desde o início do período
+    const dateToUse = task.dataInicio || task.dataFimPrevista || task.dataConclusao
     let date: string = 'sem-data'
-    const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
     if (dateToUse) {
-      if (typeof dateToUse === 'string') {
-        date = dateToUse.split('T')[0]
-      } else {
-        // Se for Date, converter para string local
-        const dateObj = dateToUse as Date
-        const year = dateObj.getFullYear()
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-        const day = String(dateObj.getDate()).padStart(2, '0')
-        date = `${year}-${month}-${day}`
-      }
+      date = dateToString(dateToUse) || 'sem-data'
     }
     if (!acc[date]) {
       acc[date] = []
@@ -1019,18 +1049,11 @@ export default function AgendaPage() {
     // As tarefas já estão ordenadas em sortedFilteredTasks, então pegamos as datas na ordem que aparecem
     const dateOrder: string[] = []
     sortedFilteredTasks.forEach((task: any) => {
+      // Priorizar dataInicio para que a tarefa apareça desde o início do período
+      const dateToUse = task.dataInicio || task.dataFimPrevista || task.dataConclusao
       let date: string = 'sem-data'
-      const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
       if (dateToUse) {
-        if (typeof dateToUse === 'string') {
-          date = dateToUse.split('T')[0]
-        } else {
-          const dateObj = dateToUse as Date
-          const year = dateObj.getFullYear()
-          const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-          const day = String(dateObj.getDate()).padStart(2, '0')
-          date = `${year}-${month}-${day}`
-        }
+        date = dateToString(dateToUse) || 'sem-data'
       }
       if (!dateOrder.includes(date)) {
         dateOrder.push(date)
