@@ -18,6 +18,7 @@ export default function InvoiceDetailsPage() {
   const [chartOfAccounts, setChartOfAccounts] = useState<any[]>([])
   const [invoiceHistory, setInvoiceHistory] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
+  const [historyExpanded, setHistoryExpanded] = useState(false)
   
   // Modal EDITAR
   const [showEditarModal, setShowEditarModal] = useState(false)
@@ -441,10 +442,14 @@ export default function InvoiceDetailsPage() {
         emissionDate: editFormData.emissionDate,
         dueDate: editFormData.dueDate,
         numeroNF: editFormData.numeroNF || null,
-        tipoEmissao: editFormData.tipoEmissao,
         desconto: editFormData.desconto ? getValorAsNumberFromInput(editFormData.desconto) : 0,
         acrescimo: editFormData.acrescimo ? getValorAsNumberFromInput(editFormData.acrescimo) : 0,
         chartOfAccountsId: editFormData.chartOfAccountsId || null,
+      }
+
+      // Só enviar tipoEmissao se o valor foi alterado
+      if (invoice && editFormData.tipoEmissao !== (invoice.tipoEmissao || 'NF')) {
+        payload.tipoEmissao = editFormData.tipoEmissao
       }
 
       await api.put(`/invoices/${invoiceId}`, payload)
@@ -1062,59 +1067,74 @@ export default function InvoiceDetailsPage() {
             {/* Histórico de Alterações */}
             {invoiceHistory.length > 0 && (
               <div className="mt-6">
-                <h2 className="text-xl font-semibold mb-4 text-gray-900">Histórico de Alterações</h2>
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Anterior</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Novo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alterado por</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {invoiceHistory.map((history: any) => (
-                        <tr key={history.id}>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {formatDate(history.changedAt, true)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              history.action === 'CANCEL' ? 'bg-red-100 text-red-800' :
-                              history.action === 'EDIT' ? 'bg-blue-100 text-blue-800' :
-                              history.action === 'RECEIVE' ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {history.action === 'CANCEL' ? 'Cancelamento' :
-                               history.action === 'EDIT' ? 'Edição' :
-                               history.action === 'RECEIVE' ? 'Recebimento' :
-                               history.action}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {getFieldDisplayName(history.fieldName)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {formatFieldValue(history.fieldName, history.oldValue)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {formatFieldValue(history.fieldName, history.newValue)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {history.changedByUser?.name || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {history.description || '-'}
-                          </td>
+                <button
+                  onClick={() => setHistoryExpanded(!historyExpanded)}
+                  className="w-full flex items-center justify-between text-xl font-semibold mb-4 text-gray-900 hover:text-gray-700 transition-colors"
+                >
+                  <span>Histórico de Alterações</span>
+                  <svg
+                    className={`w-5 h-5 transform transition-transform ${historyExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {historyExpanded && (
+                  <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campo</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Anterior</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Novo</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alterado por</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {invoiceHistory.map((history: any) => (
+                          <tr key={history.id}>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {formatDate(history.changedAt, true)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                history.action === 'CANCEL' ? 'bg-red-100 text-red-800' :
+                                history.action === 'EDIT' ? 'bg-blue-100 text-blue-800' :
+                                history.action === 'RECEIVE' ? 'bg-green-100 text-green-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {history.action === 'CANCEL' ? 'Cancelamento' :
+                                 history.action === 'EDIT' ? 'Edição' :
+                                 history.action === 'RECEIVE' ? 'Recebimento' :
+                                 history.action}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {getFieldDisplayName(history.fieldName)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {formatFieldValue(history.fieldName, history.oldValue)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {formatFieldValue(history.fieldName, history.newValue)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {history.changedByUser?.name || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {history.description || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>
