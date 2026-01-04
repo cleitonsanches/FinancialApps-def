@@ -103,10 +103,17 @@ export class ProjectsService {
       // Vamos fazer uma query raw adicional para obter esses valores
       if (tasks.length > 0) {
         const taskIds = tasks.map(t => t.id);
+        // Validar que todos os IDs são UUIDs válidos para prevenir SQL injection
+        const taskIdRegex = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+        const validTaskIds = taskIds.filter(id => taskIdRegex.test(id));
+        if (validTaskIds.length === 0) {
+          return tasks;
+        }
         const queryRunner = this.projectTaskRepository.manager.connection.createQueryRunner();
+        // SQL Server: usar interpolação com escape de aspas simples
+        const idsString = validTaskIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
         const rawTasks = await queryRunner.query(
-          `SELECT id, proposal_id, client_id FROM project_tasks WHERE id IN (${taskIds.map(() => '?').join(',')})`,
-          taskIds
+          `SELECT id, proposal_id, client_id FROM project_tasks WHERE id IN (${idsString})`
         );
         await queryRunner.release();
         
@@ -575,7 +582,13 @@ export class ProjectsService {
         console.log('Buscando tarefa para obter vínculos, taskId:', timeEntryData.taskId);
         
         // Usar query raw para buscar campos com select: false diretamente do banco
+        // SQL Server usa parâmetros nomeados, então vamos usar interpolação com validação
         const queryRunner = this.projectTaskRepository.manager.connection.createQueryRunner();
+        // Validar que taskId é um UUID válido para prevenir SQL injection
+        const taskIdRegex = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+        if (!taskIdRegex.test(timeEntryData.taskId)) {
+          throw new Error('taskId inválido');
+        }
         const rawTask = await queryRunner.query(
           `SELECT 
             id,
@@ -583,8 +596,7 @@ export class ProjectsService {
             proposal_id,
             client_id
           FROM project_tasks 
-          WHERE id = ?`,
-          [timeEntryData.taskId]
+          WHERE id = '${timeEntryData.taskId.replace(/'/g, "''")}'`
         );
         await queryRunner.release();
         
