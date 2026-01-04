@@ -522,11 +522,20 @@ export class ProjectsService {
   }
 
   async createTimeEntry(timeEntryData: Partial<TimeEntry>): Promise<TimeEntry> {
+    console.log('createTimeEntry - dados recebidos:', {
+      taskId: timeEntryData.taskId,
+      projectId: timeEntryData.projectId,
+      proposalId: timeEntryData.proposalId,
+      clientId: timeEntryData.clientId
+    });
+    
     // Se houver taskId mas não houver vínculos diretos, buscar a tarefa para obter os vínculos
     if (timeEntryData.taskId && (!timeEntryData.projectId && !timeEntryData.proposalId && !timeEntryData.clientId)) {
       try {
-        // Buscar tarefa com select explícito para incluir campos marcados com select: false
-        const task = await this.projectTaskRepository
+        console.log('Buscando tarefa para obter vínculos, taskId:', timeEntryData.taskId);
+        
+        // Tentar buscar com query builder primeiro (para campos select: false)
+        let task = await this.projectTaskRepository
           .createQueryBuilder('task')
           .leftJoinAndSelect('task.project', 'project')
           .leftJoinAndSelect('project.proposal', 'projectProposal')
@@ -538,10 +547,30 @@ export class ProjectsService {
           .where('task.id = :taskId', { taskId: timeEntryData.taskId })
           .getOne();
         
+        // Se não encontrou, tentar com findOne simples
+        if (!task) {
+          console.log('Tarefa não encontrada com query builder, tentando findOne...');
+          task = await this.projectTaskRepository.findOne({
+            where: { id: timeEntryData.taskId },
+            relations: ['project', 'project.proposal', 'project.client', 'proposal', 'client']
+          });
+        }
+        
         if (task) {
+          console.log('Tarefa encontrada:', {
+            taskId: task.id,
+            projectId: task.projectId,
+            proposalId: task.proposalId,
+            clientId: task.clientId,
+            project: task.project ? { id: task.project.id, clientId: task.project.clientId, proposalId: task.project.proposalId } : null,
+            proposal: task.proposal ? { id: task.proposal.id, clientId: task.proposal.clientId } : null,
+            client: task.client ? { id: task.client.id } : null
+          });
+          
           // Obter projectId da tarefa ou do projeto relacionado
           if (!timeEntryData.projectId) {
             timeEntryData.projectId = task.projectId || (task.project as any)?.id || null;
+            console.log('projectId obtido:', timeEntryData.projectId);
           }
           
           // Obter proposalId da tarefa, do projeto ou da negociação relacionada
@@ -549,6 +578,7 @@ export class ProjectsService {
             const taskProposalId = (task as any).proposal_id || task.proposalId;
             const projectProposalId = (task.project as any)?.proposalId || (task.project as any)?.proposal?.id;
             timeEntryData.proposalId = taskProposalId || projectProposalId || null;
+            console.log('proposalId obtido:', timeEntryData.proposalId);
           }
           
           // Obter clientId da tarefa, do projeto ou da negociação relacionada
@@ -557,16 +587,27 @@ export class ProjectsService {
             const projectClientId = (task.project as any)?.clientId || (task.project as any)?.client?.id;
             const proposalClientId = (task.proposal as any)?.clientId || (task.project as any)?.proposal?.clientId;
             timeEntryData.clientId = taskClientId || projectClientId || proposalClientId || null;
+            console.log('clientId obtido:', timeEntryData.clientId);
           }
+        } else {
+          console.warn('Tarefa não encontrada com ID:', timeEntryData.taskId);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao buscar tarefa para obter vínculos:', error);
+        console.error('Stack:', error.stack);
         // Continuar mesmo se houver erro ao buscar a tarefa
       }
     }
     
+    console.log('createTimeEntry - vínculos após busca:', {
+      projectId: timeEntryData.projectId,
+      proposalId: timeEntryData.proposalId,
+      clientId: timeEntryData.clientId
+    });
+    
     // Validar que pelo menos um vínculo existe
     if (!timeEntryData.projectId && !timeEntryData.proposalId && !timeEntryData.clientId) {
+      console.error('Erro: Nenhum vínculo encontrado após busca da tarefa');
       throw new Error('É necessário vincular a um Projeto, Negociação ou Cliente');
     }
     
