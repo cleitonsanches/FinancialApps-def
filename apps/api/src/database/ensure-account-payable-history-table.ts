@@ -11,21 +11,21 @@ export async function ensureAccountPayableHistoryTable(dataSource: DataSource): 
       console.log('Criando tabela account_payable_history...');
       
       await queryRunner.query(`
-        CREATE TABLE account_payable_history (
-          id VARCHAR(36) PRIMARY KEY,
-          account_payable_id VARCHAR(36) NOT NULL,
-          action VARCHAR(50) NOT NULL,
-          field_name VARCHAR(100),
-          old_value TEXT,
-          new_value TEXT,
-          description TEXT,
-          changed_by VARCHAR(36),
-          changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          INDEX IX_account_payable_history_account_payable_id (account_payable_id),
-          FOREIGN KEY (account_payable_id) REFERENCES accounts_payable(id) ON DELETE CASCADE,
-          FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL
+        CREATE TABLE "account_payable_history" (
+          "id" varchar PRIMARY KEY NOT NULL,
+          "account_payable_id" varchar NOT NULL,
+          "action" varchar(50) NOT NULL,
+          "field_name" varchar(100),
+          "old_value" text,
+          "new_value" text,
+          "description" text,
+          "changed_by" varchar,
+          "changed_at" datetime NOT NULL DEFAULT (datetime('now'))
         )
       `);
+      
+      // Criar índices
+      await queryRunner.query(`CREATE INDEX "IX_account_payable_history_account_payable_id" ON "account_payable_history" ("account_payable_id")`);
       
       console.log('✅ Tabela account_payable_history criada com sucesso.');
     } else {

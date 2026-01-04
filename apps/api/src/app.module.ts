@@ -169,6 +169,8 @@ export class AppModule implements OnModuleInit {
     await ensureProjectTemplatePhasesTable(this.dataSource);
     // Garantir que a tabela invoice_account_payable existe
     await ensureInvoiceAccountPayableTable(this.dataSource);
+    // Garantir que a tabela account_payable_history existe
+    await ensureAccountPayableHistoryTable(this.dataSource);
     // Garantir que a tabela task_comments existe
     await ensureTaskCommentsTable(this.dataSource);
     // Garantir que a coluna conclusao_efetiva existe na tabela project_tasks
