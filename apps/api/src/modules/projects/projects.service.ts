@@ -113,7 +113,7 @@ export class ProjectsService {
         // Mapear os valores raw para as tarefas
         const rawMap = new Map(rawTasks.map((rt: any) => [rt.id, { proposalId: rt.proposal_id, clientId: rt.client_id }]));
         tasks.forEach(task => {
-          const raw = rawMap.get(task.id);
+          const raw = rawMap.get(task.id) as { proposalId?: string; clientId?: string } | undefined;
           if (raw) {
             (task as any).proposalId = raw.proposalId;
             (task as any).clientId = raw.clientId;
