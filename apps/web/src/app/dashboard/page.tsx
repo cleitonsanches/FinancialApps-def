@@ -36,7 +36,11 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-bold text-gray-900">CoreGestão</h1>
+              <span className="text-xl text-gray-500">|</span>
+              <h2 className="text-2xl font-semibold text-gray-700">Dashboard</h2>
+            </div>
             <NavigationLinks />
           </div>
         </div>
