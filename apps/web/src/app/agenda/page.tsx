@@ -1510,60 +1510,64 @@ export default function AgendaPage() {
                             )}
                           </div>
                           <div className="flex flex-row md:flex-col gap-2 md:ml-4 flex-shrink-0 w-full md:w-auto">
-                            <button
-                              onClick={() => {
-                                setSelectedTask(task)
-                                
-                                // Converter datas para string YYYY-MM-DD sem problemas de timezone
-                                const formatDateForInput = (date: string | Date | null | undefined): string => {
-                                  if (!date) return ''
-                                  if (typeof date === 'string') {
-                                    return date.split('T')[0]
-                                  }
-                                  // Se for Date, converter para string local
-                                  const dateObj = date as Date
-                                  const year = dateObj.getFullYear()
-                                  const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-                                  const day = String(dateObj.getDate()).padStart(2, '0')
-                                  return `${year}-${month}-${day}`
-                                }
-                                
-                                setEditTaskData({
-                                  name: task.name || '',
-                                  description: task.description || '',
-                                  status: task.status || 'PENDENTE',
-                                  dataInicio: formatDateForInput(task.dataInicio),
-                                  dataFimPrevista: formatDateForInput(task.dataConclusao || task.dataFimPrevista || ''),
-                                  usuarioResponsavelId: task.usuarioResponsavelId || '',
-                                  usuarioExecutorId: task.usuarioExecutorId || '',
-                                  tipo: task.tipo || 'ATIVIDADE',
-                                  horasEstimadas: task.horasEstimadas || '',
-                                  horaInicio: task.horaInicio || '',
-                                  horaFim: task.horaFim || '',
-                                  semPrazoDefinido: task.semPrazoDefinido || false,
-                                  diaInteiro: task.diaInteiro || false,
-                                  exigirLancamentoHoras: task.exigirLancamentoHoras || false,
-                                })
-                                setShowEditTaskModal(true)
-                              }}
-                              className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedTask(task)
-                                setUpdateTaskData({
-                                  status: task.status || '',
-                                  percentual: task.percentual?.toString() || '',
-                                })
-                                setShowUpdateStatusModal(true)
-                              }}
-                              className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm whitespace-nowrap"
-                            >
-                              Alterar Status
-                            </button>
+                            {task.status !== 'CONCLUIDA' && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedTask(task)
+                                    
+                                    // Converter datas para string YYYY-MM-DD sem problemas de timezone
+                                    const formatDateForInput = (date: string | Date | null | undefined): string => {
+                                      if (!date) return ''
+                                      if (typeof date === 'string') {
+                                        return date.split('T')[0]
+                                      }
+                                      // Se for Date, converter para string local
+                                      const dateObj = date as Date
+                                      const year = dateObj.getFullYear()
+                                      const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+                                      const day = String(dateObj.getDate()).padStart(2, '0')
+                                      return `${year}-${month}-${day}`
+                                    }
+                                    
+                                    setEditTaskData({
+                                      name: task.name || '',
+                                      description: task.description || '',
+                                      status: task.status || 'PENDENTE',
+                                      dataInicio: formatDateForInput(task.dataInicio),
+                                      dataFimPrevista: formatDateForInput(task.dataConclusao || task.dataFimPrevista || ''),
+                                      usuarioResponsavelId: task.usuarioResponsavelId || '',
+                                      usuarioExecutorId: task.usuarioExecutorId || '',
+                                      tipo: task.tipo || 'ATIVIDADE',
+                                      horasEstimadas: task.horasEstimadas || '',
+                                      horaInicio: task.horaInicio || '',
+                                      horaFim: task.horaFim || '',
+                                      semPrazoDefinido: task.semPrazoDefinido || false,
+                                      diaInteiro: task.diaInteiro || false,
+                                      exigirLancamentoHoras: task.exigirLancamentoHoras || false,
+                                    })
+                                    setShowEditTaskModal(true)
+                                  }}
+                                  className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setSelectedTask(task)
+                                    setUpdateTaskData({
+                                      status: task.status || '',
+                                      percentual: task.percentual?.toString() || '',
+                                    })
+                                    setShowUpdateStatusModal(true)
+                                  }}
+                                  className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm whitespace-nowrap"
+                                >
+                                  Alterar Status
+                                </button>
+                              </>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -1825,6 +1829,12 @@ export default function AgendaPage() {
                     {formatDate(selectedTask.dataConclusao || selectedTask.dataFimPrevista)}
                   </div>
                 )}
+                {selectedTask.status === 'CONCLUIDA' && selectedTask.conclusaoEfetiva && (
+                  <div>
+                    <span className="font-semibold">Conclusão Efetiva:</span>{' '}
+                    {formatDate(selectedTask.conclusaoEfetiva)}
+                  </div>
+                )}
                 {selectedTask.horasEstimadas && (
                   <div>
                     <span className="font-semibold">Horas Estimadas:</span>{' '}
@@ -1910,55 +1920,59 @@ export default function AgendaPage() {
 
               {/* Botões de Ação */}
               <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => {
-                    setShowTaskDetailsModal(false)
-                    const formatDateForInput = (date: string | Date | null | undefined): string => {
-                      if (!date) return ''
-                      if (typeof date === 'string') {
-                        return date.split('T')[0]
-                      }
-                      const dateObj = date as Date
-                      const year = dateObj.getFullYear()
-                      const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-                      const day = String(dateObj.getDate()).padStart(2, '0')
-                      return `${year}-${month}-${day}`
-                    }
-                    setEditTaskData({
-                      name: selectedTask.name || '',
-                      description: selectedTask.description || '',
-                      status: selectedTask.status || 'PENDENTE',
-                      dataInicio: formatDateForInput(selectedTask.dataInicio),
-                      dataFimPrevista: formatDateForInput(selectedTask.dataConclusao || selectedTask.dataFimPrevista || ''),
-                      usuarioResponsavelId: selectedTask.usuarioResponsavelId || '',
-                      usuarioExecutorId: selectedTask.usuarioExecutorId || '',
-                      tipo: selectedTask.tipo || 'ATIVIDADE',
-                      horasEstimadas: selectedTask.horasEstimadas || '',
-                      horaInicio: selectedTask.horaInicio || '',
-                      horaFim: selectedTask.horaFim || '',
-                      semPrazoDefinido: selectedTask.semPrazoDefinido || false,
-                      diaInteiro: selectedTask.diaInteiro || false,
-                      exigirLancamentoHoras: selectedTask.exigirLancamentoHoras || false,
-                    })
-                    setShowEditTaskModal(true)
-                  }}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => {
-                    setShowTaskDetailsModal(false)
-                    setUpdateTaskData({
-                      status: selectedTask.status || '',
-                      percentual: selectedTask.percentual?.toString() || '',
-                    })
-                    setShowUpdateStatusModal(true)
-                  }}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-                >
-                  Alterar Status
-                </button>
+                {selectedTask.status !== 'CONCLUIDA' && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowTaskDetailsModal(false)
+                        const formatDateForInput = (date: string | Date | null | undefined): string => {
+                          if (!date) return ''
+                          if (typeof date === 'string') {
+                            return date.split('T')[0]
+                          }
+                          const dateObj = date as Date
+                          const year = dateObj.getFullYear()
+                          const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+                          const day = String(dateObj.getDate()).padStart(2, '0')
+                          return `${year}-${month}-${day}`
+                        }
+                        setEditTaskData({
+                          name: selectedTask.name || '',
+                          description: selectedTask.description || '',
+                          status: selectedTask.status || 'PENDENTE',
+                          dataInicio: formatDateForInput(selectedTask.dataInicio),
+                          dataFimPrevista: formatDateForInput(selectedTask.dataConclusao || selectedTask.dataFimPrevista || ''),
+                          usuarioResponsavelId: selectedTask.usuarioResponsavelId || '',
+                          usuarioExecutorId: selectedTask.usuarioExecutorId || '',
+                          tipo: selectedTask.tipo || 'ATIVIDADE',
+                          horasEstimadas: selectedTask.horasEstimadas || '',
+                          horaInicio: selectedTask.horaInicio || '',
+                          horaFim: selectedTask.horaFim || '',
+                          semPrazoDefinido: selectedTask.semPrazoDefinido || false,
+                          diaInteiro: selectedTask.diaInteiro || false,
+                          exigirLancamentoHoras: selectedTask.exigirLancamentoHoras || false,
+                        })
+                        setShowEditTaskModal(true)
+                      }}
+                      className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowTaskDetailsModal(false)
+                        setUpdateTaskData({
+                          status: selectedTask.status || '',
+                          percentual: selectedTask.percentual?.toString() || '',
+                        })
+                        setShowUpdateStatusModal(true)
+                      }}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                    >
+                      Alterar Status
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => {
                     setShowTaskDetailsModal(false)

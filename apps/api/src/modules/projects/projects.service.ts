@@ -102,7 +102,7 @@ export class ProjectsService {
     const uuidFields = ['projectId', 'proposalId', 'clientId', 'phaseId', 'usuarioResponsavelId', 'usuarioExecutorId'];
     const numericFields = ['ordem']; // Campos numéricos que não podem receber strings vazias
     const stringFields = ['horasEstimadas']; // Campos string que podem receber números do frontend
-    const dateFields = ['dataInicio', 'dataConclusao', 'dataFimPrevista']; // Campos de data
+    const dateFields = ['dataInicio', 'dataConclusao', 'dataFimPrevista', 'conclusaoEfetiva']; // Campos de data
     const cleaned = { ...data };
     
     // Limpar campos UUID
@@ -359,6 +359,11 @@ export class ProjectsService {
     if ('dataFimPrevista' in updateData) {
       updateData.dataConclusao = updateData.dataFimPrevista;
       delete updateData.dataFimPrevista;
+    }
+    
+    // Se o status está mudando para CONCLUIDA, registrar a data de conclusão efetiva
+    if (taskData.status === 'CONCLUIDA' && currentTask.status !== 'CONCLUIDA') {
+      updateData.conclusaoEfetiva = new Date();
     }
     
     // Limpar campos UUID, numéricos e datas: converter strings vazias para null (SQL Server não aceita string vazia em campos GUID)

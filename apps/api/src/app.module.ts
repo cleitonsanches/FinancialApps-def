@@ -37,6 +37,7 @@ import { ensureInvoiceHistoryTable } from './database/ensure-invoice-history-tab
 import { ensureProjectTemplatePhasesTable } from './database/ensure-project-template-phases-table';
 import { ensureInvoiceAccountPayableTable } from './database/ensure-invoice-account-payable-table';
 import { ensureTaskCommentsTable } from './database/ensure-task-comments-table';
+import { ensureProjectTaskConclusaoEfetiva } from './database/ensure-project-task-conclusao-efetiva';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
 import { ClientsModule } from './modules/clients/clients.module';
@@ -169,6 +170,8 @@ export class AppModule implements OnModuleInit {
     await ensureInvoiceAccountPayableTable(this.dataSource);
     // Garantir que a tabela task_comments existe
     await ensureTaskCommentsTable(this.dataSource);
+    // Garantir que a coluna conclusao_efetiva existe na tabela project_tasks
+    await ensureProjectTaskConclusaoEfetiva(this.dataSource);
   }
 }
 

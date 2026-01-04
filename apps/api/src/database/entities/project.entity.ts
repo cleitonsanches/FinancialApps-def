@@ -121,6 +121,9 @@ export class ProjectTask {
   @Column({ name: 'data_conclusao', type: 'date', nullable: true })
   dataConclusao?: Date;
 
+  @Column({ name: 'conclusao_efetiva', type: 'date', nullable: true })
+  conclusaoEfetiva?: Date;
+
   @Column({ name: 'status', type: 'varchar', length: 50, default: 'PENDENTE' })
   status: string; // PENDENTE, EM_ANDAMENTO, CONCLUIDA, CANCELADA
 
