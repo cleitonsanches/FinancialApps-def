@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import api from '@/services/api'
 
 export default function LoginPage() {
@@ -76,9 +77,16 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-md p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          CoreGestão
-        </h1>
+        <div className="flex justify-center mb-8">
+          <Image
+            src="/logo.png"
+            alt="CoreGestão"
+            width={180}
+            height={60}
+            className="object-contain"
+            priority
+          />
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">

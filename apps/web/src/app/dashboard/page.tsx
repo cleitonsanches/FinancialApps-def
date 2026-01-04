@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import NavigationLinks from '@/components/NavigationLinks'
 
 export default function DashboardPage() {
@@ -37,7 +38,16 @@ export default function DashboardPage() {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-bold text-gray-900">CoreGestão</h1>
+              <div className="flex items-center gap-3">
+                <Image
+                  src="/logo.png"
+                  alt="CoreGestão"
+                  width={120}
+                  height={40}
+                  className="object-contain"
+                  priority
+                />
+              </div>
               <span className="text-xl text-gray-500">|</span>
               <h2 className="text-2xl font-semibold text-gray-700">Dashboard</h2>
             </div>
