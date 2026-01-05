@@ -135,11 +135,26 @@ export default function AnaliseFinanceiraPage() {
       ? recebimentosFuturos[0].toISOString().split('T')[0]
       : null
 
-    // Calcular valor disponível (saldo atual - contas a pagar até próximo recebimento)
-    let valorDisponivel = saldoInicialBTG
+    // Calcular valor disponível (saldo atual + recebimentos já realizados - contas a pagar até próximo recebimento)
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    
+    // Adicionar recebimentos já realizados (com dataRecebimento preenchida e status RECEBIDA)
+    const recebimentosRealizados = invoicesBTG
+      .filter(inv => {
+        if (!inv.dataRecebimento) return false
+        const dataReceb = new Date(inv.dataRecebimento)
+        dataReceb.setHours(0, 0, 0, 0)
+        // Considerar recebimentos de hoje ou anteriores
+        return dataReceb <= hoje && inv.status === 'RECEBIDA'
+      })
+      .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0)
+    
+    // Saldo atual = saldo inicial + recebimentos já realizados
+    const saldoAtual = saldoInicialBTG + recebimentosRealizados
+    
+    let valorDisponivel = saldoAtual
     if (proximoRecebimento) {
-      const hoje = new Date()
-      hoje.setHours(0, 0, 0, 0)
       const proximaData = new Date(proximoRecebimento)
       proximaData.setHours(0, 0, 0, 0)
 
@@ -153,7 +168,7 @@ export default function AnaliseFinanceiraPage() {
         })
         .reduce((sum, pay) => sum + parseFloat(pay.totalValue?.toString() || '0'), 0)
 
-      valorDisponivel = saldoInicialBTG - contasPagarAteProximo
+      valorDisponivel = saldoAtual - contasPagarAteProximo
     }
 
     // Calcular fluxo de caixa por data
