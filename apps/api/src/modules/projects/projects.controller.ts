@@ -112,8 +112,18 @@ export class ProjectsController {
     return this.projectsService.findTimeEntries(projectId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post('time-entries')
-  async createTimeEntry(@Body() timeEntryData: any): Promise<any> {
+  async createTimeEntry(@Body() timeEntryData: any, @Request() req?: any): Promise<any> {
+    // Obter userId do token se não foi fornecido no payload
+    if (!timeEntryData.userId && req?.user?.id) {
+      timeEntryData.userId = req.user.id;
+      console.log('createTimeEntry - userId obtido do token:', req.user.id);
+    } else if (timeEntryData.userId) {
+      console.log('createTimeEntry - userId fornecido no payload:', timeEntryData.userId);
+    } else {
+      console.warn('createTimeEntry - userId não encontrado nem no token nem no payload');
+    }
     return this.projectsService.createTimeEntry(timeEntryData);
   }
 
@@ -122,17 +132,23 @@ export class ProjectsController {
     return this.projectsService.createTimeEntry({ ...timeEntryData, projectId });
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Patch('time-entries/:entryId')
   async updateTimeEntry(@Param('entryId') entryId: string, @Body() timeEntryData: any, @Request() req?: any): Promise<any> {
     const userId = req?.user?.id; // ID do usuário que está fazendo a atualização
+    console.log('updateTimeEntry - userId obtido do token:', userId);
     return this.projectsService.updateTimeEntry(entryId, timeEntryData, userId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Patch(':id/time-entries/:entryId')
-  async updateTimeEntryForProject(@Param('id') projectId: string, @Param('entryId') entryId: string, @Body() timeEntryData: any): Promise<any> {
-    return this.projectsService.updateTimeEntry(entryId, { ...timeEntryData, projectId });
+  async updateTimeEntryForProject(@Param('id') projectId: string, @Param('entryId') entryId: string, @Body() timeEntryData: any, @Request() req?: any): Promise<any> {
+    const userId = req?.user?.id; // ID do usuário que está fazendo a atualização
+    console.log('updateTimeEntryForProject - userId obtido do token:', userId);
+    return this.projectsService.updateTimeEntry(entryId, { ...timeEntryData, projectId }, userId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post('time-entries/:id/approve')
   async approveTimeEntry(@Param('id') entryId: string, @Body() body?: any, @Request() req?: any): Promise<any> {
     const companyId = req?.user?.companyId;
@@ -140,6 +156,7 @@ export class ProjectsController {
     const motivoAprovacao = body?.motivoAprovacao;
     const valorPorHora = body?.valorPorHora;
     const criarInvoice = body?.criarInvoice !== false; // Por padrão, criar invoice (true)
+    console.log('approveTimeEntry - userId obtido do token:', userId);
     // O service agora busca o companyId automaticamente se não for fornecido
     return this.projectsService.approveTimeEntry(entryId, companyId, motivoAprovacao, valorPorHora, criarInvoice, userId);
   }

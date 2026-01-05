@@ -573,7 +573,8 @@ export class ProjectsService {
       taskId: timeEntryData.taskId,
       projectId: timeEntryData.projectId,
       proposalId: timeEntryData.proposalId,
-      clientId: timeEntryData.clientId
+      clientId: timeEntryData.clientId,
+      userId: timeEntryData.userId
     });
     
     // Se houver taskId mas não houver vínculos diretos, buscar a tarefa para obter os vínculos
@@ -685,8 +686,29 @@ export class ProjectsService {
                                    (typeof isFaturavelValue === 'number' && isFaturavelValue === 1);
     }
     
+    // Garantir que userId seja salvo (não pode ser string vazia)
+    if (timeEntryData.userId === '' || timeEntryData.userId === null) {
+      timeEntryData.userId = undefined;
+    }
+    
+    console.log('createTimeEntry - dados finais antes de salvar:', {
+      userId: timeEntryData.userId,
+      projectId: timeEntryData.projectId,
+      proposalId: timeEntryData.proposalId,
+      clientId: timeEntryData.clientId,
+      isFaturavel: timeEntryData.isFaturavel
+    });
+    
     const timeEntry = this.timeEntryRepository.create(timeEntryData);
     const saved = await this.timeEntryRepository.save(timeEntry);
+    
+    console.log('createTimeEntry - hora salva com sucesso:', {
+      id: saved.id,
+      userId: saved.userId,
+      projectId: saved.projectId,
+      proposalId: saved.proposalId,
+      clientId: saved.clientId
+    });
     
     // Se houver proposalId e a negociação for do tipo "Por hora", criar conta a receber
     if (saved.proposalId) {
@@ -828,6 +850,20 @@ export class ProjectsService {
         }
       }
 
+      // Se está mudando para APROVADA, salvar informações de aprovação
+      if (timeEntryData.status === 'APROVADA' && existingEntry.status !== 'APROVADA') {
+        timeEntryData.aprovadoEm = new Date();
+        if (userId) {
+          timeEntryData.aprovadoPor = userId;
+        }
+        console.log('Salvando informações de aprovação:', {
+          entryId,
+          aprovadoEm: timeEntryData.aprovadoEm,
+          aprovadoPor: timeEntryData.aprovadoPor,
+          userId
+        });
+      }
+      
       // Se está mudando para REPROVADA, salvar informações de reprovação
       if (timeEntryData.status === 'REPROVADA' && existingEntry.status !== 'REPROVADA') {
         // Se estava APROVADA, remover da invoice
