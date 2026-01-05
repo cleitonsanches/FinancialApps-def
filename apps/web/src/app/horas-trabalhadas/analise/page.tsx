@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
 import { formatHoursFromDecimal } from '@/utils/hourFormatter'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 export default function AnaliseHorasTrabalhadasPage() {
   const router = useRouter()
@@ -23,6 +25,7 @@ export default function AnaliseHorasTrabalhadasPage() {
   const [tasksMap, setTasksMap] = useState<Record<string, any>>({})
   const [phasesMap, setPhasesMap] = useState<Record<string, any>>({})
   const [loadingHierarchy, setLoadingHierarchy] = useState(false)
+  const relatorioRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -271,6 +274,102 @@ export default function AnaliseHorasTrabalhadasPage() {
     setUserFilter('')
     setDateFrom('')
     setDateTo('')
+  }
+
+  const formatDate = (dateString: string): string => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    return date.toLocaleDateString('pt-BR')
+  }
+
+  const getRelatorioTitulo = (): string => {
+    const partes: string[] = []
+    
+    // Verificar se há filtros aplicados
+    const temFiltros = clientFilter || projectFilter || userFilter || dateFrom || dateTo
+    
+    if (!temFiltros) {
+      return 'Relatório Detalhado'
+    }
+    
+    // Base do título
+    partes.push('Relatório de Horas Trabalhadas')
+    
+    // Cliente
+    if (clientFilter) {
+      const cliente = clients.find(c => c.id === clientFilter)
+      if (cliente) {
+        partes.push(`Cliente ${cliente.razaoSocial || cliente.name || 'Desconhecido'}`)
+      }
+    }
+    
+    // Projeto
+    if (projectFilter) {
+      const projeto = projects.find(p => p.id === projectFilter)
+      if (projeto) {
+        partes.push(`Projeto ${projeto.name || 'Desconhecido'}`)
+      }
+    }
+    
+    // Período
+    if (dateFrom || dateTo) {
+      if (dateFrom && dateTo) {
+        partes.push(`Período ${formatDate(dateFrom)} a ${formatDate(dateTo)}`)
+      } else if (dateFrom) {
+        partes.push(`A partir de ${formatDate(dateFrom)}`)
+      } else if (dateTo) {
+        partes.push(`Até ${formatDate(dateTo)}`)
+      }
+    }
+    
+    // Usuário (opcional, mas pode ser útil)
+    if (userFilter) {
+      const usuario = users.find(u => u.id === userFilter)
+      if (usuario) {
+        partes.push(`Usuário ${usuario.name || 'Desconhecido'}`)
+      }
+    }
+    
+    return partes.join(' | ')
+  }
+
+  const handleExportPDF = async () => {
+    if (!relatorioRef.current) {
+      alert('Erro ao gerar PDF: relatório não encontrado')
+      return
+    }
+
+    try {
+      // Criar canvas do relatório
+      const canvas = await html2canvas(relatorioRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      
+      // Criar PDF
+      const pdf = new jsPDF('portrait', 'mm', 'a4')
+      const imgWidth = 210 // A4 portrait width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      
+      // Adicionar título
+      pdf.setFontSize(16)
+      const titulo = getRelatorioTitulo()
+      pdf.text(titulo, 14, 15)
+      
+      // Adicionar imagem do relatório
+      pdf.addImage(imgData, 'PNG', 0, 25, imgWidth, imgHeight)
+      
+      // Salvar PDF
+      const tituloNome = titulo.replace(/\s+/g, '-').replace(/\|/g, '').toLowerCase()
+      pdf.save(`relatorio-horas-${tituloNome}.pdf`)
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error)
+      alert('Erro ao exportar PDF. Tente novamente.')
+    }
   }
 
   // Filtrar entries baseado nos filtros
@@ -882,7 +981,16 @@ export default function AnaliseHorasTrabalhadasPage() {
 
         {/* Relatório Hierárquico */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Relatório Detalhado</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">{getRelatorioTitulo()}</h2>
+            <button
+              onClick={handleExportPDF}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+            >
+              📄 Exportar PDF
+            </button>
+          </div>
+          <div ref={relatorioRef}>
           {(() => {
             // Organizar dados hierarquicamente: Cliente > Projeto > Fase > Horas
             const organizeHierarchy = () => {
@@ -1170,6 +1278,7 @@ export default function AnaliseHorasTrabalhadasPage() {
               </div>
             )
           })()}
+          </div>
         </div>
       </div>
     </div>
