@@ -234,7 +234,8 @@ export default function AnaliseHorasTrabalhadasPage() {
         // Carregar fases de todos os projetos
         const phasesMapLocal: Record<string, any> = {}
         // Usar allProjectsData que está no escopo da função
-        const projectIds = [...new Set(allProjectsData.map((p: any) => p.id))]
+        // Usar Array.from para compatibilidade com TypeScript
+        const projectIds = Array.from(new Set(allProjectsData.map((p: any) => p.id)))
         
         for (const projectId of projectIds) {
           try {
