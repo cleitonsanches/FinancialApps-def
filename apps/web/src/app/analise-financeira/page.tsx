@@ -235,9 +235,22 @@ export default function AnaliseFinanceiraPage() {
       })
     })
 
+    // Calcular saldo atual (incluindo recebimentos realizados)
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    const recebimentosRealizados = invoicesBTG
+      .filter(inv => {
+        if (!inv.dataRecebimento) return false
+        const dataReceb = new Date(inv.dataRecebimento)
+        dataReceb.setHours(0, 0, 0, 0)
+        return dataReceb <= hoje && inv.status === 'RECEBIDA'
+      })
+      .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0)
+    const saldoAtualBTG = saldoInicialBTG + recebimentosRealizados
+
     setAnalysis({
       fluxoCaixa,
-      saldoInicialBTG,
+      saldoInicialBTG: saldoAtualBTG, // Atualizar para mostrar saldo atual
       valorDistribuir,
       valorDisponivel,
       proximoRecebimento
