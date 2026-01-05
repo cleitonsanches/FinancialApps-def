@@ -433,6 +433,146 @@ export default function AnaliseFinanceiraPage() {
             </>
           )}
         </div>
+
+        {/* Extrato */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Extrato</h2>
+          {(() => {
+            // Filtrar contas do BTG (mesma lógica do calculateAnalysis)
+            const btgAccount = getBTGAccount(bankAccounts)
+            const filterBTG = (item: any) => {
+              if (!btgAccount) return true
+              const itemBankId = item.bankAccountId || item.contaCorrenteId
+              return !itemBankId || itemBankId === btgAccount.id
+            }
+
+            const invoicesBTG = invoices.filter(filterBTG)
+            const payablesBTG = accountsPayable.filter(filterBTG)
+
+            // Obter saldo inicial
+            const saldoInicial = btgAccount?.currentBalance || 
+                                btgAccount?.saldoInicial || 
+                                btgAccount?.balance ||
+                                parseFloat(btgAccount?.initialBalance || '0') || 0
+
+            // Criar array de movimentações
+            const movimentacoes: Array<{
+              data: Date
+              tipo: 'RECEBIMENTO' | 'PAGAMENTO'
+              nome: string
+              valorOriginal: number
+              valorMovimentado: number
+              invoice?: any
+              payable?: any
+            }> = []
+
+            // Adicionar recebimentos realizados
+            invoicesBTG
+              .filter(inv => inv.dataRecebimento && inv.status === 'RECEBIDA')
+              .forEach(inv => {
+                const valorMovimentado = inv.valorRecebido 
+                  ? parseFloat(inv.valorRecebido?.toString() || '0')
+                  : parseFloat(inv.grossValue?.toString() || '0')
+                
+                movimentacoes.push({
+                  data: new Date(inv.dataRecebimento),
+                  tipo: 'RECEBIMENTO',
+                  nome: inv.client?.razaoSocial || inv.client?.name || 'Cliente não informado',
+                  valorOriginal: parseFloat(inv.grossValue?.toString() || '0'),
+                  valorMovimentado,
+                  invoice: inv
+                })
+              })
+
+            // Adicionar pagamentos realizados
+            payablesBTG
+              .filter(pay => pay.paymentDate && pay.status === 'PAGA')
+              .forEach(pay => {
+                const valorMovimentado = pay.valorPago 
+                  ? parseFloat(pay.valorPago?.toString() || '0')
+                  : parseFloat(pay.totalValue?.toString() || '0')
+                
+                movimentacoes.push({
+                  data: new Date(pay.paymentDate),
+                  tipo: 'PAGAMENTO',
+                  nome: pay.supplier?.razaoSocial || pay.supplier?.name || 'Fornecedor não informado',
+                  valorOriginal: parseFloat(pay.totalValue?.toString() || '0'),
+                  valorMovimentado,
+                  payable: pay
+                })
+              })
+
+            // Ordenar por data (mais antigo primeiro)
+            movimentacoes.sort((a, b) => a.data.getTime() - b.data.getTime())
+
+            // Calcular saldos acumulados
+            let saldoAtual = saldoInicial
+            const extratoComSaldo = movimentacoes.map(mov => {
+              const saldoAnterior = saldoAtual
+              if (mov.tipo === 'RECEBIMENTO') {
+                saldoAtual += mov.valorMovimentado
+              } else {
+                saldoAtual -= mov.valorMovimentado
+              }
+              return {
+                ...mov,
+                saldoAnterior,
+                saldoAtual
+              }
+            })
+
+            if (extratoComSaldo.length === 0) {
+              return (
+                <div className="text-center text-gray-500 py-8">
+                  Nenhuma movimentação encontrada para o período
+                </div>
+              )
+            }
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo Anterior</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente/Fornecedor</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Original</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Movimentado</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo Atual</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {extratoComSaldo.map((item, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(item.saldoAnterior)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {formatDate(item.data.toISOString().split('T')[0])}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {item.nome}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 text-right">
+                          {formatCurrency(item.valorOriginal)}
+                        </td>
+                        <td className={`px-4 py-3 whitespace-nowrap text-sm font-medium text-right ${
+                          item.tipo === 'RECEBIMENTO' ? 'text-blue-600' : 'text-red-600'
+                        }`}>
+                          {item.tipo === 'RECEBIMENTO' ? '+' : '-'}{formatCurrency(item.valorMovimentado)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 text-right">
+                          {formatCurrency(item.saldoAtual)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
+        </div>
       </div>
     </div>
   )
