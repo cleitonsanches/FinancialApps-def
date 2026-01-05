@@ -135,7 +135,7 @@ export default function AnaliseFinanceiraPage() {
       ? recebimentosFuturos[0].toISOString().split('T')[0]
       : null
 
-    // Calcular valor disponível (saldo atual + recebimentos já realizados - contas a pagar até próximo recebimento)
+    // Calcular valor disponível (saldo atual + recebimentos já realizados - pagamentos já realizados - contas a pagar até próximo recebimento)
     const hoje = new Date()
     hoje.setHours(0, 0, 0, 0)
     
@@ -150,8 +150,19 @@ export default function AnaliseFinanceiraPage() {
       })
       .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0)
     
-    // Saldo atual = saldo inicial + recebimentos já realizados
-    const saldoAtual = saldoInicialBTG + recebimentosRealizados
+    // Subtrair pagamentos já realizados (com paymentDate preenchida e status PAGA)
+    const pagamentosRealizados = payablesBTG
+      .filter(pay => {
+        if (!pay.paymentDate) return false
+        const dataPag = new Date(pay.paymentDate)
+        dataPag.setHours(0, 0, 0, 0)
+        // Considerar pagamentos de hoje ou anteriores
+        return dataPag <= hoje && pay.status === 'PAGA'
+      })
+      .reduce((sum, pay) => sum + parseFloat(pay.totalValue?.toString() || '0'), 0)
+    
+    // Saldo atual = saldo inicial + recebimentos já realizados - pagamentos já realizados
+    const saldoAtual = saldoInicialBTG + recebimentosRealizados - pagamentosRealizados
     
     let valorDisponivel = saldoAtual
     if (proximoRecebimento) {
