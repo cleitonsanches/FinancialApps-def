@@ -20,6 +20,9 @@ export default function AnaliseHorasTrabalhadasPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
+  const [tasksMap, setTasksMap] = useState<Record<string, any>>({})
+  const [phasesMap, setPhasesMap] = useState<Record<string, any>>({})
+  const [loadingHierarchy, setLoadingHierarchy] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -62,8 +65,8 @@ export default function AnaliseHorasTrabalhadasPage() {
       
       // Carregar projetos
       const projectsResponse = await api.get(`/projects?companyId=${companyId}`)
-      const allProjects = projectsResponse.data || []
-      setProjects(allProjects)
+      const allProjectsData = projectsResponse.data || []
+      setProjects(allProjectsData)
       
       // Carregar clientes
       const clientsResponse = await api.get(`/clients?companyId=${companyId}`)
@@ -79,7 +82,7 @@ export default function AnaliseHorasTrabalhadasPage() {
       
       // Criar mapas para relacionamentos
       const projectsMap: Record<string, { name: string; tipoContratacao?: string; proposalId?: string; clientId?: string; clientName?: string }> = {}
-      allProjects.forEach((project: any) => {
+      allProjectsData.forEach((project: any) => {
         let tipoContratacao = project.proposal?.tipoContratacao
         if (!tipoContratacao && project.proposalId) {
           const proposal = allProposals.find((p: any) => p.id === project.proposalId)
@@ -135,8 +138,8 @@ export default function AnaliseHorasTrabalhadasPage() {
       // Buscar time entries de todos os projetos
       const allTimeEntries: any[] = []
       
-      if (allProjects.length > 0) {
-        const timeEntryPromises = allProjects.map(async (project: any) => {
+      if (allProjectsData.length > 0) {
+        const timeEntryPromises = allProjectsData.map(async (project: any) => {
           try {
             const timeEntriesResponse = await api.get(`/projects/${project.id}/time-entries`)
             const entries = (timeEntriesResponse.data || []).map((entry: any) => {
@@ -210,6 +213,48 @@ export default function AnaliseHorasTrabalhadasPage() {
       }
       
       setTimeEntries(allTimeEntries)
+      
+      // Carregar tarefas e fases para montar hierarquia
+      setLoadingHierarchy(true)
+      try {
+        // Carregar todas as tarefas
+        const tasksResponse = await api.get('/projects/tasks/all')
+        const allTasks = tasksResponse.data || []
+        const tasksMapLocal: Record<string, any> = {}
+        allTasks.forEach((task: any) => {
+          tasksMapLocal[task.id] = {
+            name: task.name || task.titulo,
+            phaseId: task.phaseId || task.phase?.id,
+            phaseName: task.phase?.name,
+            projectId: task.projectId
+          }
+        })
+        setTasksMap(tasksMapLocal)
+
+        // Carregar fases de todos os projetos
+        const phasesMapLocal: Record<string, any> = {}
+        const projectIds = [...new Set(allProjectsData.map((p: any) => p.id))]
+        
+        for (const projectId of projectIds) {
+          try {
+            const phasesResponse = await api.get(`/phases?projectId=${projectId}`)
+            const phases = phasesResponse.data || []
+            phases.forEach((phase: any) => {
+              phasesMapLocal[phase.id] = {
+                name: phase.name,
+                projectId: phase.projectId
+              }
+            })
+          } catch (error) {
+            // Projeto pode não ter fases, ignorar erro
+          }
+        }
+        setPhasesMap(phasesMapLocal)
+      } catch (error) {
+        console.error('Erro ao carregar dados hierárquicos:', error)
+      } finally {
+        setLoadingHierarchy(false)
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
       alert('Erro ao carregar dados de horas trabalhadas')
@@ -831,6 +876,298 @@ export default function AnaliseHorasTrabalhadasPage() {
               )
             })()}
           </div>
+        </div>
+
+        {/* Relatório Hierárquico */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Relatório Detalhado</h2>
+          {(() => {
+            // Organizar dados hierarquicamente: Cliente > Projeto > Fase > Horas
+            const organizeHierarchy = () => {
+              const hierarchy: Record<string, {
+                name: string
+                projects: Record<string, {
+                  name: string
+                  phases: Record<string, {
+                    name: string
+                    hours: any[]
+                  }>
+                  hoursWithoutPhase: any[]
+                }>
+                hoursWithoutProject: any[]
+              }> = {}
+
+              filteredTimeEntries.forEach((entry: any) => {
+                const clientId = entry.clientId || 'sem-cliente'
+                const clientName = entry.clientName || 'Sem Cliente'
+                const projectId = entry.projectId
+                const taskId = entry.taskId
+                const task = taskId ? tasksMap[taskId] : null
+                const phaseId = task?.phaseId
+                const phase = phaseId ? phasesMap[phaseId] : null
+
+                // Inicializar cliente se não existir
+                if (!hierarchy[clientId]) {
+                  hierarchy[clientId] = {
+                    name: clientName,
+                    projects: {},
+                    hoursWithoutProject: []
+                  }
+                }
+
+                // Se não tem projeto, adicionar em hoursWithoutProject
+                if (!projectId) {
+                  hierarchy[clientId].hoursWithoutProject.push(entry)
+                  return
+                }
+
+                // Inicializar projeto se não existir
+                if (!hierarchy[clientId].projects[projectId]) {
+                  hierarchy[clientId].projects[projectId] = {
+                    name: entry.projectName || 'Sem Nome',
+                    phases: {},
+                    hoursWithoutPhase: []
+                  }
+                }
+
+                // Se não tem fase, adicionar em hoursWithoutPhase do projeto
+                if (!phaseId || !phase) {
+                  hierarchy[clientId].projects[projectId].hoursWithoutPhase.push(entry)
+                  return
+                }
+
+                // Inicializar fase se não existir
+                if (!hierarchy[clientId].projects[projectId].phases[phaseId]) {
+                  hierarchy[clientId].projects[projectId].phases[phaseId] = {
+                    name: phase.name,
+                    hours: []
+                  }
+                }
+
+                // Adicionar hora na fase
+                hierarchy[clientId].projects[projectId].phases[phaseId].hours.push(entry)
+              })
+
+              return hierarchy
+            }
+
+            const hierarchy = organizeHierarchy()
+            const hierarchyEntries = Object.entries(hierarchy)
+
+            if (loadingHierarchy) {
+              return <p className="text-gray-500 text-center py-8">Carregando relatório...</p>
+            }
+
+            if (hierarchyEntries.length === 0) {
+              return <p className="text-gray-500 text-center py-8">Nenhum dado disponível para o período selecionado</p>
+            }
+
+            // Calcular totais
+            const totalHoras = filteredTimeEntries.reduce((sum, entry) => sum + (parseFloat(entry.horas) || 0), 0)
+            const horasAprovadas = filteredTimeEntries
+              .filter(entry => entry.status === 'APROVADA')
+              .reduce((sum, entry) => sum + (parseFloat(entry.horas) || 0), 0)
+            const horasFaturaveis = filteredTimeEntries
+              .filter(entry => entry.isFaturavel)
+              .reduce((sum, entry) => sum + (parseFloat(entry.horas) || 0), 0)
+            const valorTotal = filteredTimeEntries
+              .filter(entry => entry.isFaturavel)
+              .reduce((sum, entry) => {
+                const horas = parseFloat(entry.horas) || 0
+                const valorPorHora = parseFloat(entry.valorPorHora) || 0
+                return sum + (horas * valorPorHora)
+              }, 0)
+
+            return (
+              <div>
+                {/* Hierarquia */}
+                <div className="space-y-4">
+                  {hierarchyEntries.map(([clientId, clientData]) => (
+                    <div key={clientId} className="border border-gray-200 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                        📁 {clientData.name}
+                      </h3>
+
+                      {/* Projetos do cliente */}
+                      {Object.entries(clientData.projects).map(([projectId, projectData]) => (
+                        <div key={projectId} className="ml-6 mb-4 border-l-2 border-blue-200 pl-4">
+                          <h4 className="text-md font-medium text-gray-800 mb-2">
+                            📋 {projectData.name}
+                          </h4>
+
+                          {/* Fases do projeto */}
+                          {Object.entries(projectData.phases).map(([phaseId, phaseData]) => (
+                            <div key={phaseId} className="ml-6 mb-3 border-l-2 border-green-200 pl-4">
+                              <h5 className="text-sm font-medium text-gray-700 mb-2">
+                                🎯 {phaseData.name}
+                              </h5>
+
+                              {/* Horas da fase */}
+                              <div className="ml-4 space-y-2">
+                                {phaseData.hours.map((hour: any) => {
+                                  const userName = users.find(u => u.id === hour.userId)?.name || hour.user?.name || 'Usuário desconhecido'
+                                  const dataFormatada = new Date(hour.data).toLocaleDateString('pt-BR')
+                                  const horasFormatadas = formatHoursFromDecimal(parseFloat(hour.horas) || 0)
+                                  const valorPorHora = parseFloat(hour.valorPorHora) || 0
+                                  const valorTotal = (parseFloat(hour.horas) || 0) * valorPorHora
+
+                                  return (
+                                    <div key={hour.id} className="bg-gray-50 rounded p-3 text-sm">
+                                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                        <div>
+                                          <span className="text-gray-500">Data:</span>
+                                          <p className="font-medium">{dataFormatada}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">Usuário:</span>
+                                          <p className="font-medium">{userName}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">Quantidade:</span>
+                                          <p className="font-medium">{horasFormatadas}</p>
+                                        </div>
+                                        {hour.isFaturavel && valorPorHora > 0 && (
+                                          <div>
+                                            <span className="text-gray-500">Valor:</span>
+                                            <p className="font-medium">R$ {valorTotal.toFixed(2)}</p>
+                                          </div>
+                                        )}
+                                        <div className="md:col-span-2">
+                                          <span className="text-gray-500">Descrição:</span>
+                                          <p className="font-medium">{hour.descricao || '-'}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Horas sem fase */}
+                          {projectData.hoursWithoutPhase.length > 0 && (
+                            <div className="ml-6 mb-3 border-l-2 border-yellow-200 pl-4">
+                              <h5 className="text-sm font-medium text-gray-700 mb-2">
+                                ⚠️ Sem Fase
+                              </h5>
+                              <div className="ml-4 space-y-2">
+                                {projectData.hoursWithoutPhase.map((hour: any) => {
+                                  const userName = users.find(u => u.id === hour.userId)?.name || hour.user?.name || 'Usuário desconhecido'
+                                  const dataFormatada = new Date(hour.data).toLocaleDateString('pt-BR')
+                                  const horasFormatadas = formatHoursFromDecimal(parseFloat(hour.horas) || 0)
+                                  const valorPorHora = parseFloat(hour.valorPorHora) || 0
+                                  const valorTotal = (parseFloat(hour.horas) || 0) * valorPorHora
+
+                                  return (
+                                    <div key={hour.id} className="bg-gray-50 rounded p-3 text-sm">
+                                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                        <div>
+                                          <span className="text-gray-500">Data:</span>
+                                          <p className="font-medium">{dataFormatada}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">Usuário:</span>
+                                          <p className="font-medium">{userName}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">Quantidade:</span>
+                                          <p className="font-medium">{horasFormatadas}</p>
+                                        </div>
+                                        {hour.isFaturavel && valorPorHora > 0 && (
+                                          <div>
+                                            <span className="text-gray-500">Valor:</span>
+                                            <p className="font-medium">R$ {valorTotal.toFixed(2)}</p>
+                                          </div>
+                                        )}
+                                        <div className="md:col-span-2">
+                                          <span className="text-gray-500">Descrição:</span>
+                                          <p className="font-medium">{hour.descricao || '-'}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Horas sem projeto */}
+                      {clientData.hoursWithoutProject.length > 0 && (
+                        <div className="ml-6 mb-3 border-l-2 border-red-200 pl-4">
+                          <h4 className="text-md font-medium text-gray-800 mb-2">
+                            ⚠️ Sem Projeto
+                          </h4>
+                          <div className="ml-4 space-y-2">
+                            {clientData.hoursWithoutProject.map((hour: any) => {
+                              const userName = users.find(u => u.id === hour.userId)?.name || hour.user?.name || 'Usuário desconhecido'
+                              const dataFormatada = new Date(hour.data).toLocaleDateString('pt-BR')
+                              const horasFormatadas = formatHoursFromDecimal(parseFloat(hour.horas) || 0)
+                              const valorPorHora = parseFloat(hour.valorPorHora) || 0
+                              const valorTotal = (parseFloat(hour.horas) || 0) * valorPorHora
+
+                              return (
+                                <div key={hour.id} className="bg-gray-50 rounded p-3 text-sm">
+                                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                    <div>
+                                      <span className="text-gray-500">Data:</span>
+                                      <p className="font-medium">{dataFormatada}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-500">Usuário:</span>
+                                      <p className="font-medium">{userName}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-500">Quantidade:</span>
+                                      <p className="font-medium">{horasFormatadas}</p>
+                                    </div>
+                                    {hour.isFaturavel && valorPorHora > 0 && (
+                                      <div>
+                                        <span className="text-gray-500">Valor:</span>
+                                        <p className="font-medium">R$ {valorTotal.toFixed(2)}</p>
+                                      </div>
+                                    )}
+                                    <div className="md:col-span-2">
+                                      <span className="text-gray-500">Descrição:</span>
+                                      <p className="font-medium">{hour.descricao || '-'}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Resumo */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumo</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600 mb-1">Horas Trabalhadas</p>
+                      <p className="text-2xl font-bold text-blue-600">{formatHoursFromDecimal(totalHoras)}</p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600 mb-1">Horas Aprovadas</p>
+                      <p className="text-2xl font-bold text-green-600">{formatHoursFromDecimal(horasAprovadas)}</p>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600 mb-1">Horas Faturáveis</p>
+                      <p className="text-2xl font-bold text-purple-600">{formatHoursFromDecimal(horasFaturaveis)}</p>
+                    </div>
+                    <div className="bg-yellow-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600 mb-1">Valor Total</p>
+                      <p className="text-2xl font-bold text-yellow-600">R$ {valorTotal.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </div>
