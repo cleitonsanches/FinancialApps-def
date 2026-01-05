@@ -111,14 +111,20 @@ export default function AnaliseFinanceiraPage() {
     // Filtrar contas a receber (BTG ou sem conta)
     const invoicesBTG = invoicesData.filter(filterBTG)
     const totalReceber = invoicesBTG.reduce((sum, inv) => {
-      const valor = parseFloat(inv.grossValue?.toString() || '0')
+      // Usar valorRecebido se disponível e status RECEBIDA, senão grossValue
+      const valor = inv.status === 'RECEBIDA' && inv.valorRecebido 
+        ? parseFloat(inv.valorRecebido?.toString() || '0')
+        : parseFloat(inv.grossValue?.toString() || '0')
       return sum + valor
     }, 0)
 
     // Filtrar contas a pagar (BTG ou sem conta)
     const payablesBTG = payablesData.filter(filterBTG)
     const totalPagar = payablesBTG.reduce((sum, pay) => {
-      const valor = parseFloat(pay.totalValue?.toString() || '0')
+      // Usar valorPago se disponível e status PAGA, senão totalValue
+      const valor = pay.status === 'PAGA' && pay.valorPago 
+        ? parseFloat(pay.valorPago?.toString() || '0')
+        : parseFloat(pay.totalValue?.toString() || '0')
       return sum + valor
     }, 0)
 
@@ -148,7 +154,13 @@ export default function AnaliseFinanceiraPage() {
         // Considerar recebimentos de hoje ou anteriores
         return dataReceb <= hoje && inv.status === 'RECEBIDA'
       })
-      .reduce((sum, inv) => sum + parseFloat(inv.grossValue?.toString() || '0'), 0)
+      .reduce((sum, inv) => {
+        // Usar valorRecebido se disponível, senão grossValue
+        const valor = inv.valorRecebido 
+          ? parseFloat(inv.valorRecebido?.toString() || '0')
+          : parseFloat(inv.grossValue?.toString() || '0')
+        return sum + valor
+      }, 0)
     
     // Subtrair pagamentos já realizados (com paymentDate preenchida e status PAGA)
     const pagamentosRealizados = payablesBTG
@@ -159,7 +171,13 @@ export default function AnaliseFinanceiraPage() {
         // Considerar pagamentos de hoje ou anteriores
         return dataPag <= hoje && pay.status === 'PAGA'
       })
-      .reduce((sum, pay) => sum + parseFloat(pay.totalValue?.toString() || '0'), 0)
+      .reduce((sum, pay) => {
+        // Usar valorPago se disponível, senão totalValue
+        const valor = pay.valorPago 
+          ? parseFloat(pay.valorPago?.toString() || '0')
+          : parseFloat(pay.totalValue?.toString() || '0')
+        return sum + valor
+      }, 0)
     
     // Saldo atual = saldo inicial + recebimentos já realizados - pagamentos já realizados
     const saldoAtual = saldoInicialBTG + recebimentosRealizados - pagamentosRealizados
@@ -177,7 +195,11 @@ export default function AnaliseFinanceiraPage() {
           return vencimento >= hoje && vencimento <= proximaData && 
                  pay.status !== 'PAGA' && pay.status !== 'CANCELADA'
         })
-        .reduce((sum, pay) => sum + parseFloat(pay.totalValue?.toString() || '0'), 0)
+        .reduce((sum, pay) => {
+          // Para contas não pagas, usar totalValue
+          const valor = parseFloat(pay.totalValue?.toString() || '0')
+          return sum + valor
+        }, 0)
 
       valorDisponivel = saldoAtual - contasPagarAteProximo
     }

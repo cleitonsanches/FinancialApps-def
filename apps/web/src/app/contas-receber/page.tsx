@@ -227,6 +227,7 @@ export default function ContasReceberPage() {
           status: 'RECEBIDA',
           dataRecebimento: recebimentoData.dataRecebimento,
           contaCorrenteId: recebimentoData.contaCorrenteId,
+          valorRecebido: valorRecebido,
         })
         await loadInvoices()
         alert('Recebimento registrado com sucesso!')
@@ -249,6 +250,7 @@ export default function ContasReceberPage() {
         status: 'RECEBIDA',
         dataRecebimento: recebimentoData.dataRecebimento,
         contaCorrenteId: recebimentoData.contaCorrenteId,
+        valorRecebido: valorRecebido,
       }
 
       if (valorMenorData.opcao === 'desconsiderar') {
@@ -323,6 +325,7 @@ export default function ContasReceberPage() {
         status: 'RECEBIDA',
         dataRecebimento: recebimentoData.dataRecebimento,
         contaCorrenteId: recebimentoData.contaCorrenteId,
+        valorRecebido: valorRecebido,
       }
 
       if (valorMaiorData.opcao === 'acrescimo') {

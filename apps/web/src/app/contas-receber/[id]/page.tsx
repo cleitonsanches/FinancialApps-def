@@ -657,6 +657,7 @@ export default function InvoiceDetailsPage() {
           status: 'RECEBIDA',
           dataRecebimento: recebimentoData.dataRecebimento,
           contaCorrenteId: recebimentoData.contaCorrenteId,
+          valorRecebido: valorRecebido,
         })
         await loadInvoice()
         await loadInvoiceHistory()
@@ -679,6 +680,7 @@ export default function InvoiceDetailsPage() {
         status: 'RECEBIDA',
         dataRecebimento: recebimentoData.dataRecebimento,
         contaCorrenteId: recebimentoData.contaCorrenteId,
+        valorRecebido: valorRecebido,
       }
 
       if (valorMenorData.opcao === 'desconsiderar') {
@@ -750,6 +752,7 @@ export default function InvoiceDetailsPage() {
         status: 'RECEBIDA',
         dataRecebimento: recebimentoData.dataRecebimento,
         contaCorrenteId: recebimentoData.contaCorrenteId,
+        valorRecebido: valorRecebido,
       }
 
       if (valorMaiorData.opcao === 'acrescimo') {

@@ -112,7 +112,7 @@ export class InvoicesService {
     const fieldsToTrack = [
       'grossValue', 'emissionDate', 'dueDate', 'numeroNF', 'tipoEmissao',
       'desconto', 'acrescimo', 'chartOfAccountsId', 'status', 'dataRecebimento',
-      'contaCorrenteId'
+      'contaCorrenteId', 'valorRecebido'
     ];
     
     for (const field of fieldsToTrack) {

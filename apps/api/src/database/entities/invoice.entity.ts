@@ -68,6 +68,9 @@ export class Invoice {
   @Column({ name: 'data_recebimento', type: 'date', nullable: true })
   dataRecebimento?: Date;
 
+  @Column({ name: 'valor_recebido', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  valorRecebido?: number;
+
   @Column({ name: 'numero_nf', type: 'varchar', length: 50, nullable: true })
   numeroNF?: string;
 
