@@ -209,6 +209,7 @@ export default function ContasPagarPage() {
           status: 'PAGA',
           paymentDate: pagamentoData.dataPagamento,
           bankAccountId: pagamentoData.contaCorrenteId,
+          valorPago: valorPago, // Salvar o valor pago
         })
         loadAccountsPayable()
         alert('Pagamento registrado com sucesso!')
@@ -232,6 +233,7 @@ export default function ContasPagarPage() {
         status: 'PAGA',
         paymentDate: pagamentoData.dataPagamento,
         bankAccountId: pagamentoData.contaCorrenteId,
+        valorPago: valorPago, // Salvar o valor pago
       }
 
       if (valorMenorData.opcao === 'desconsiderar') {
@@ -297,6 +299,7 @@ export default function ContasPagarPage() {
         status: 'PAGA',
         paymentDate: pagamentoData.dataPagamento,
         bankAccountId: pagamentoData.contaCorrenteId,
+        valorPago: valorPago, // Salvar o valor pago
       }
 
       if (valorMaiorData.opcao === 'acrescimo') {

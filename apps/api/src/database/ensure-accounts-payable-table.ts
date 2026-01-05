@@ -23,6 +23,7 @@ export async function ensureAccountsPayableTable(dataSource: DataSource): Promis
           "total_value" decimal(15,2) NOT NULL,
           "status" varchar(50) NOT NULL DEFAULT 'PROVISIONADA',
           "payment_date" date,
+          "valor_pago" decimal(15,2),
           "bank_account_id" varchar(36),
           "is_reembolsavel" boolean NOT NULL DEFAULT 0,
           "valor_reembolsar" decimal(15,2),
@@ -54,6 +55,7 @@ export async function ensureAccountsPayableTable(dataSource: DataSource): Promis
         'status_reembolso',
         'data_status_reembolso',
         'destinatario_fatura_reembolso_id',
+        'valor_pago',
       ];
       
       for (const colName of requiredColumns) {
@@ -72,6 +74,8 @@ export async function ensureAccountsPayableTable(dataSource: DataSource): Promis
             await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "data_status_reembolso" date`);
           } else if (colName === 'destinatario_fatura_reembolso_id') {
             await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "destinatario_fatura_reembolso_id" varchar(36)`);
+          } else if (colName === 'valor_pago') {
+            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "valor_pago" decimal(15,2) NULL`);
           }
         }
       }

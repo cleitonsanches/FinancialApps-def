@@ -55,6 +55,9 @@ export class AccountPayable {
   @Column({ name: 'payment_date', type: 'date', nullable: true })
   paymentDate?: Date;
 
+  @Column({ name: 'valor_pago', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  valorPago?: number;
+
   @Column({ name: 'bank_account_id', nullable: true })
   bankAccountId?: string;
 

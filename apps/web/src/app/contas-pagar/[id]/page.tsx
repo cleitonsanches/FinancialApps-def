@@ -463,6 +463,7 @@ export default function AccountPayableDetailsPage() {
           status: 'PAGA',
           paymentDate: pagamentoData.dataPagamento,
           bankAccountId: pagamentoData.contaCorrenteId,
+          valorPago: valorPago, // Salvar o valor pago
         })
         await loadAccountPayable()
         await loadAccountPayableHistory()
@@ -485,6 +486,7 @@ export default function AccountPayableDetailsPage() {
         status: 'PAGA',
         paymentDate: pagamentoData.dataPagamento,
         bankAccountId: pagamentoData.contaCorrenteId,
+        valorPago: valorPago, // Salvar o valor pago
       }
 
       if (valorMenorData.opcao === 'desconsiderar') {
@@ -554,6 +556,7 @@ export default function AccountPayableDetailsPage() {
         status: 'PAGA',
         paymentDate: pagamentoData.dataPagamento,
         bankAccountId: pagamentoData.contaCorrenteId,
+        valorPago: valorPago, // Salvar o valor pago
       }
 
       if (valorMaiorData.opcao === 'acrescimo') {
