@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
 import NavigationLinks from '@/components/NavigationLinks'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart, Area, AreaChart } from 'recharts'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface FinancialAnalysis {
   fluxoCaixa: Array<{
@@ -30,6 +32,7 @@ export default function AnaliseFinanceiraPage() {
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [analysis, setAnalysis] = useState<FinancialAnalysis | null>(null)
+  const extratoRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -293,6 +296,67 @@ export default function AnaliseFinanceiraPage() {
     return date.toLocaleDateString('pt-BR')
   }
 
+  const getPeriodoTexto = (): string => {
+    const hoje = new Date()
+    const mesAtual = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    
+    if (periodFilter === 'current') {
+      return mesAtual.charAt(0).toUpperCase() + mesAtual.slice(1)
+    } else if (periodFilter === 'next30') {
+      const dataFim = new Date(hoje)
+      dataFim.setDate(dataFim.getDate() + 30)
+      return `${formatDate(hoje.toISOString().split('T')[0])} a ${formatDate(dataFim.toISOString().split('T')[0])}`
+    } else if (periodFilter === 'custom') {
+      if (customStartDate && customEndDate) {
+        return `${formatDate(customStartDate)} a ${formatDate(customEndDate)}`
+      } else if (customStartDate) {
+        return `A partir de ${formatDate(customStartDate)}`
+      } else if (customEndDate) {
+        return `Até ${formatDate(customEndDate)}`
+      }
+      return 'Período personalizado'
+    }
+    return 'Todos os períodos'
+  }
+
+  const handleExportPDF = async () => {
+    if (!extratoRef.current) {
+      alert('Erro ao gerar PDF: extrato não encontrado')
+      return
+    }
+
+    try {
+      // Criar canvas do extrato
+      const canvas = await html2canvas(extratoRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      
+      // Criar PDF
+      const pdf = new jsPDF('landscape', 'mm', 'a4')
+      const imgWidth = 297 // A4 landscape width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      
+      // Adicionar título
+      pdf.setFontSize(16)
+      pdf.text(`Extrato do período ${getPeriodoTexto()}`, 14, 15)
+      
+      // Adicionar imagem do extrato
+      pdf.addImage(imgData, 'PNG', 0, 25, imgWidth, imgHeight)
+      
+      // Salvar PDF
+      const periodoNome = getPeriodoTexto().replace(/\s+/g, '-').toLowerCase()
+      pdf.save(`extrato-${periodoNome}.pdf`)
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error)
+      alert('Erro ao exportar PDF. Tente novamente.')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 p-4 md:p-8">
@@ -436,7 +500,18 @@ export default function AnaliseFinanceiraPage() {
 
         {/* Extrato */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Extrato</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Extrato do período {getPeriodoTexto()}
+            </h2>
+            <button
+              onClick={handleExportPDF}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+            >
+              📄 Exportar PDF
+            </button>
+          </div>
+          <div ref={extratoRef}>
           {(() => {
             // Filtrar contas do BTG (mesma lógica do calculateAnalysis)
             const btgAccount = getBTGAccount(bankAccounts)
@@ -572,6 +647,7 @@ export default function AnaliseFinanceiraPage() {
               </div>
             )
           })()}
+          </div>
         </div>
       </div>
     </div>
