@@ -351,14 +351,14 @@ export class InvoicesService {
       const competencia = `${String(mes).padStart(2, '0')}/${ano}`;
       const descricao = `SIMPLES NACIONAL competência ${competencia}`;
 
-      let accountPayable = await this.accountPayableRepository.findOne({
-        where: {
-          companyId: invoice.companyId,
-          supplierId: fornecedor.id,
-          description: descricao,
-          status: 'PROVISIONADA',
-        },
-      });
+      // Usar query builder para comparar campo text corretamente no SQL Server
+      let accountPayable = await this.accountPayableRepository
+        .createQueryBuilder('ap')
+        .where('ap.companyId = :companyId', { companyId: invoice.companyId })
+        .andWhere('ap.supplierId = :supplierId', { supplierId: fornecedor.id })
+        .andWhere('CAST(ap.description AS NVARCHAR(MAX)) = :description', { description: descricao })
+        .andWhere('ap.status = :status', { status: 'PROVISIONADA' })
+        .getOne();
 
       if (accountPayable) {
         // Atualizar valor existente
