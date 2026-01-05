@@ -62,20 +62,21 @@ export async function ensureAccountsPayableTable(dataSource: DataSource): Promis
         if (!columns.includes(colName)) {
           console.log(`Adicionando coluna ${colName}...`);
           
+          // SQL Server não aceita COLUMN na sintaxe ALTER TABLE ADD
           if (colName === 'codigo') {
-            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "codigo" varchar(50)`);
+            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD "codigo" varchar(50)`);
           } else if (colName === 'is_reembolsavel') {
-            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "is_reembolsavel" boolean NOT NULL DEFAULT 0`);
+            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD "is_reembolsavel" bit NOT NULL DEFAULT 0`);
           } else if (colName === 'valor_reembolsar') {
-            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "valor_reembolsar" decimal(15,2)`);
+            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD "valor_reembolsar" decimal(15,2)`);
           } else if (colName === 'status_reembolso') {
-            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "status_reembolso" varchar(50)`);
+            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD "status_reembolso" varchar(50)`);
           } else if (colName === 'data_status_reembolso') {
-            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "data_status_reembolso" date`);
+            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD "data_status_reembolso" date`);
           } else if (colName === 'destinatario_fatura_reembolso_id') {
-            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "destinatario_fatura_reembolso_id" varchar(36)`);
+            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD "destinatario_fatura_reembolso_id" varchar(36)`);
           } else if (colName === 'valor_pago') {
-            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD COLUMN "valor_pago" decimal(15,2) NULL`);
+            await queryRunner.query(`ALTER TABLE "accounts_payable" ADD "valor_pago" decimal(15,2) NULL`);
           }
         }
       }
