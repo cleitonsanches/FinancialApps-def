@@ -142,11 +142,17 @@ export default function ContasPagarPage() {
   }
 
   const calculatePaidAmount = (accountPayable: any) => {
+    // Se tem valorPago salvo, usar esse valor
+    if (accountPayable.valorPago !== null && accountPayable.valorPago !== undefined) {
+      return parseFloat(accountPayable.valorPago.toString())
+    }
+    
+    // Caso contrário, usar lógica antiga (parcelas ou totalValue)
     if (!accountPayable.installments || accountPayable.installments.length === 0) {
-      return accountPayable.status === 'PAGO' ? parseFloat(accountPayable.totalValue.toString()) : 0
+      return accountPayable.status === 'PAGA' ? parseFloat(accountPayable.totalValue.toString()) : 0
     }
     return accountPayable.installments
-      .filter((inst: any) => inst.status === 'PAGO')
+      .filter((inst: any) => inst.status === 'PAGA')
       .reduce((sum: number, inst: any) => sum + parseFloat(inst.value.toString()), 0)
   }
 

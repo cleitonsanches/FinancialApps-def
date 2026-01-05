@@ -422,9 +422,11 @@ export default function AccountPayableDetailsPage() {
       dataPagamento: accountPayable.paymentDate 
         ? new Date(accountPayable.paymentDate).toISOString().split('T')[0] 
         : new Date().toISOString().split('T')[0],
-      valorPago: accountPayable.totalValue 
-        ? parseFloat(accountPayable.totalValue.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : '',
+      valorPago: accountPayable.valorPago 
+        ? parseFloat(accountPayable.valorPago.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : (accountPayable.totalValue 
+          ? parseFloat(accountPayable.totalValue.toString()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : ''),
       contaCorrenteId: accountPayable.bankAccountId || '',
     })
     setShowPagamentoModal(true)
@@ -686,6 +688,12 @@ export default function AccountPayableDetailsPage() {
                 <label className="block text-sm font-medium text-gray-700">Valor Total</label>
                 <p className="mt-1 text-sm text-gray-900 font-semibold">{formatCurrency(accountPayable.totalValue)}</p>
               </div>
+              {accountPayable.valorPago !== null && accountPayable.valorPago !== undefined && (
+                <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                  <label className="block text-sm font-medium text-gray-700">Valor Pago</label>
+                  <p className="mt-1 text-sm text-gray-900 font-semibold">{formatCurrency(accountPayable.valorPago)}</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Status</label>
                 <p className="mt-1">
