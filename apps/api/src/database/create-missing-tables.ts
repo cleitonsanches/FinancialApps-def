@@ -1,7 +1,11 @@
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseConfig } from '../config/database.config';
+// Importar entidades relacionadas também (TypeORM precisa delas para metadados)
+import { ProjectTask } from './entities/project.entity';
+import { User } from './entities/user.entity';
 import { TaskComment } from './entities/task-comment.entity';
+import { AccountPayable } from './entities/account-payable.entity';
 import { AccountPayableHistory } from './entities/account-payable-history.entity';
 
 /**
@@ -38,8 +42,14 @@ async function createMissingTables() {
   const databaseConfig = new DatabaseConfig(configService);
   const dbOptions = databaseConfig.createTypeOrmOptions();
 
-  // Apenas as entidades que precisamos criar
-  const entities = [TaskComment, AccountPayableHistory];
+  // Entidades necessárias (incluindo relacionadas para TypeORM construir metadados)
+  const entities = [
+    User,           // Relacionado com TaskComment
+    ProjectTask,    // Relacionado com TaskComment
+    AccountPayable,  // Relacionado com AccountPayableHistory
+    TaskComment,    // Tabela que queremos criar
+    AccountPayableHistory, // Tabela que queremos criar
+  ];
 
   // Criar DataSource
   const dbOptionsAny = dbOptions as any;
