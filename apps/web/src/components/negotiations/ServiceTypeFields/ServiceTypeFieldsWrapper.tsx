@@ -85,8 +85,8 @@ export default function ServiceTypeFieldsWrapper({
             dataInicio: formData.inicio || '',
             dataFimContrato: formData.dataFimContrato || '',
             valorProposta: formData.valorProposta || '',
-            quantidadeParcelas: formData.quantidadeParcelas || '',
-            parcelas: formData.parcelas || [],
+            ...(formData.quantidadeParcelas && { quantidadeParcelas: formData.quantidadeParcelas }),
+            ...(formData.parcelas && { parcelas: formData.parcelas }),
           }}
           onChange={handleChange}
           formatCurrency={formatCurrency}
