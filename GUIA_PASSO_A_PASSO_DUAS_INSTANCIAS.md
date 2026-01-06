@@ -351,6 +351,52 @@ pm2 start all
 pm2 stop financial-api-test financial-web-test
 ```
 
+## 🚨 PROBLEMA: Nenhum processo PM2 está rodando
+
+**Se você executou `CONFIGURAR_MANUALMENTE.sh` e `pm2 list` não mostra nada:**
+
+### Solução Rápida (Execute na ordem):
+
+1. **Verificar PM2:**
+   ```bash
+   pm2 --version
+   # Se não estiver instalado: npm install -g pm2
+   ```
+
+2. **Verificar builds:**
+   ```bash
+   ls -la apps/api/dist/main.js
+   ls -la apps/web/.next
+   # Se não existirem: npm run build --workspace=apps/api && npm run build --workspace=apps/web
+   ```
+
+3. **Criar diretório de logs:**
+   ```bash
+   mkdir -p logs
+   ```
+
+4. **Limpar tudo:**
+   ```bash
+   pm2 delete all
+   pm2 kill
+   ```
+
+5. **Iniciar manualmente:**
+   ```bash
+   pm2 start ecosystem.config.js
+   sleep 5
+   pm2 list
+   ```
+
+6. **Se ainda não funcionar, execute o diagnóstico simples:**
+   ```bash
+   bash DIAGNOSTICO_SIMPLES.sh
+   ```
+
+**📖 Para mais detalhes, veja:** `SOLUCAO_RAPIDA_PM2.md`
+
+---
+
 ## ⚠️ Troubleshooting
 
 ### ⚠️ Problema: Nenhuma instância PM2 está rodando
