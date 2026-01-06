@@ -31,6 +31,15 @@ export default function NovaNegociacaoPage() {
   
   // Estados para modal de Análise de Dados
   const [showAnaliseDadosModal, setShowAnaliseDadosModal] = useState(false)
+  const [showValidadePropostaAnalise, setShowValidadePropostaAnalise] = useState(false)
+  
+  // Estados para modal de Automações
+  const [showAutomacoesModal, setShowAutomacoesModal] = useState(false)
+  const [showValidadePropostaAutomacoes, setShowValidadePropostaAutomacoes] = useState(false)
+  
+  // Estados para modal de Consultoria
+  const [showConsultoriaModal, setShowConsultoriaModal] = useState(false)
+  const [showValidadePropostaConsultoria, setShowValidadePropostaConsultoria] = useState(false)
   
   const [formData, setFormData] = useState({
     clientId: '',
@@ -77,6 +86,8 @@ export default function NovaNegociacaoPage() {
     // Campos de validade
     dataValidade: '',
     dataLimiteAceite: '',
+    // Campo de observações
+    observacoes: '',
   })
 
   useEffect(() => {
@@ -277,12 +288,133 @@ export default function NovaNegociacaoPage() {
       console.log('Debug - payload a ser enviado:', payload)
 
 
-      // Campos de validade (sempre enviar se preenchidos)
+      // Campos de validade e observações (sempre enviar se preenchidos)
       if (formData.dataValidade) {
         payload.dataValidade = formData.dataValidade
       }
       if (formData.dataLimiteAceite) {
         payload.dataLimiteAceite = formData.dataLimiteAceite
+      }
+      if (formData.observacoes) {
+        payload.observacoes = formData.observacoes
+      }
+
+      // Campos específicos para Consultoria
+      if (formData.serviceType === 'CONSULTORIA') {
+        payload.tipoContratacao = formData.tipoContratacao
+        payload.formaFaturamento = formData.formaFaturamento
+        payload.inicio = formData.inicio
+        payload.previsaoConclusao = formData.previsaoConclusao
+        payload.inicioFaturamento = formData.inicioFaturamento
+        payload.vencimento = formData.vencimento
+        payload.horasEstimadas = formData.horasEstimadas
+        
+        if (formData.tipoContratacao === 'HORAS') {
+          const valorPorHoraNumber = getValorAsNumber(formData.valorPorHora)
+          if (valorPorHoraNumber !== null) {
+            payload.valorPorHora = valorPorHoraNumber
+          }
+        } else {
+          const valorPropostaNumber = getValorAsNumber(formData.valorProposta)
+          if (valorPropostaNumber !== null) {
+            payload.valorProposta = valorPropostaNumber
+          }
+        }
+        
+        // Incluir parcelas se necessário
+        if (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL' || formData.tipoContratacao === 'HORAS') {
+          if (formData.parcelas.length > 0) {
+            payload.parcelas = formData.parcelas.map(p => ({
+              numero: p.numero,
+              valor: getValorAsNumber(p.valor) || 0,
+              dataFaturamento: p.dataFaturamento,
+              dataVencimento: p.dataVencimento,
+            }))
+          } else if (formData.quantidadeParcelas) {
+            const quantidade = parseInt(formData.quantidadeParcelas) || 0
+            let valorTotal = 0
+            
+            if (formData.tipoContratacao === 'FIXO_RECORRENTE') {
+              valorTotal = getValorAsNumber(formData.valorProposta) || 0
+            } else if (formData.tipoContratacao === 'HORAS') {
+              const valorHora = getValorAsNumber(formData.valorPorHora) || 0
+              const horas = parseFloat(formData.horasEstimadas) || 0
+              valorTotal = valorHora * horas
+            } else {
+              valorTotal = getValorAsNumber(formData.valorProposta) || 0
+            }
+            
+            const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
+            const dataInicio = formData.inicioFaturamento || formData.inicio || new Date().toISOString().split('T')[0]
+            const dataInicioObj = new Date(dataInicio)
+            const vencimentoDias = formData.vencimento ? parseInt(formData.vencimento.toString()) : 30
+            
+            payload.parcelas = []
+            for (let i = 0; i < quantidade; i++) {
+              const dataFaturamento = new Date(dataInicioObj)
+              dataFaturamento.setMonth(dataFaturamento.getMonth() + i)
+              
+              const dataVencimento = new Date(dataFaturamento)
+              dataVencimento.setDate(dataVencimento.getDate() + vencimentoDias)
+              
+              payload.parcelas.push({
+                numero: i + 1,
+                valor: valorPorParcela,
+                dataFaturamento: dataFaturamento.toISOString().split('T')[0],
+                dataVencimento: dataVencimento.toISOString().split('T')[0],
+              })
+            }
+          }
+        }
+      }
+
+      // Campos específicos para Automações
+      if (formData.serviceType === 'AUTOMACOES') {
+        payload.tipoContratacao = 'PROJETO' // Fixo para Automações
+        payload.formaFaturamento = formData.formaFaturamento
+        payload.inicio = formData.inicio || new Date().toISOString().split('T')[0]
+        payload.inicioFaturamento = formData.inicioFaturamento
+        payload.vencimento = formData.vencimento
+        payload.horasEstimadas = formData.horasEstimadas
+        const valorPropostaNumber = getValorAsNumber(formData.valorProposta)
+        if (valorPropostaNumber !== null) {
+          payload.valorProposta = valorPropostaNumber
+        }
+        
+        // Incluir parcelas se forma de pagamento for Parcelado
+        if (formData.formaFaturamento === 'PARCELADO') {
+          if (formData.parcelas.length > 0) {
+            payload.parcelas = formData.parcelas.map(p => ({
+              numero: p.numero,
+              valor: getValorAsNumber(p.valor) || 0,
+              dataFaturamento: p.dataFaturamento,
+              dataVencimento: p.dataVencimento,
+            }))
+          } else if (formData.quantidadeParcelas) {
+            const quantidade = parseInt(formData.quantidadeParcelas) || 0
+            const valorTotal = getValorAsNumber(formData.valorProposta) || 0
+            const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
+            const dataInicio = formData.inicioFaturamento || new Date().toISOString().split('T')[0]
+            const dataInicioObj = new Date(dataInicio)
+            const vencimentoDias = formData.vencimento ? parseInt(formData.vencimento.toString()) : 30
+            
+            payload.parcelas = []
+            for (let i = 0; i < quantidade; i++) {
+              const dataFaturamento = new Date(dataInicioObj)
+              dataFaturamento.setMonth(dataFaturamento.getMonth() + i)
+              
+              const dataVencimento = new Date(dataFaturamento)
+              dataVencimento.setDate(dataVencimento.getDate() + vencimentoDias)
+              
+              payload.parcelas.push({
+                numero: i + 1,
+                valor: valorPorParcela,
+                dataFaturamento: dataFaturamento.toISOString().split('T')[0],
+                dataVencimento: dataVencimento.toISOString().split('T')[0],
+              })
+            }
+          }
+        }
       }
 
       // Campos específicos para Análise de Dados
@@ -433,6 +565,10 @@ export default function NovaNegociacaoPage() {
         dataInicioAnalise: formData.dataInicioAnalise,
         dataProgramadaHomologacao: formData.dataProgramadaHomologacao,
         dataProgramadaProducao: formData.dataProgramadaProducao,
+        // Campos de validade e observações (se preenchidos) - aplica para todos os tipos
+        dataValidade: formData.dataValidade || null,
+        dataLimiteAceite: formData.dataLimiteAceite || null,
+        observacoes: formData.observacoes || null,
         // Campos específicos para Migração de Dados
         sistemaOrigem: formData.sistemaOrigem,
         sistemaDestino: formData.sistemaDestino,
@@ -679,7 +815,16 @@ export default function NovaNegociacaoPage() {
 
   const handleQuantidadeParcelasChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const quantidade = parseInt(e.target.value) || 0
-    const valorTotal = getValorAsNumber(formData.valorProposta) || 0
+    
+    // Calcular valor total baseado no tipo de contratação
+    let valorTotal = 0
+    if (formData.serviceType === 'CONSULTORIA' && formData.tipoContratacao === 'HORAS') {
+      const valorHora = getValorAsNumber(formData.valorPorHora) || 0
+      const horas = parseFloat(formData.horasEstimadas) || 0
+      valorTotal = valorHora * horas
+    } else {
+      valorTotal = getValorAsNumber(formData.valorProposta) || 0
+    }
     
     const novasParcelas: Array<{ numero: number; valor: string; dataFaturamento: string; dataVencimento: string }> = []
     
@@ -695,8 +840,9 @@ export default function NovaNegociacaoPage() {
     // Para Migração de Dados com PARCELADO, usar dataFaturamento como base
     const dataFaturamentoBase = formData.dataFaturamento || formData.inicioFaturamento
     
-    // Para Análise de Dados, usar inicioFaturamento como base
+    // Para Análise de Dados e Automações, usar inicioFaturamento como base
     const dataFaturamentoBaseAnalise = formData.inicioFaturamento || formData.dataInicioAnalise
+    const dataFaturamentoBaseAutomacoes = formData.inicioFaturamento
     
     if (formData.tipoContratacao === 'FIXO_RECORRENTE') {
       // Fixo Recorrente: valor da proposta para cada parcela
@@ -736,6 +882,45 @@ export default function NovaNegociacaoPage() {
           dataVencimento,
         })
       }
+    } else if (formData.serviceType === 'CONSULTORIA' && formData.tipoContratacao === 'HORAS') {
+      // Por Horas: dividir valor total (valorPorHora * horasEstimadas) pelas parcelas
+      const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
+      const valorFormatado = valorPorParcela.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+      
+      for (let i = 1; i <= quantidade; i++) {
+        // Calcular data de faturamento baseada em inicioFaturamento (mensal)
+        let dataFaturamento = ''
+        if (formData.inicioFaturamento) {
+          const dataBase = new Date(formData.inicioFaturamento)
+          dataBase.setMonth(dataBase.getMonth() + (i - 1))
+          dataFaturamento = dataBase.toISOString().split('T')[0]
+        }
+        
+        // Calcular vencimento
+        let dataVencimento = ''
+        if (formData.vencimento && formData.vencimento.includes('-')) {
+          // Se vencimento é uma data, usar diretamente e somar meses
+          const dataBase = new Date(formData.vencimento)
+          dataBase.setMonth(dataBase.getMonth() + (i - 1))
+          dataVencimento = dataBase.toISOString().split('T')[0]
+        } else if (dataFaturamento && formData.vencimento) {
+          // Se vencimento é número (dias), calcular dias após faturamento
+          const vencimentoDias = parseInt(formData.vencimento.toString()) || 30
+          const dataBase = new Date(dataFaturamento)
+          dataBase.setDate(dataBase.getDate() + vencimentoDias)
+          dataVencimento = dataBase.toISOString().split('T')[0]
+        }
+        
+        novasParcelas.push({
+          numero: i,
+          valor: valorFormatado,
+          dataFaturamento,
+          dataVencimento,
+        })
+      }
     } else {
       // Projeto, Migração de Dados ou Análise de Dados: dividir valor da proposta pela quantidade
       const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
@@ -747,8 +932,8 @@ export default function NovaNegociacaoPage() {
       for (let i = 1; i <= quantidade; i++) {
         // Calcular data de faturamento
         let dataFaturamento = ''
-        if (formData.serviceType === 'ANALISE_DADOS' && dataFaturamentoBaseAnalise) {
-          // Para Análise de Dados, usar inicioFaturamento como base
+        if ((formData.serviceType === 'ANALISE_DADOS' || formData.serviceType === 'AUTOMACOES' || formData.serviceType === 'CONSULTORIA') && dataFaturamentoBaseAnalise) {
+          // Para Análise de Dados e Automações, usar inicioFaturamento como base
           const dataBase = new Date(dataFaturamentoBaseAnalise)
           dataBase.setMonth(dataBase.getMonth() + (i - 1))
           dataFaturamento = dataBase.toISOString().split('T')[0]
@@ -938,12 +1123,31 @@ export default function NovaNegociacaoPage() {
                   // Abrir modal automaticamente para ANALISE_DADOS
                   setShowAnaliseDadosModal(true)
                   setShowAssinaturasModal(false)
+                  setShowAutomacoesModal(false)
                   setShowValidadeProposta(false)
                   // Definir tipo de contratação fixo como "Por Projeto"
                   setFormData(prev => ({ ...prev, tipoContratacao: 'PROJETO' }))
+                } else if (newServiceType === 'AUTOMACOES') {
+                  // Abrir modal automaticamente para AUTOMACOES
+                  setShowAutomacoesModal(true)
+                  setShowAssinaturasModal(false)
+                  setShowAnaliseDadosModal(false)
+                  setShowConsultoriaModal(false)
+                  setShowValidadeProposta(false)
+                  // Definir tipo de contratação fixo como "Por Projeto"
+                  setFormData(prev => ({ ...prev, tipoContratacao: 'PROJETO' }))
+                } else if (newServiceType === 'CONSULTORIA') {
+                  // Abrir modal automaticamente para CONSULTORIA
+                  setShowConsultoriaModal(true)
+                  setShowAssinaturasModal(false)
+                  setShowAnaliseDadosModal(false)
+                  setShowAutomacoesModal(false)
+                  setShowValidadeProposta(false)
                 } else {
                   setShowAssinaturasModal(false)
                   setShowAnaliseDadosModal(false)
+                  setShowAutomacoesModal(false)
+                  setShowConsultoriaModal(false)
                   setShowValidadeProposta(false)
                 }
               }}
@@ -1280,8 +1484,8 @@ export default function NovaNegociacaoPage() {
             </div>
           )}
 
-          {/* Campos específicos por tipo de serviço - Não mostrar ASSINATURAS e ANALISE_DADOS aqui, serão nos modais */}
-          {formData.serviceType !== 'ASSINATURAS' && formData.serviceType !== 'ANALISE_DADOS' && (
+          {/* Campos específicos por tipo de serviço - Não mostrar ASSINATURAS, ANALISE_DADOS, AUTOMACOES e CONSULTORIA aqui, serão nos modais */}
+          {formData.serviceType !== 'ASSINATURAS' && formData.serviceType !== 'ANALISE_DADOS' && formData.serviceType !== 'AUTOMACOES' && formData.serviceType !== 'CONSULTORIA' && (
             <ServiceTypeFieldsWrapper
               serviceType={formData.serviceType}
               formData={formData}
@@ -1929,6 +2133,23 @@ export default function NovaNegociacaoPage() {
                   </div>
 
                   <div>
+                    <label htmlFor="horasEstimadasAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                      Horas Estimadas
+                    </label>
+                    <input
+                      type="text"
+                      id="horasEstimadasAnalise"
+                      value={formData.horasEstimadas}
+                      onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Ex: 40h, 1h30min, 50 horas"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Formato: 40h, 1h30min, 50 horas, etc.
+                    </p>
+                  </div>
+
+                  <div>
                     <label htmlFor="tipoContratacaoAnalise" className="block text-sm font-medium text-gray-700 mb-2">
                       Tipo de Contratação
                     </label>
@@ -2077,6 +2298,79 @@ export default function NovaNegociacaoPage() {
                     )}
                   </div>
                 )}
+
+                {/* Pergunta sobre prazos e observações */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showValidadePropostaAnalise}
+                        onChange={(e) => setShowValidadePropostaAnalise(e.target.checked)}
+                        className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Inserir prazos para a proposta e Observações específicas?
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Campos de Validade da Proposta e Observações - aparecem apenas se selecionado */}
+                {showValidadePropostaAnalise && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                      
+                      <div>
+                        <label htmlFor="dataValidadeAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data de Validade da Proposta
+                        </label>
+                        <input
+                          type="date"
+                          id="dataValidadeAnalise"
+                          value={formData.dataValidade}
+                          onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="dataLimiteAceiteAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data Limite para Aceite
+                        </label>
+                        <input
+                          type="date"
+                          id="dataLimiteAceiteAnalise"
+                          value={formData.dataLimiteAceite}
+                          onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                      </div>
+                    </div>
+
+                    {/* Campo de Observações */}
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+                      <div>
+                        <label htmlFor="observacoesAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                          Observações Específicas
+                        </label>
+                        <textarea
+                          id="observacoesAnalise"
+                          value={formData.observacoes}
+                          onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Digite observações relevantes que serão incluídas no PDF da proposta..."
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Essas observações serão incluídas no PDF da proposta</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Botões do modal */}
@@ -2093,6 +2387,344 @@ export default function NovaNegociacaoPage() {
                   onClick={() => {
                     if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
                       setShowAnaliseDadosModal(false)
+                    }
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Cadastro de Automações */}
+        {showAutomacoesModal && formData.serviceType === 'AUTOMACOES' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Informações de Automações</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowAutomacoesModal(false)
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Campos Financeiros */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="valorPropostaAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                      Valor da Proposta *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                      <input
+                        type="text"
+                        id="valorPropostaAutomacoes"
+                        value={formData.valorProposta}
+                        onChange={(e) => {
+                          const formatted = formatCurrency(e.target.value)
+                          setFormData({ ...formData, valorProposta: formatted })
+                        }}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="0,00"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="horasEstimadasAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                      Horas Estimadas
+                    </label>
+                    <input
+                      type="text"
+                      id="horasEstimadasAutomacoes"
+                      value={formData.horasEstimadas}
+                      onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Ex: 40h, 1h30min, 50 horas"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Formato: 40h, 1h30min, 50 horas, etc.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="tipoContratacaoAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Contratação
+                    </label>
+                    <input
+                      type="text"
+                      id="tipoContratacaoAutomacoes"
+                      value="Por Projeto"
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Fixo para Automações</p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="formaFaturamentoAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                      Forma de Pagamento *
+                    </label>
+                    <select
+                      id="formaFaturamentoAutomacoes"
+                      value={formData.formaFaturamento}
+                      onChange={(e) => {
+                        setFormData({ 
+                          ...formData, 
+                          formaFaturamento: e.target.value as 'ONESHOT' | 'PARCELADO',
+                          parcelas: [],
+                          quantidadeParcelas: ''
+                        })
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="ONESHOT">OneShot</option>
+                      <option value="PARCELADO">Parcelado</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="inicioFaturamentoAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                      Início do Faturamento *
+                    </label>
+                    <input
+                      type="date"
+                      id="inicioFaturamentoAutomacoes"
+                      value={formData.inicioFaturamento}
+                      onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="vencimentoAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                      Vencimento *
+                    </label>
+                    <input
+                      type="date"
+                      id="vencimentoAutomacoes"
+                      value={formData.vencimento}
+                      onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Campos para Parcelado */}
+                {formData.formaFaturamento === 'PARCELADO' && (
+                  <div className="mt-6 space-y-4">
+                    <div>
+                      <label htmlFor="quantidadeParcelasAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantidade de Parcelas *
+                      </label>
+                      <input
+                        type="number"
+                        id="quantidadeParcelasAutomacoes"
+                        min="1"
+                        value={formData.quantidadeParcelas}
+                        onChange={handleQuantidadeParcelasChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite a quantidade de parcelas"
+                        required
+                      />
+                    </div>
+
+                    {/* Lista de Parcelas */}
+                    {formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Pergunta sobre prazos e observações */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showValidadePropostaAutomacoes}
+                        onChange={(e) => setShowValidadePropostaAutomacoes(e.target.checked)}
+                        className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Inserir prazos para a proposta e Observações específicas?
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Campos de Validade da Proposta e Observações - aparecem apenas se selecionado */}
+                {showValidadePropostaAutomacoes && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                      
+                      <div>
+                        <label htmlFor="dataValidadeAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data de Validade da Proposta
+                        </label>
+                        <input
+                          type="date"
+                          id="dataValidadeAutomacoes"
+                          value={formData.dataValidade}
+                          onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="dataLimiteAceiteAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data Limite para Aceite
+                        </label>
+                        <input
+                          type="date"
+                          id="dataLimiteAceiteAutomacoes"
+                          value={formData.dataLimiteAceite}
+                          onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                      </div>
+                    </div>
+
+                    {/* Campo de Observações */}
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+                      <div>
+                        <label htmlFor="observacoesAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
+                          Observações Específicas
+                        </label>
+                        <textarea
+                          id="observacoesAutomacoes"
+                          value={formData.observacoes}
+                          onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Digite observações relevantes que serão incluídas no PDF da proposta..."
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Essas observações serão incluídas no PDF da proposta</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botões do modal */}
+              <div className="flex justify-end gap-4 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Validar campos obrigatórios antes de fechar
+                    if (!formData.valorProposta || getValorAsNumber(formData.valorProposta) === 0) {
+                      alert('Preencha o Valor da Proposta')
+                      return
+                    }
+                    if (!formData.formaFaturamento) {
+                      alert('Selecione a Forma de Pagamento')
+                      return
+                    }
+                    if (!formData.inicioFaturamento) {
+                      alert('Preencha o Início do Faturamento')
+                      return
+                    }
+                    if (!formData.vencimento) {
+                      alert('Preencha o Vencimento')
+                      return
+                    }
+                    if (formData.formaFaturamento === 'PARCELADO') {
+                      if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+                        alert('Informe a quantidade de parcelas')
+                        return
+                      }
+                      if (formData.parcelas.length === 0) {
+                        alert('Configure as parcelas')
+                        return
+                      }
+                    }
+                    setShowAutomacoesModal(false)
+                  }}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Salvar e Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowAutomacoesModal(false)
                     }
                   }}
                   className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
@@ -2133,6 +2765,24 @@ export default function NovaNegociacaoPage() {
                 />
               </div>
 
+              {/* Campo Horas Estimadas */}
+              <div className="mb-6">
+                <label htmlFor="horasEstimadasAssinaturas" className="block text-sm font-medium text-gray-700 mb-2">
+                  Horas Estimadas
+                </label>
+                <input
+                  type="text"
+                  id="horasEstimadasAssinaturas"
+                  value={formData.horasEstimadas}
+                  onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Ex: 40h, 1h30min, 50 horas"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Formato: 40h, 1h30min, 50 horas, etc.
+                </p>
+              </div>
+
               {/* Pergunta sobre prazos e observações */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex items-center gap-4">
@@ -2150,37 +2800,58 @@ export default function NovaNegociacaoPage() {
                 </div>
               </div>
 
-              {/* Campos de Validade da Proposta - aparecem apenas se selecionado */}
+              {/* Campos de Validade da Proposta e Observações - aparecem apenas se selecionado */}
               {showValidadeProposta && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
-                  
-                  <div>
-                    <label htmlFor="dataValidade" className="block text-sm font-medium text-gray-700 mb-2">
-                      Data de Validade da Proposta
-                    </label>
-                    <input
-                      type="date"
-                      id="dataValidade"
-                      value={formData.dataValidade}
-                      onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                <div className="space-y-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                    
+                    <div>
+                      <label htmlFor="dataValidadeAssinaturas" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data de Validade da Proposta
+                      </label>
+                      <input
+                        type="date"
+                        id="dataValidadeAssinaturas"
+                        value={formData.dataValidade}
+                        onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                    </div>
+
+                    <div>
+                      <label htmlFor="dataLimiteAceiteAssinaturas" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data Limite para Aceite
+                      </label>
+                      <input
+                        type="date"
+                        id="dataLimiteAceiteAssinaturas"
+                        value={formData.dataLimiteAceite}
+                        onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                    </div>
                   </div>
 
-                  <div>
-                    <label htmlFor="dataLimiteAceite" className="block text-sm font-medium text-gray-700 mb-2">
-                      Data Limite para Aceite
-                    </label>
-                    <input
-                      type="date"
-                      id="dataLimiteAceite"
-                      value={formData.dataLimiteAceite}
-                      onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                  {/* Campo de Observações */}
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+                    <div>
+                      <label htmlFor="observacoesAssinaturas" className="block text-sm font-medium text-gray-700 mb-2">
+                        Observações Específicas
+                      </label>
+                      <textarea
+                        id="observacoesAssinaturas"
+                        value={formData.observacoes}
+                        onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                        rows={6}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite observações relevantes que serão incluídas no PDF da proposta..."
+                      />
+                      <p className="mt-1 text-xs text-gray-500">Essas observações serão incluídas no PDF da proposta</p>
+                    </div>
                   </div>
                 </div>
               )}
