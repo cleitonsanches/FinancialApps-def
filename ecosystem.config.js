@@ -1,3 +1,6 @@
+// Carregar variáveis de ambiente de um arquivo .env.pm2 (não versionado)
+require('dotenv').config({ path: '.env.pm2' });
+
 module.exports = {
   apps: [
     // ============================================
@@ -15,12 +18,12 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3001,
-        // Banco de dados de produção
-        DB_TYPE: 'mssql',
-        DB_HOST: process.env.DB_HOST || 'seu-servidor.database.windows.net',
-        DB_PORT: process.env.DB_PORT || '1433',
-        DB_USERNAME: process.env.DB_USERNAME || 'seu-usuario',
-        DB_PASSWORD: process.env.DB_PASSWORD || 'sua-senha',
+        // Banco de dados de produção - lê do .env.pm2 ou usa valores padrão
+        DB_TYPE: process.env.DB_TYPE || 'mssql',
+        DB_HOST: process.env.DB_HOST_PROD || process.env.DB_HOST || 'seu-servidor.database.windows.net',
+        DB_PORT: process.env.DB_PORT_PROD || process.env.DB_PORT || '1433',
+        DB_USERNAME: process.env.DB_USERNAME_PROD || process.env.DB_USERNAME || 'seu-usuario',
+        DB_PASSWORD: process.env.DB_PASSWORD_PROD || process.env.DB_PASSWORD || 'sua-senha',
         DB_DATABASE: process.env.DB_DATABASE_PROD || 'free-db-financeapp',
         FRONTEND_URL: process.env.FRONTEND_URL_PROD || 'http://seu-ip:8080'
       },
@@ -63,12 +66,12 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3002,
-        // Banco de dados de testes
-        DB_TYPE: 'mssql',
-        DB_HOST: process.env.DB_HOST || 'seu-servidor.database.windows.net',
-        DB_PORT: process.env.DB_PORT || '1433',
-        DB_USERNAME: process.env.DB_USERNAME || 'seu-usuario',
-        DB_PASSWORD: process.env.DB_PASSWORD || 'sua-senha',
+        // Banco de dados de testes - lê do .env.pm2 ou usa valores padrão
+        DB_TYPE: process.env.DB_TYPE || 'mssql',
+        DB_HOST: process.env.DB_HOST_TEST || process.env.DB_HOST || 'seu-servidor.database.windows.net',
+        DB_PORT: process.env.DB_PORT_TEST || process.env.DB_PORT || '1433',
+        DB_USERNAME: process.env.DB_USERNAME_TEST || process.env.DB_USERNAME || 'seu-usuario',
+        DB_PASSWORD: process.env.DB_PASSWORD_TEST || process.env.DB_PASSWORD || 'sua-senha',
         DB_DATABASE: process.env.DB_DATABASE_TEST || 'free-db-financeapp-2',
         FRONTEND_URL: process.env.FRONTEND_URL_TEST || 'http://seu-ip:8080/test'
       },
@@ -99,7 +102,3 @@ module.exports = {
     }
   ]
 }
-
-
-
-
