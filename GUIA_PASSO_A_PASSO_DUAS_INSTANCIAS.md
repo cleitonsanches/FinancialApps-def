@@ -27,7 +27,10 @@ git pull origin main
 # Verificar se os arquivos foram atualizados
 ls -la ecosystem.config.js
 ls -la nginx-duas-instancias.conf
-ls -la SETUP_DUAS_INSTANCIAS.sh
+ls -la GUIA_PASSO_A_PASSO_DUAS_INSTANCIAS.md
+
+# Nota: O script SETUP_DUAS_INSTANCIAS.sh é opcional
+# Você pode seguir os passos manualmente usando este guia
 ```
 
 ### **PASSO 3: Configurar as Credenciais do Banco de Dados**
@@ -125,11 +128,28 @@ pm2 delete all
 # Build da API
 npm run build --workspace=apps/api
 
+# Aguardar conclusão e verificar se não houve erros
+# Se houver erros, corrija antes de continuar
+
 # Build do Frontend
 npm run build --workspace=apps/web
+
+# Aguardar conclusão e verificar se não houve erros
 ```
 
 ### **PASSO 7: Iniciar Todas as Instâncias PM2**
+
+**Opção A: Usando o script automatizado (recomendado)**
+
+```bash
+# Dar permissão de execução
+chmod +x CONFIGURAR_MANUALMENTE.sh
+
+# Executar o script
+./CONFIGURAR_MANUALMENTE.sh
+```
+
+**Opção B: Manualmente**
 
 ```bash
 # Iniciar todas as 4 instâncias definidas no ecosystem.config.js
@@ -154,6 +174,7 @@ pm2 save
 # Configurar PM2 para iniciar automaticamente no boot
 pm2 startup
 # (Siga as instruções que aparecerem no terminal)
+# Exemplo de saída: sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u usuario --hp /home/usuario
 ```
 
 ### **PASSO 9: Configurar o Nginx**
