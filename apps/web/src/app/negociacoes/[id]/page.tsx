@@ -49,6 +49,8 @@ export default function NegotiationDetailsPage() {
   })
   const [showObservacoesModal, setShowObservacoesModal] = useState(false)
   const [observacoesText, setObservacoesText] = useState('')
+  const [showRevertStatusModal, setShowRevertStatusModal] = useState(false)
+  const [revertStatusData, setRevertStatusData] = useState({ newStatus: '', provisionadas: [] as any[], faturadas: [] as any[], recebidas: [] as any[], projects: [] as any[] })
   
   // Dados temporários
   const [calculatedParcels, setCalculatedParcels] = useState<any[]>([])
@@ -545,6 +547,26 @@ export default function NegotiationDetailsPage() {
       return
     }
 
+    // Se status atual for FECHADA e novo status for RASCUNHO, REVISADA ou RE_ENVIADA
+    // Precisa excluir parcelas provisionadas e projetos vinculados
+    if (negotiation.status === 'FECHADA' && (newStatus === 'RASCUNHO' || newStatus === 'REVISADA' || newStatus === 'RE_ENVIADA')) {
+      const invoices = await loadRelatedInvoices()
+      const provisionadas = invoices.provisionadas || []
+      const faturadas = invoices.faturadas || []
+      const recebidas = invoices.recebidas || []
+      
+      // Preparar dados do modal
+      setRevertStatusData({
+        newStatus,
+        provisionadas,
+        faturadas,
+        recebidas,
+        projects: projects || []
+      })
+      setShowRevertStatusModal(true)
+      return
+    }
+
     // Para outros status, usar lógica padrão
     try {
       await api.put(`/negotiations/${negotiationId}`, { status: newStatus })
@@ -634,6 +656,65 @@ export default function NegotiationDetailsPage() {
     } catch (error: any) {
       console.error('Erro ao atualizar status:', error)
       alert(error.response?.data?.message || 'Erro ao atualizar status')
+    }
+  }
+
+  const handleConfirmRevertStatus = async () => {
+    try {
+      setLoading(true)
+      
+      // 1. Excluir parcelas provisionadas
+      if (revertStatusData.provisionadas.length > 0) {
+        for (const invoice of revertStatusData.provisionadas) {
+          try {
+            await api.delete(`/invoices/${invoice.id}`)
+          } catch (error) {
+            console.error(`Erro ao excluir invoice ${invoice.id}:`, error)
+          }
+        }
+      }
+
+      // 2. Excluir projetos vinculados
+      if (revertStatusData.projects.length > 0) {
+        for (const project of revertStatusData.projects) {
+          try {
+            await api.delete(`/projects/${project.id}`)
+          } catch (error) {
+            console.error(`Erro ao excluir projeto ${project.id}:`, error)
+          }
+        }
+      }
+
+      // 3. Avisar sobre parcelas faturadas/recebidas se houver
+      if (revertStatusData.faturadas.length > 0 || revertStatusData.recebidas.length > 0) {
+        let mensagem = 'Atenção:\n\n'
+        if (revertStatusData.faturadas.length > 0) {
+          mensagem += `- ${revertStatusData.faturadas.length} parcela(s) FATURADA(s) não foram excluídas.\n`
+        }
+        if (revertStatusData.recebidas.length > 0) {
+          mensagem += `- ${revertStatusData.recebidas.length} parcela(s) RECEBIDA(s) não foram excluídas.\n`
+        }
+        mensagem += '\nEssas parcelas permanecerão no sistema.'
+        alert(mensagem)
+      }
+
+      // 4. Atualizar status da negociação
+      await api.put(`/negotiations/${negotiationId}`, { status: revertStatusData.newStatus })
+      
+      // 5. Recarregar dados
+      await loadNegotiation()
+      await loadProjects()
+      await loadTasks()
+      await loadRelatedInvoices()
+      
+      setShowRevertStatusModal(false)
+      setRevertStatusData({ newStatus: '', provisionadas: [], faturadas: [], recebidas: [], projects: [] })
+      alert('Status atualizado com sucesso! Parcelas provisionadas e projetos foram excluídos.')
+    } catch (error: any) {
+      console.error('Erro ao reverter status:', error)
+      alert(error.response?.data?.message || 'Erro ao atualizar status')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -2518,6 +2599,113 @@ export default function NegotiationDetailsPage() {
               >
                 Cancelar Operação
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Confirmação para Reverter Status (FECHADA -> RASCUNHO/REVISADA/RE_ENVIADA) */}
+        {showRevertStatusModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">
+                Confirmar Alteração de Status
+              </h2>
+              
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  Ao alterar o status de <strong>FECHADA</strong> para <strong>{getStatusLabel(revertStatusData.newStatus)}</strong>, 
+                  os seguintes itens serão <strong className="text-red-600">EXCLUÍDOS</strong> do sistema:
+                </p>
+
+                {/* Parcelas Provisionadas */}
+                {revertStatusData.provisionadas.length > 0 && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h3 className="font-semibold text-red-900 mb-2">
+                      Parcelas Provisionadas a serem EXCLUÍDAS: {revertStatusData.provisionadas.length}
+                    </h3>
+                    <ul className="list-disc list-inside text-sm text-red-800 space-y-1">
+                      {revertStatusData.provisionadas.slice(0, 5).map((inv: any, index: number) => (
+                        <li key={index}>
+                          Parcela {inv.invoiceNumber || inv.numero} - {formatCurrency(inv.grossValue || inv.valor)}
+                        </li>
+                      ))}
+                      {revertStatusData.provisionadas.length > 5 && (
+                        <li className="text-red-600">... e mais {revertStatusData.provisionadas.length - 5} parcela(s)</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Projetos Vinculados */}
+                {revertStatusData.projects.length > 0 && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h3 className="font-semibold text-red-900 mb-2">
+                      Projetos Vinculados a serem EXCLUÍDOS: {revertStatusData.projects.length}
+                    </h3>
+                    <ul className="list-disc list-inside text-sm text-red-800 space-y-1">
+                      {revertStatusData.projects.map((project: any, index: number) => (
+                        <li key={index}>
+                          {project.name || `Projeto ${index + 1}`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Aviso sobre Parcelas Faturadas/Recebidas */}
+                {(revertStatusData.faturadas.length > 0 || revertStatusData.recebidas.length > 0) && (
+                  <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <h3 className="font-semibold text-yellow-900 mb-2">Atenção:</h3>
+                    <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1">
+                      {revertStatusData.faturadas.length > 0 && (
+                        <li>
+                          {revertStatusData.faturadas.length} parcela(s) FATURADA(s) não serão excluídas e permanecerão no sistema.
+                        </li>
+                      )}
+                      {revertStatusData.recebidas.length > 0 && (
+                        <li>
+                          {revertStatusData.recebidas.length} parcela(s) RECEBIDA(s) não serão excluídas e permanecerão no sistema.
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Mensagem quando não há itens para excluir */}
+                {revertStatusData.provisionadas.length === 0 && revertStatusData.projects.length === 0 && (
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      Não há parcelas provisionadas nem projetos vinculados para excluir.
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    <strong>Importante:</strong> Se a negociação voltar a ser FECHADA no futuro, 
+                    as parcelas e projetos serão recriados automaticamente seguindo a lógica normal de fechamento.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => {
+                    setShowRevertStatusModal(false)
+                    setRevertStatusData({ newStatus: '', provisionadas: [], faturadas: [], recebidas: [], projects: [] })
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmRevertStatus}
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {loading ? 'Processando...' : 'Confirmar e Excluir'}
+                </button>
+              </div>
             </div>
           </div>
         )}
