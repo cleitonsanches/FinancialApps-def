@@ -17,10 +17,18 @@ ssh usuario@seu-ip
 cd /var/www/FinancialApps-def
 ```
 
-### Passo 2: Executar o script de inicialização
+### Passo 2: Fazer Build da API
 
 ```bash
-# Definir variáveis de ambiente e executar
+# Primeiro, fazer build para gerar o arquivo JavaScript
+npm run build --workspace=apps/api
+```
+
+### Passo 3: Executar o script de inicialização
+
+**Opção A: Usando npm (mais fácil)**
+
+```bash
 DB_TYPE=mssql \
 DB_HOST=seu-servidor.database.windows.net \
 DB_USERNAME=seu-usuario \
@@ -29,13 +37,9 @@ DB_DATABASE=free-db-financeapp-2 \
 npm run init:test-db --workspace=apps/api
 ```
 
-**Ou após o build:**
+**Opção B: Executando diretamente o arquivo compilado**
 
 ```bash
-# Primeiro, fazer build
-npm run build --workspace=apps/api
-
-# Depois executar
 DB_TYPE=mssql \
 DB_HOST=seu-servidor.database.windows.net \
 DB_USERNAME=seu-usuario \
@@ -44,9 +48,36 @@ DB_DATABASE=free-db-financeapp-2 \
 node apps/api/dist/database/init-test-database.js
 ```
 
-### Passo 3: Verificar se as tabelas foram criadas
+**⚠️ IMPORTANTE:** Substitua:
+- `seu-servidor.database.windows.net` → Servidor real do Azure SQL Database
+- `seu-usuario` → Usuário do banco de dados
+- `sua-senha` → Senha do banco de dados
 
-O script mostrará uma lista de todas as tabelas criadas.
+### Passo 4: Verificar se as tabelas foram criadas
+
+O script mostrará:
+- ✅ Status da conexão
+- 📋 Lista de todas as tabelas criadas
+- ✅ Confirmação de sucesso
+
+**Exemplo de saída esperada:**
+```
+🚀 Iniciando inicialização do banco de dados de testes...
+📡 Conectando ao banco de dados...
+   Host: seu-servidor.database.windows.net
+   Database: free-db-financeapp-2
+   Username: seu-usuario
+✅ Conectado com sucesso!
+📝 Criando todas as tabelas baseadas nas entidades...
+✅ Todas as tabelas criadas com sucesso!
+📊 Total de tabelas criadas: 25
+📋 Tabelas criadas:
+   1. companies
+   2. users
+   3. contacts
+   ...
+✅ Inicialização do banco de dados concluída com sucesso!
+```
 
 ## Método 2: Iniciar a API de Testes (Automático)
 
