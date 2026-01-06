@@ -11,6 +11,7 @@
     "init:db": "ts-node -r tsconfig-paths/register src/database/init-database.ts",
     "create:missing-tables": "ts-node -r tsconfig-paths/register src/database/create-missing-tables.ts",
     "seed:admin:mssql": "ts-node -r tsconfig-paths/register src/database/seed-admin-mssql.ts",
+    "check:users": "ts-node -r tsconfig-paths/register src/database/check-users.ts",
     "migrate:user-fields": "ts-node -r tsconfig-paths/register src/database/add-user-fields.ts",
     "migrate:chart-status": "ts-node -r tsconfig-paths/register src/database/add-status-column.ts",
     "migrate:bank-fields": "ts-node -r tsconfig-paths/register src/database/add-bank-account-fields.ts",
