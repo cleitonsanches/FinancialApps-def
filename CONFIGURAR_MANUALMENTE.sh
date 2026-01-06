@@ -53,12 +53,30 @@ if [[ ! $REPLY =~ ^[Ss]$ ]]; then
 fi
 echo ""
 
-# 4. Fazer build das aplicações
-echo -e "${YELLOW}4. Fazendo build das aplicações...${NC}"
+# 4. Verificar se diretório de logs existe
+echo -e "${YELLOW}4. Verificando diretório de logs...${NC}"
+if [ ! -d "logs" ]; then
+    echo "   Criando diretório logs..."
+    mkdir -p logs
+    echo -e "${GREEN}✅ Diretório logs criado${NC}"
+else
+    echo -e "${GREEN}✅ Diretório logs existe${NC}"
+fi
+echo ""
+
+# 5. Fazer build das aplicações
+echo -e "${YELLOW}5. Fazendo build das aplicações...${NC}"
 echo "   Build da API..."
 npm run build --workspace=apps/api
 if [ $? -ne 0 ]; then
     echo -e "${RED}Erro no build da API!${NC}"
+    echo "   Verifique os erros acima e tente novamente."
+    exit 1
+fi
+
+# Verificar se o build foi criado
+if [ ! -f "apps/api/dist/main.js" ]; then
+    echo -e "${RED}Erro: apps/api/dist/main.js não foi criado!${NC}"
     exit 1
 fi
 echo -e "${GREEN}✅ API build concluído${NC}"
@@ -67,28 +85,47 @@ echo "   Build do Frontend..."
 npm run build --workspace=apps/web
 if [ $? -ne 0 ]; then
     echo -e "${RED}Erro no build do Frontend!${NC}"
+    echo "   Verifique os erros acima e tente novamente."
+    exit 1
+fi
+
+# Verificar se o build foi criado
+if [ ! -d "apps/web/.next" ]; then
+    echo -e "${RED}Erro: apps/web/.next não foi criado!${NC}"
     exit 1
 fi
 echo -e "${GREEN}✅ Frontend build concluído${NC}"
 echo ""
 
-# 5. Iniciar todas as instâncias
-echo -e "${YELLOW}5. Iniciando todas as instâncias PM2...${NC}"
+# 6. Iniciar todas as instâncias
+echo -e "${YELLOW}6. Iniciando todas as instâncias PM2...${NC}"
 pm2 start ecosystem.config.js
-if [ $? -ne 0 ]; then
+START_EXIT_CODE=$?
+
+if [ $START_EXIT_CODE -ne 0 ]; then
     echo -e "${RED}Erro ao iniciar instâncias PM2!${NC}"
+    echo ""
+    echo "Verificando o que aconteceu..."
+    pm2 list
+    echo ""
+    echo -e "${YELLOW}Tente verificar os logs:${NC}"
+    echo "   pm2 logs"
     exit 1
 fi
-echo -e "${GREEN}✅ Instâncias iniciadas${NC}"
+
+# Aguardar um pouco para os processos iniciarem
+sleep 3
+
+echo -e "${GREEN}✅ Comando pm2 start executado${NC}"
 echo ""
 
-# 6. Salvar configuração do PM2
-echo -e "${YELLOW}6. Salvando configuração do PM2...${NC}"
+# 7. Salvar configuração do PM2
+echo -e "${YELLOW}7. Salvando configuração do PM2...${NC}"
 pm2 save
 echo -e "${GREEN}✅ Configuração salva${NC}"
 echo ""
 
-# 7. Verificar status
+# 8. Verificar status
 echo ""
 echo -e "${GREEN}=========================================="
 echo "Status das Instâncias:"
@@ -96,17 +133,59 @@ echo "==========================================${NC}"
 pm2 list
 echo ""
 
-# 8. Verificar se todas estão rodando
-echo -e "${YELLOW}8. Verificando status das instâncias...${NC}"
+# 9. Verificar se todas estão rodando
+echo -e "${YELLOW}9. Verificando status das instâncias...${NC}"
 API_PROD=$(pm2 jlist | grep -c '"name":"financial-api-prod"') || echo "0"
 WEB_PROD=$(pm2 jlist | grep -c '"name":"financial-web-prod"') || echo "0"
 API_TEST=$(pm2 jlist | grep -c '"name":"financial-api-test"') || echo "0"
 WEB_TEST=$(pm2 jlist | grep -c '"name":"financial-web-test"') || echo "0"
 
-if [ "$API_PROD" -eq 1 ] && [ "$WEB_PROD" -eq 1 ] && [ "$API_TEST" -eq 1 ] && [ "$WEB_TEST" -eq 1 ]; then
-    echo -e "${GREEN}✅ Todas as 4 instâncias estão rodando!${NC}"
+TOTAL_PROCESSES=$(pm2 jlist | jq '. | length' 2>/dev/null || echo "0")
+
+if [ "$TOTAL_PROCESSES" -eq "0" ]; then
+    echo -e "${RED}❌ NENHUM processo PM2 está rodando!${NC}"
+    echo ""
+    echo -e "${YELLOW}Possíveis causas:${NC}"
+    echo "  1. Erro ao iniciar os processos"
+    echo "  2. Credenciais do banco incorretas"
+    echo "  3. Portas já em uso"
+    echo "  4. Erro nos builds"
+    echo ""
+    echo -e "${YELLOW}Para diagnosticar, execute:${NC}"
+    echo "  ./DIAGNOSTICO_PM2.sh"
+    echo ""
+    echo -e "${YELLOW}Ou verifique os logs:${NC}"
+    echo "  pm2 logs"
+    echo "  tail -f logs/api-prod-error.log"
+    echo "  tail -f logs/web-prod-error.log"
+    exit 1
+elif [ "$TOTAL_PROCESSES" -lt 4 ]; then
+    echo -e "${YELLOW}⚠️  Apenas $TOTAL_PROCESSES de 4 instâncias estão rodando${NC}"
+    echo ""
+    echo "Verifique quais processos estão faltando:"
+    pm2 list
+    echo ""
+    echo -e "${YELLOW}Verifique os logs para identificar o problema:${NC}"
+    echo "  pm2 logs"
 else
-    echo -e "${YELLOW}⚠️  Algumas instâncias podem não estar rodando. Verifique com: pm2 list${NC}"
+    # Verificar status de cada processo
+    API_PROD_STATUS=$(pm2 jlist | jq -r '.[] | select(.name=="financial-api-prod") | .pm2_env.status' 2>/dev/null || echo "not found")
+    WEB_PROD_STATUS=$(pm2 jlist | jq -r '.[] | select(.name=="financial-web-prod") | .pm2_env.status' 2>/dev/null || echo "not found")
+    API_TEST_STATUS=$(pm2 jlist | jq -r '.[] | select(.name=="financial-api-test") | .pm2_env.status' 2>/dev/null || echo "not found")
+    WEB_TEST_STATUS=$(pm2 jlist | jq -r '.[] | select(.name=="financial-web-test") | .pm2_env.status' 2>/dev/null || echo "not found")
+    
+    if [ "$API_PROD_STATUS" = "online" ] && [ "$WEB_PROD_STATUS" = "online" ] && [ "$API_TEST_STATUS" = "online" ] && [ "$WEB_TEST_STATUS" = "online" ]; then
+        echo -e "${GREEN}✅ Todas as 4 instâncias estão rodando (status: online)!${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Algumas instâncias podem não estar online:${NC}"
+        echo "  - financial-api-prod: $API_PROD_STATUS"
+        echo "  - financial-web-prod: $WEB_PROD_STATUS"
+        echo "  - financial-api-test: $API_TEST_STATUS"
+        echo "  - financial-web-test: $WEB_TEST_STATUS"
+        echo ""
+        echo -e "${YELLOW}Verifique os logs:${NC}"
+        echo "  pm2 logs"
+    fi
 fi
 echo ""
 

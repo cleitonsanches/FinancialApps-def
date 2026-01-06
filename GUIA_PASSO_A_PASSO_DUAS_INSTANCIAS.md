@@ -353,6 +353,122 @@ pm2 stop financial-api-test financial-web-test
 
 ## ⚠️ Troubleshooting
 
+### ⚠️ Problema: Nenhuma instância PM2 está rodando
+
+Se após executar `CONFIGURAR_MANUALMENTE.sh` ou `pm2 start ecosystem.config.js` você não vê nenhum processo rodando:
+
+**1. Execute o script de diagnóstico:**
+```bash
+chmod +x DIAGNOSTICO_PM2.sh
+./DIAGNOSTICO_PM2.sh
+```
+
+Este script irá verificar:
+- ✅ Se PM2 está instalado
+- ✅ Se os builds existem
+- ✅ Se o diretório de logs existe
+- ✅ Status atual dos processos
+- ✅ Logs de erro
+- ✅ Configuração do ecosystem.config.js
+
+**2. Verifique manualmente:**
+
+```bash
+# Ver todos os processos PM2
+pm2 list
+
+# Ver logs em tempo real
+pm2 logs
+
+# Ver logs de um processo específico
+pm2 logs financial-api-prod
+pm2 logs financial-web-prod
+
+# Ver logs de erro nos arquivos
+tail -f logs/api-prod-error.log
+tail -f logs/web-prod-error.log
+```
+
+**3. Causas comuns e soluções:**
+
+| Problema | Solução |
+|----------|---------|
+| **Builds não existem** | Execute: `npm run build --workspace=apps/api && npm run build --workspace=apps/web` |
+| **Credenciais incorretas** | Edite `ecosystem.config.js` e substitua `seu-servidor`, `seu-usuario`, `sua-senha` |
+| **Portas em uso** | Verifique: `netstat -tulpn \| grep -E ':(3000\|3001\|3002\|3003)'` |
+| **Diretório de logs não existe** | Crie: `mkdir -p logs` |
+| **PM2 não instalado** | Instale: `npm install -g pm2` |
+| **Processos falharam ao iniciar** | Verifique logs: `pm2 logs` e `tail -f logs/*-error.log` |
+
+**4. Tentar iniciar manualmente (passo a passo):**
+
+```bash
+# Limpar tudo primeiro
+pm2 delete all
+
+# Verificar se os builds existem
+ls -la apps/api/dist/main.js
+ls -la apps/web/.next
+
+# Se não existirem, fazer build
+npm run build --workspace=apps/api
+npm run build --workspace=apps/web
+
+# Criar diretório de logs se não existir
+mkdir -p logs
+
+# Iniciar uma instância por vez para ver erros
+pm2 start ecosystem.config.js --only financial-api-prod
+pm2 logs financial-api-prod
+
+# Se funcionar, iniciar as outras
+pm2 start ecosystem.config.js --only financial-web-prod
+pm2 start ecosystem.config.js --only financial-api-test
+pm2 start ecosystem.config.js --only financial-web-test
+
+# Ou iniciar todas de uma vez
+pm2 start ecosystem.config.js
+```
+
+### Problema: Algumas instâncias não estão rodando
+
+1. Verifique o status de cada uma:
+   ```bash
+   pm2 list
+   ```
+
+2. Verifique os logs das que não estão rodando:
+   ```bash
+   pm2 logs financial-api-prod
+   pm2 logs financial-web-prod
+   ```
+
+3. Tente reiniciar apenas as que falharam:
+   ```bash
+   pm2 restart financial-api-prod
+   pm2 restart financial-web-prod
+   ```
+
+### Erro: "Cannot find module" ou "File not found"
+
+1. Verifique se os builds foram criados:
+   ```bash
+   ls -la apps/api/dist/main.js
+   ls -la apps/web/.next
+   ```
+
+2. Se os builds não existirem, execute:
+   ```bash
+   npm run build --workspace=apps/api
+   npm run build --workspace=apps/web
+   ```
+
+3. Verifique se está no diretório correto:
+   ```bash
+   pwd
+   # Deve ser: /var/www/FinancialApps-def
+   ```
+
 ### Erro: "Cannot connect to database"
 
 1. Verifique as credenciais no `ecosystem.config.js`
