@@ -44,7 +44,8 @@
     "create:time-entries-table": "node create-time-entries-table.js",
     "migrate:project-task-vinculos": "node add-project-task-vinculos.js",
     "migrate:project-task-exigir-horas": "node add-project-task-exigir-horas.js",
-    "migrate:proposal-observacoes": "node add-proposal-observacoes.js"
+    "migrate:proposal-observacoes": "node add-proposal-observacoes.js",
+    "init:test-db": "ts-node -r tsconfig-paths/register src/database/init-test-database.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
