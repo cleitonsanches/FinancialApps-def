@@ -896,6 +896,7 @@ export default function NegotiationDetailsPage() {
           clientId: negotiation.clientId,
         })
       }
+      }
     }
     
     console.log('Parcelas finais para exibição:', parcels)
