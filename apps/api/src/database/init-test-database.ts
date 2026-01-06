@@ -24,6 +24,7 @@ import { Invoice, InvoiceTax } from './entities/invoice.entity';
 import { InvoiceHistory } from './entities/invoice-history.entity';
 import { InvoiceAccountPayable } from './entities/invoice-account-payable.entity';
 import { AccountPayable } from './entities/account-payable.entity';
+import { AccountPayableHistory } from './entities/account-payable-history.entity';
 import { Reimbursement } from './entities/reimbursement.entity';
 import { TimeEntry } from './entities/time-entry.entity';
 import { TaskComment } from './entities/task-comment.entity';
@@ -88,6 +89,7 @@ async function initTestDatabase() {
     InvoiceHistory,
     InvoiceAccountPayable,
     AccountPayable,
+    AccountPayableHistory,
     Reimbursement,
     TimeEntry,
     TaskComment,

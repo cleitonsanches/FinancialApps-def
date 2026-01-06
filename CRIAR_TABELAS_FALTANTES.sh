@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Script para criar apenas as tabelas faltantes (comments e time_entries)
+# Script para criar apenas as tabelas faltantes (task_comments e account_payable_history)
 # Execute: sh CRIAR_TABELAS_FALTANTES.sh
 
 echo "=========================================="
@@ -69,12 +69,11 @@ async function createMissingTables() {
                     CREATE TABLE task_comments (
                         id NVARCHAR(36) PRIMARY KEY,
                         task_id NVARCHAR(36) NOT NULL,
-                        user_id NVARCHAR(36),
-                        comment TEXT NOT NULL,
+                        user_id NVARCHAR(36) NOT NULL,
+                        texto TEXT NOT NULL,
                         created_at DATETIME2 DEFAULT GETDATE(),
-                        updated_at DATETIME2 DEFAULT GETDATE(),
                         FOREIGN KEY (task_id) REFERENCES project_tasks(id) ON DELETE CASCADE,
-                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE NO ACTION
                     );
                     
                     CREATE INDEX IX_task_comments_task_id ON task_comments(task_id);
@@ -92,63 +91,45 @@ async function createMissingTables() {
             console.log('⚠️  Erro ao criar task_comments:', err.message);
         }
 
-        // Criar tabela time_entries
-        console.log('Criando tabela time_entries...');
+        // Criar tabela account_payable_history
+        console.log('Criando tabela account_payable_history...');
         try {
             await request.query(`
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'time_entries')
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'account_payable_history')
                 BEGIN
-                    CREATE TABLE time_entries (
+                    CREATE TABLE account_payable_history (
                         id NVARCHAR(36) PRIMARY KEY,
-                        project_id NVARCHAR(36),
-                        task_id NVARCHAR(36),
-                        proposal_id NVARCHAR(36),
-                        client_id NVARCHAR(36),
-                        user_id NVARCHAR(36),
-                        data DATE NOT NULL,
-                        horas DECIMAL(10,2) NOT NULL,
-                        descricao TEXT,
-                        status NVARCHAR(20) DEFAULT 'PENDENTE',
-                        motivo_reprovacao TEXT,
-                        motivo_aprovacao TEXT,
-                        is_faturavel BIT DEFAULT 0,
-                        valor_por_hora DECIMAL(15,2),
-                        aprovado_por NVARCHAR(36),
-                        aprovado_em DATETIME2,
-                        faturamento_desprezado BIT DEFAULT 0,
-                        reprovado_por NVARCHAR(36),
-                        reprovado_em DATETIME2,
-                        created_at DATETIME2 DEFAULT GETDATE(),
-                        updated_at DATETIME2 DEFAULT GETDATE(),
-                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-                        FOREIGN KEY (task_id) REFERENCES project_tasks(id) ON DELETE CASCADE,
-                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-                        FOREIGN KEY (aprovado_por) REFERENCES users(id) ON DELETE SET NULL,
-                        FOREIGN KEY (reprovado_por) REFERENCES users(id) ON DELETE SET NULL
+                        account_payable_id NVARCHAR(36) NOT NULL,
+                        action NVARCHAR(50) NOT NULL,
+                        field_name NVARCHAR(100),
+                        old_value TEXT,
+                        new_value TEXT,
+                        description TEXT,
+                        changed_by NVARCHAR(36),
+                        changed_at DATETIME2 DEFAULT GETDATE(),
+                        FOREIGN KEY (account_payable_id) REFERENCES accounts_payable(id) ON DELETE CASCADE,
+                        FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL
                     );
                     
-                    CREATE INDEX IX_time_entries_project_id ON time_entries(project_id);
-                    CREATE INDEX IX_time_entries_task_id ON time_entries(task_id);
-                    CREATE INDEX IX_time_entries_proposal_id ON time_entries(proposal_id);
-                    CREATE INDEX IX_time_entries_client_id ON time_entries(client_id);
+                    CREATE INDEX IX_account_payable_history_account_payable_id ON account_payable_history(account_payable_id);
                     
-                    PRINT 'Tabela time_entries criada com sucesso!';
+                    PRINT 'Tabela account_payable_history criada com sucesso!';
                 END
                 ELSE
                 BEGIN
-                    PRINT 'Tabela time_entries já existe.';
+                    PRINT 'Tabela account_payable_history já existe.';
                 END
             `);
-            console.log('✅ Tabela time_entries criada/verificada!\n');
+            console.log('✅ Tabela account_payable_history criada/verificada!\n');
         } catch (err) {
-            console.log('⚠️  Erro ao criar time_entries:', err.message);
+            console.log('⚠️  Erro ao criar account_payable_history:', err.message);
         }
 
         // Verificar tabelas criadas
         console.log('Verificando tabelas...');
         const result = await request.query(`
             SELECT name FROM sys.tables 
-            WHERE name IN ('task_comments', 'time_entries')
+            WHERE name IN ('task_comments', 'account_payable_history')
             ORDER BY name
         `);
 
