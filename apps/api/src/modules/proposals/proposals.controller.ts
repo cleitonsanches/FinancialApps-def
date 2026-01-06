@@ -106,13 +106,25 @@ export class ProposalsController {
     @Query('observacoes') observacoes?: string,
   ): Promise<void> {
     try {
-      const pdfBuffer = await this.proposalPdfService.generatePdf(id, observacoes);
+      // Decodificar observações se fornecidas (pode vir encoded na URL)
+      let decodedObservacoes: string | undefined = undefined;
+      if (observacoes) {
+        try {
+          decodedObservacoes = decodeURIComponent(observacoes);
+        } catch (error) {
+          // Se falhar a decodificação, usar o valor original
+          decodedObservacoes = observacoes;
+        }
+      }
+      
+      const pdfBuffer = await this.proposalPdfService.generatePdf(id, decodedObservacoes);
       const proposal = await this.proposalsService.findOne(id);
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="proposta-${proposal.numero || id}.pdf"`);
       res.send(pdfBuffer);
     } catch (error: any) {
+      console.error('Erro ao gerar PDF:', error);
       res.status(500).json({ message: error.message || 'Erro ao gerar PDF' });
     }
   }

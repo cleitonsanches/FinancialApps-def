@@ -222,25 +222,36 @@ export class ProposalPdfService {
 
     // Observações adicionais (se fornecidas via parâmetro)
     if (observacoes) {
-      currentY = this.drawSectionContainer(doc, currentY, 'OBSERVAÇÕES ADICIONAIS', darkGray);
-      currentY += 10;
-      
-      doc.fillColor(darkGray)
-        .fontSize(10)
-        .font('Helvetica');
-      
-      // Quebrar texto em múltiplas linhas se necessário
-      const lines = doc.heightOfString(observacoes, {
-        width: 500,
-        align: 'left',
-      });
-      
-      doc.text(observacoes, 60, currentY, {
-        width: 500,
-        align: 'left',
-      });
-      
-      currentY += lines + 10;
+      try {
+        currentY = this.drawSectionContainer(doc, currentY, 'OBSERVAÇÕES ADICIONAIS', darkGray);
+        currentY += 10;
+        
+        doc.fillColor(darkGray)
+          .fontSize(10)
+          .font('Helvetica');
+        
+        // Limpar e sanitizar o texto das observações
+        const cleanObservacoes = observacoes
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          .trim();
+        
+        // Quebrar texto em múltiplas linhas se necessário
+        const lines = doc.heightOfString(cleanObservacoes, {
+          width: 500,
+          align: 'left',
+        });
+        
+        doc.text(cleanObservacoes, 60, currentY, {
+          width: 500,
+          align: 'left',
+        });
+        
+        currentY += lines + 10;
+      } catch (error) {
+        // Se houver erro ao processar observações, logar e continuar sem elas
+        console.error('Erro ao processar observações adicionais:', error);
+      }
     }
 
     // Campos específicos por tipo de serviço
@@ -586,22 +597,9 @@ export class ProposalPdfService {
       }
     }
 
-    // Rodapé com numeração de páginas (corrigido)
-    const pageCount = doc.bufferedPageRange().count;
-    for (let i = 0; i < pageCount; i++) {
-      doc.switchToPage(i);
-      
-      doc.fillColor(darkGray)
-        .fontSize(8)
-        .font('Helvetica');
-      
-      doc.text(
-        `Página ${i + 1} de ${pageCount}`,
-        40,
-        doc.page.height - 30,
-        { align: 'center', width: doc.page.width - 80 }
-      );
-    }
+    // Nota: A numeração de páginas foi removida temporariamente devido a problemas
+    // com bufferedPageRange() e switchToPage() após doc.end()
+    // TODO: Implementar numeração de páginas usando uma abordagem diferente
 
     doc.end();
 
