@@ -84,7 +84,7 @@ async function seedAdminMssql() {
       console.log('📦 Criando empresa padrão...');
       company = companyRepository.create({
         id: '00000000-0000-0000-0000-000000000001',
-        name: 'FinanceApp',
+        razaoSocial: 'FinanceApp',
         cnpj: '00.000.000/0001-00',
       });
       company = await companyRepository.save(company);
