@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import AnaliseDadosFields from './AnaliseDadosFields'
 import AssinaturasFields from './AssinaturasFields'
 import ManutencoesFields from './ManutencoesFields'
@@ -10,12 +11,22 @@ interface ServiceTypeFieldsWrapperProps {
   serviceType: string;
   formData: any;
   onChange: (field: string, value: string) => void;
+  handleQuantidadeParcelasChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleParcelaDataFaturamentoChange?: (index: number, value: string) => void;
+  handleParcelaDataVencimentoChange?: (index: number, value: string) => void;
+  handleParcelaValorChange?: (index: number, value: string) => void;
+  getValorAsNumber?: (value: string | number) => number | null;
 }
 
 export default function ServiceTypeFieldsWrapper({ 
   serviceType, 
   formData, 
-  onChange 
+  onChange,
+  handleQuantidadeParcelasChange,
+  handleParcelaDataFaturamentoChange,
+  handleParcelaDataVencimentoChange,
+  handleParcelaValorChange,
+  getValorAsNumber
 }: ServiceTypeFieldsWrapperProps) {
   const handleChange = (field: string, value: string) => {
     onChange(field, value)
@@ -74,9 +85,16 @@ export default function ServiceTypeFieldsWrapper({
             dataInicio: formData.inicio || '',
             dataFimContrato: formData.dataFimContrato || '',
             valorProposta: formData.valorProposta || '',
+            quantidadeParcelas: formData.quantidadeParcelas || '',
+            parcelas: formData.parcelas || [],
           }}
           onChange={handleChange}
           formatCurrency={formatCurrency}
+          handleQuantidadeParcelasChange={handleQuantidadeParcelasChange}
+          handleParcelaDataFaturamentoChange={handleParcelaDataFaturamentoChange}
+          handleParcelaDataVencimentoChange={handleParcelaDataVencimentoChange}
+          handleParcelaValorChange={handleParcelaValorChange}
+          getValorAsNumber={getValorAsNumber}
         />
       )
 
