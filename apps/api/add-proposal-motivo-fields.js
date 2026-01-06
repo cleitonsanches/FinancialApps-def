@@ -52,3 +52,4 @@ db.run('ALTER TABLE proposals ADD COLUMN motivo_cancelamento TEXT', (err) => {
 
 
 
+

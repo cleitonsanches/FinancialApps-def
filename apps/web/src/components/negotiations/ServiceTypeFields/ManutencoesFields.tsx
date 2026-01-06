@@ -83,7 +83,7 @@ export default function ManutencoesFields({ formData, onChange, formatCurrency }
         </div>
         <div>
           <label htmlFor="vencimentoManutencao" className="block text-sm font-medium text-gray-700 mb-2">
-            Vencimento da Proposta (12 meses a partir do início)
+            Data de Renovação
           </label>
           <input
             type="date"

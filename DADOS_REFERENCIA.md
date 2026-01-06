@@ -191,3 +191,4 @@ Qual abordagem você prefere?
 
 
 
+

@@ -2928,8 +2928,8 @@ export default function NegotiationDetailsPage() {
                         return
                       }
                       
-                      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '')
-                      let pdfUrl = apiBaseUrl.replace(/\/api$/, '') + `/api/negotiations/${negotiation.id}/pdf`
+                      // Construir URL da API
+                      let pdfUrl = '/api/negotiations/' + negotiation.id + '/pdf'
                       
                       // Adicionar observações como query parameter
                       if (observacoesText.trim()) {

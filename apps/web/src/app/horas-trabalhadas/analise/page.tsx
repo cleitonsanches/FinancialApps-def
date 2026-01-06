@@ -352,21 +352,16 @@ export default function AnaliseHorasTrabalhadasPage() {
       
       // Criar PDF
       const pdf = new jsPDF('portrait', 'mm', 'a4')
-      const pageWidth = 210 // A4 portrait width in mm
-      const margin = 5 // 0.5cm = 5mm de cada lado
-      const contentWidth = pageWidth - (margin * 2) // Largura disponível para conteúdo (200mm)
-      
-      // Calcular dimensões da imagem respeitando as margens
-      const imgWidth = contentWidth
+      const imgWidth = 210 // A4 portrait width in mm
       const imgHeight = (canvas.height * imgWidth) / canvas.width
       
       // Adicionar título
       pdf.setFontSize(16)
       const titulo = getRelatorioTitulo()
-      pdf.text(titulo, margin, margin + 5)
+      pdf.text(titulo, 14, 15)
       
-      // Adicionar imagem do relatório com margens de 0.5cm (5mm) de cada lado
-      pdf.addImage(imgData, 'PNG', margin, margin + 10, imgWidth, imgHeight)
+      // Adicionar imagem do relatório
+      pdf.addImage(imgData, 'PNG', 0, 25, imgWidth, imgHeight)
       
       // Salvar PDF
       const tituloNome = titulo.replace(/\s+/g, '-').replace(/\|/g, '').toLowerCase()

@@ -59,3 +59,4 @@ db.run('ALTER TABLE project_tasks ADD COLUMN usuario_responsavel_id VARCHAR(36)'
 
 
 
+

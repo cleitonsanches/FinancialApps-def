@@ -197,9 +197,9 @@ export class ProposalPdfService {
       currentY += 10;
     }
 
-    // Campos de Validade (apenas para Rascunho)
-    if (proposal.status === 'RASCUNHO' && (proposal.dataValidade || proposal.dataLimiteAceite)) {
-      currentY = this.drawSectionContainer(doc, currentY, 'VALIDADE DA PROPOSTA', orange);
+    // Campos de Validade e Observações (se preenchidos)
+    if (proposal.dataValidade || proposal.dataLimiteAceite || proposal.observacoes) {
+      currentY = this.drawSectionContainer(doc, currentY, 'VALIDADE DA PROPOSTA E OBSERVAÇÕES', orange);
       currentY += 10;
 
       if (proposal.dataValidade) {
@@ -209,12 +209,20 @@ export class ProposalPdfService {
         currentY = this.drawInfoRow(doc, 60, currentY, 'Data Limite para Aceite:', this.formatDate(proposal.dataLimiteAceite), 250);
       }
       
+      // Observações da negociação (se houver)
+      if (proposal.observacoes) {
+        doc.fillColor(darkGray).fontSize(10).font('Helvetica');
+        doc.text('Observações:', 60, currentY);
+        doc.text(proposal.observacoes, 60, currentY + 15, { width: 500 });
+        currentY += 35;
+      }
+      
       currentY += 10;
     }
 
-    // Observações (se fornecidas)
+    // Observações adicionais (se fornecidas via parâmetro)
     if (observacoes) {
-      currentY = this.drawSectionContainer(doc, currentY, 'OBSERVAÇÕES', darkGray);
+      currentY = this.drawSectionContainer(doc, currentY, 'OBSERVAÇÕES ADICIONAIS', darkGray);
       currentY += 10;
       
       doc.fillColor(darkGray)
@@ -236,6 +244,92 @@ export class ProposalPdfService {
     }
 
     // Campos específicos por tipo de serviço
+    
+    // ASSINATURAS
+    if (proposal.serviceType === 'ASSINATURAS') {
+      currentY = this.drawSectionContainer(doc, currentY, 'INFORMAÇÕES DE ASSINATURA', secondaryColor);
+      currentY += 10;
+
+      if (proposal.tipoProdutoAssinado) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Tipo de Produto:', proposal.tipoProdutoAssinado, 300);
+      }
+      if (proposal.quantidadeUsuarios) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Quantidade de Usuários:', String(proposal.quantidadeUsuarios), 200);
+      }
+      if (proposal.valorUnitarioUsuario) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Valor Unitário por Usuário:', `R$ ${this.formatCurrency(proposal.valorUnitarioUsuario)}`, 250);
+      }
+      if (proposal.dataInicioAssinatura) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data de Início:', this.formatDate(proposal.dataInicioAssinatura), 250);
+      }
+      if (proposal.vencimentoAssinatura) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data de Renovação:', this.formatDate(proposal.vencimentoAssinatura), 250);
+      }
+      
+      currentY += 10;
+    }
+
+    // ANÁLISE DE DADOS
+    if (proposal.serviceType === 'ANALISE_DADOS') {
+      currentY = this.drawSectionContainer(doc, currentY, 'INFORMAÇÕES DE ANÁLISE DE DADOS', secondaryColor);
+      currentY += 10;
+
+      if (proposal.dataInicioAnalise) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data de Início:', this.formatDate(proposal.dataInicioAnalise), 250);
+      }
+      if (proposal.dataProgramadaHomologacao) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data Programada para Homologação:', this.formatDate(proposal.dataProgramadaHomologacao), 250);
+      }
+      if (proposal.dataProgramadaProducao) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data Programada para Produção:', this.formatDate(proposal.dataProgramadaProducao), 250);
+      }
+      
+      currentY += 10;
+    }
+
+    // MANUTENÇÕES
+    if (proposal.serviceType === 'MANUTENCOES') {
+      currentY = this.drawSectionContainer(doc, currentY, 'INFORMAÇÕES DE MANUTENÇÃO', secondaryColor);
+      currentY += 10;
+
+      if (proposal.descricaoManutencao) {
+        doc.fillColor(darkGray).fontSize(10).font('Helvetica');
+        doc.text('Descrição:', 60, currentY);
+        doc.text(proposal.descricaoManutencao, 60, currentY + 15, { width: 500 });
+        currentY += 35;
+      }
+      if (proposal.valorMensalManutencao) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Valor Mensal:', `R$ ${this.formatCurrency(proposal.valorMensalManutencao)}`, 250);
+      }
+      if (proposal.dataInicioManutencao) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data de Início:', this.formatDate(proposal.dataInicioManutencao), 250);
+      }
+      if (proposal.vencimentoManutencao) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data de Renovação:', this.formatDate(proposal.vencimentoManutencao), 250);
+      }
+      
+      currentY += 10;
+    }
+
+    // CONTRATO FIXO
+    if (proposal.serviceType === 'CONTRATO_FIXO') {
+      currentY = this.drawSectionContainer(doc, currentY, 'INFORMAÇÕES DE CONTRATO FIXO', secondaryColor);
+      currentY += 10;
+
+      if (proposal.valorMensalFixo) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Valor Mensal:', `R$ ${this.formatCurrency(proposal.valorMensalFixo)}`, 250);
+      }
+      if (proposal.dataInicio) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data de Início:', this.formatDate(proposal.dataInicio), 250);
+      }
+      if (proposal.dataFimContrato) {
+        currentY = this.drawInfoRow(doc, 60, currentY, 'Data de Término:', this.formatDate(proposal.dataFimContrato), 250);
+      }
+      
+      currentY += 10;
+    }
+
+    // MIGRAÇÃO DE DADOS
     if (proposal.sistemaOrigem || proposal.sistemaDestino) {
       currentY = this.drawSectionContainer(doc, currentY, 'MIGRAÇÃO DE DADOS', secondaryColor);
       currentY += 10;
