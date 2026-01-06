@@ -43,8 +43,10 @@ echo ""
 
 # 3. Fazer build da API
 echo "3. Fazendo build da API..."
-npm run build --workspace=apps/api
-if [ $? -eq 0 ]; then
+cd /var/www/FinancialApps-def
+npm run build:api
+BUILD_API_EXIT=$?
+if [ $BUILD_API_EXIT -eq 0 ]; then
     echo "   ✅ API build concluído"
 else
     echo "   ❌ Erro no build da API!"
@@ -60,8 +62,10 @@ echo ""
 
 # 4. Fazer build do Web
 echo "4. Fazendo build do Web..."
-npm run build --workspace=apps/web
-if [ $? -eq 0 ]; then
+cd /var/www/FinancialApps-def
+npm run build:web
+BUILD_WEB_EXIT=$?
+if [ $BUILD_WEB_EXIT -eq 0 ]; then
     echo "   ✅ Web build concluído"
 else
     echo "   ❌ Erro no build do Web!"
