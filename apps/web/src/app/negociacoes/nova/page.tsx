@@ -41,6 +41,14 @@ export default function NovaNegociacaoPage() {
   const [showConsultoriaModal, setShowConsultoriaModal] = useState(false)
   const [showValidadePropostaConsultoria, setShowValidadePropostaConsultoria] = useState(false)
   
+  // Estados para modal de Desenvolvimentos
+  const [showDesenvolvimentosModal, setShowDesenvolvimentosModal] = useState(false)
+  const [showValidadePropostaDesenvolvimentos, setShowValidadePropostaDesenvolvimentos] = useState(false)
+  
+  // Estados para modal de Treinamento
+  const [showTreinamentoModal, setShowTreinamentoModal] = useState(false)
+  const [showValidadePropostaTreinamento, setShowValidadePropostaTreinamento] = useState(false)
+  
   const [formData, setFormData] = useState({
     clientId: '',
     serviceType: '',
@@ -299,8 +307,8 @@ export default function NovaNegociacaoPage() {
         payload.observacoes = formData.observacoes
       }
 
-      // Campos específicos para Consultoria
-      if (formData.serviceType === 'CONSULTORIA') {
+      // Campos específicos para Consultoria e Treinamento (mesmo padrão)
+      if (formData.serviceType === 'CONSULTORIA' || formData.serviceType === 'TREINAMENTO') {
         payload.tipoContratacao = formData.tipoContratacao
         payload.formaFaturamento = formData.formaFaturamento
         payload.inicio = formData.inicio
@@ -346,6 +354,58 @@ export default function NovaNegociacaoPage() {
             
             const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
             const dataInicio = formData.inicioFaturamento || formData.inicio || new Date().toISOString().split('T')[0]
+            const dataInicioObj = new Date(dataInicio)
+            const vencimentoDias = formData.vencimento ? parseInt(formData.vencimento.toString()) : 30
+            
+            payload.parcelas = []
+            for (let i = 0; i < quantidade; i++) {
+              const dataFaturamento = new Date(dataInicioObj)
+              dataFaturamento.setMonth(dataFaturamento.getMonth() + i)
+              
+              const dataVencimento = new Date(dataFaturamento)
+              dataVencimento.setDate(dataVencimento.getDate() + vencimentoDias)
+              
+              payload.parcelas.push({
+                numero: i + 1,
+                valor: valorPorParcela,
+                dataFaturamento: dataFaturamento.toISOString().split('T')[0],
+                dataVencimento: dataVencimento.toISOString().split('T')[0],
+              })
+            }
+          }
+        }
+      }
+
+      // Campos específicos para Desenvolvimentos (mesmo padrão de Análise de Dados)
+      if (formData.serviceType === 'DESENVOLVIMENTOS') {
+        payload.dataInicioAnalise = formData.dataInicioAnalise
+        payload.dataProgramadaHomologacao = formData.dataProgramadaHomologacao
+        payload.dataProgramadaProducao = formData.dataProgramadaProducao
+        payload.tipoContratacao = 'PROJETO' // Fixo para Desenvolvimentos
+        payload.formaFaturamento = formData.formaFaturamento
+        payload.inicio = formData.dataInicioAnalise // Usar data de início da análise
+        payload.inicioFaturamento = formData.inicioFaturamento
+        payload.vencimento = formData.vencimento
+        payload.horasEstimadas = formData.horasEstimadas
+        const valorPropostaNumber = getValorAsNumber(formData.valorProposta)
+        if (valorPropostaNumber !== null) {
+          payload.valorProposta = valorPropostaNumber
+        }
+        
+        // Incluir parcelas se forma de pagamento for Parcelado
+        if (formData.formaFaturamento === 'PARCELADO') {
+          if (formData.parcelas.length > 0) {
+            payload.parcelas = formData.parcelas.map(p => ({
+              numero: p.numero,
+              valor: getValorAsNumber(p.valor) || 0,
+              dataFaturamento: p.dataFaturamento,
+              dataVencimento: p.dataVencimento,
+            }))
+          } else if (formData.quantidadeParcelas) {
+            const quantidade = parseInt(formData.quantidadeParcelas) || 0
+            const valorTotal = getValorAsNumber(formData.valorProposta) || 0
+            const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
+            const dataInicio = formData.inicioFaturamento || formData.dataInicioAnalise || new Date().toISOString().split('T')[0]
             const dataInicioObj = new Date(dataInicio)
             const vencimentoDias = formData.vencimento ? parseInt(formData.vencimento.toString()) : 30
             
@@ -597,7 +657,7 @@ export default function NovaNegociacaoPage() {
           
           // Determinar data base dependendo do tipo de serviço
           let dataInicio = formData.inicioFaturamento || formData.dataFaturamento || formData.inicio
-          if (formData.serviceType === 'ANALISE_DADOS') {
+          if (formData.serviceType === 'ANALISE_DADOS' || formData.serviceType === 'DESENVOLVIMENTOS' || formData.serviceType === 'TREINAMENTO') {
             dataInicio = formData.inicioFaturamento || formData.dataInicioAnalise || new Date().toISOString().split('T')[0]
           } else {
             dataInicio = dataInicio || new Date().toISOString().split('T')[0]
@@ -882,45 +942,6 @@ export default function NovaNegociacaoPage() {
           dataVencimento,
         })
       }
-    } else if (formData.serviceType === 'CONSULTORIA' && formData.tipoContratacao === 'HORAS') {
-      // Por Horas: dividir valor total (valorPorHora * horasEstimadas) pelas parcelas
-      const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
-      const valorFormatado = valorPorParcela.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-      
-      for (let i = 1; i <= quantidade; i++) {
-        // Calcular data de faturamento baseada em inicioFaturamento (mensal)
-        let dataFaturamento = ''
-        if (formData.inicioFaturamento) {
-          const dataBase = new Date(formData.inicioFaturamento)
-          dataBase.setMonth(dataBase.getMonth() + (i - 1))
-          dataFaturamento = dataBase.toISOString().split('T')[0]
-        }
-        
-        // Calcular vencimento
-        let dataVencimento = ''
-        if (formData.vencimento && formData.vencimento.includes('-')) {
-          // Se vencimento é uma data, usar diretamente e somar meses
-          const dataBase = new Date(formData.vencimento)
-          dataBase.setMonth(dataBase.getMonth() + (i - 1))
-          dataVencimento = dataBase.toISOString().split('T')[0]
-        } else if (dataFaturamento && formData.vencimento) {
-          // Se vencimento é número (dias), calcular dias após faturamento
-          const vencimentoDias = parseInt(formData.vencimento.toString()) || 30
-          const dataBase = new Date(dataFaturamento)
-          dataBase.setDate(dataBase.getDate() + vencimentoDias)
-          dataVencimento = dataBase.toISOString().split('T')[0]
-        }
-        
-        novasParcelas.push({
-          numero: i,
-          valor: valorFormatado,
-          dataFaturamento,
-          dataVencimento,
-        })
-      }
     } else {
       // Projeto, Migração de Dados ou Análise de Dados: dividir valor da proposta pela quantidade
       const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
@@ -932,7 +953,7 @@ export default function NovaNegociacaoPage() {
       for (let i = 1; i <= quantidade; i++) {
         // Calcular data de faturamento
         let dataFaturamento = ''
-        if ((formData.serviceType === 'ANALISE_DADOS' || formData.serviceType === 'AUTOMACOES' || formData.serviceType === 'CONSULTORIA') && dataFaturamentoBaseAnalise) {
+        if ((formData.serviceType === 'ANALISE_DADOS' || formData.serviceType === 'AUTOMACOES' || formData.serviceType === 'CONSULTORIA' || formData.serviceType === 'DESENVOLVIMENTOS' || formData.serviceType === 'TREINAMENTO') && dataFaturamentoBaseAnalise) {
           // Para Análise de Dados e Automações, usar inicioFaturamento como base
           const dataBase = new Date(dataFaturamentoBaseAnalise)
           dataBase.setMonth(dataBase.getMonth() + (i - 1))
@@ -1142,12 +1163,35 @@ export default function NovaNegociacaoPage() {
                   setShowAssinaturasModal(false)
                   setShowAnaliseDadosModal(false)
                   setShowAutomacoesModal(false)
+                  setShowDesenvolvimentosModal(false)
+                  setShowValidadeProposta(false)
+                } else if (newServiceType === 'DESENVOLVIMENTOS') {
+                  // Abrir modal automaticamente para DESENVOLVIMENTOS
+                  setShowDesenvolvimentosModal(true)
+                  setShowAssinaturasModal(false)
+                  setShowAnaliseDadosModal(false)
+                  setShowAutomacoesModal(false)
+                  setShowConsultoriaModal(false)
+                  setShowTreinamentoModal(false)
+                  setShowValidadeProposta(false)
+                  // Definir tipo de contratação fixo como "Por Projeto"
+                  setFormData(prev => ({ ...prev, tipoContratacao: 'PROJETO' }))
+                } else if (newServiceType === 'TREINAMENTO') {
+                  // Abrir modal automaticamente para TREINAMENTO
+                  setShowTreinamentoModal(true)
+                  setShowAssinaturasModal(false)
+                  setShowAnaliseDadosModal(false)
+                  setShowAutomacoesModal(false)
+                  setShowConsultoriaModal(false)
+                  setShowDesenvolvimentosModal(false)
                   setShowValidadeProposta(false)
                 } else {
                   setShowAssinaturasModal(false)
                   setShowAnaliseDadosModal(false)
                   setShowAutomacoesModal(false)
                   setShowConsultoriaModal(false)
+                  setShowDesenvolvimentosModal(false)
+                  setShowTreinamentoModal(false)
                   setShowValidadeProposta(false)
                 }
               }}
@@ -1484,14 +1528,19 @@ export default function NovaNegociacaoPage() {
             </div>
           )}
 
-          {/* Campos específicos por tipo de serviço - Não mostrar ASSINATURAS, ANALISE_DADOS, AUTOMACOES e CONSULTORIA aqui, serão nos modais */}
-          {formData.serviceType !== 'ASSINATURAS' && formData.serviceType !== 'ANALISE_DADOS' && formData.serviceType !== 'AUTOMACOES' && formData.serviceType !== 'CONSULTORIA' && (
+          {/* Campos específicos por tipo de serviço - Não mostrar ASSINATURAS, ANALISE_DADOS, AUTOMACOES, CONSULTORIA, DESENVOLVIMENTOS e TREINAMENTO aqui, serão nos modais */}
+          {formData.serviceType !== 'ASSINATURAS' && formData.serviceType !== 'ANALISE_DADOS' && formData.serviceType !== 'AUTOMACOES' && formData.serviceType !== 'CONSULTORIA' && formData.serviceType !== 'DESENVOLVIMENTOS' && formData.serviceType !== 'TREINAMENTO' && (
             <ServiceTypeFieldsWrapper
               serviceType={formData.serviceType}
               formData={formData}
               onChange={(field, value) => {
                 setFormData((prev) => ({ ...prev, [field]: value }))
               }}
+              handleQuantidadeParcelasChange={handleQuantidadeParcelasChange}
+              handleParcelaDataFaturamentoChange={handleParcelaDataFaturamentoChange}
+              handleParcelaDataVencimentoChange={handleParcelaDataVencimentoChange}
+              handleParcelaValorChange={handleParcelaValorChange}
+              getValorAsNumber={getValorAsNumber}
             />
           )}
 
@@ -2736,6 +2785,1942 @@ export default function NovaNegociacaoPage() {
           </div>
         )}
 
+        {/* Modal: Cadastro de Desenvolvimentos */}
+        {showDesenvolvimentosModal && formData.serviceType === 'DESENVOLVIMENTOS' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Informações de Desenvolvimentos</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowDesenvolvimentosModal(false)
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Bloco azul de Informações de Desenvolvimentos */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações de Desenvolvimentos</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="dataInicioDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data de Início *
+                      </label>
+                      <input
+                        type="date"
+                        id="dataInicioDesenvolvimentos"
+                        value={formData.dataInicioAnalise}
+                        onChange={(e) => setFormData({ ...formData, dataInicioAnalise: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="dataProgramadaHomologacaoDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data Programada para Homologação *
+                      </label>
+                      <input
+                        type="date"
+                        id="dataProgramadaHomologacaoDesenvolvimentos"
+                        value={formData.dataProgramadaHomologacao}
+                        onChange={(e) => setFormData({ ...formData, dataProgramadaHomologacao: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="dataProgramadaProducaoDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data Programada para Produção *
+                      </label>
+                      <input
+                        type="date"
+                        id="dataProgramadaProducaoDesenvolvimentos"
+                        value={formData.dataProgramadaProducao}
+                        onChange={(e) => setFormData({ ...formData, dataProgramadaProducao: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Campos Financeiros */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="valorPropostaDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                      Valor da Proposta *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                      <input
+                        type="text"
+                        id="valorPropostaDesenvolvimentos"
+                        value={formData.valorProposta}
+                        onChange={(e) => {
+                          const formatted = formatCurrency(e.target.value)
+                          setFormData({ ...formData, valorProposta: formatted })
+                        }}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="0,00"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="horasEstimadasDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                      Horas Estimadas
+                    </label>
+                    <input
+                      type="text"
+                      id="horasEstimadasDesenvolvimentos"
+                      value={formData.horasEstimadas}
+                      onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Ex: 40h, 1h30min, 50 horas"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Formato: 40h, 1h30min, 50 horas, etc.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="tipoContratacaoDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Contratação
+                    </label>
+                    <input
+                      type="text"
+                      id="tipoContratacaoDesenvolvimentos"
+                      value="Por Projeto"
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Fixo para Desenvolvimentos</p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="formaFaturamentoDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                      Forma de Pagamento *
+                    </label>
+                    <select
+                      id="formaFaturamentoDesenvolvimentos"
+                      value={formData.formaFaturamento}
+                      onChange={(e) => {
+                        setFormData({ 
+                          ...formData, 
+                          formaFaturamento: e.target.value as 'ONESHOT' | 'PARCELADO',
+                          parcelas: [],
+                          quantidadeParcelas: ''
+                        })
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="ONESHOT">OneShot</option>
+                      <option value="PARCELADO">Parcelado</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="inicioFaturamentoDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                      Início do Faturamento *
+                    </label>
+                    <input
+                      type="date"
+                      id="inicioFaturamentoDesenvolvimentos"
+                      value={formData.inicioFaturamento}
+                      onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="vencimentoDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                      Vencimento *
+                    </label>
+                    <input
+                      type="date"
+                      id="vencimentoDesenvolvimentos"
+                      value={formData.vencimento}
+                      onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Campos para Parcelado */}
+                {formData.formaFaturamento === 'PARCELADO' && (
+                  <div className="mt-6 space-y-4">
+                    <div>
+                      <label htmlFor="quantidadeParcelasDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantidade de Parcelas *
+                      </label>
+                      <input
+                        type="number"
+                        id="quantidadeParcelasDesenvolvimentos"
+                        min="1"
+                        value={formData.quantidadeParcelas}
+                        onChange={handleQuantidadeParcelasChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite a quantidade de parcelas"
+                        required
+                      />
+                    </div>
+
+                    {/* Lista de Parcelas */}
+                    {formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Pergunta sobre prazos e observações */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showValidadePropostaDesenvolvimentos}
+                        onChange={(e) => setShowValidadePropostaDesenvolvimentos(e.target.checked)}
+                        className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Inserir prazos para a proposta e Observações específicas?
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Campos de Validade da Proposta e Observações - aparecem apenas se selecionado */}
+                {showValidadePropostaDesenvolvimentos && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                      
+                      <div>
+                        <label htmlFor="dataValidadeDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data de Validade da Proposta
+                        </label>
+                        <input
+                          type="date"
+                          id="dataValidadeDesenvolvimentos"
+                          value={formData.dataValidade}
+                          onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="dataLimiteAceiteDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data Limite para Aceite
+                        </label>
+                        <input
+                          type="date"
+                          id="dataLimiteAceiteDesenvolvimentos"
+                          value={formData.dataLimiteAceite}
+                          onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                      </div>
+                    </div>
+
+                    {/* Campo de Observações */}
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+                      <div>
+                        <label htmlFor="observacoesDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
+                          Observações Específicas
+                        </label>
+                        <textarea
+                          id="observacoesDesenvolvimentos"
+                          value={formData.observacoes}
+                          onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Digite observações relevantes que serão incluídas no PDF da proposta..."
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Essas observações serão incluídas no PDF da proposta</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botões do modal */}
+              <div className="flex justify-end gap-4 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Validação igual ao de Análise de Dados
+                    if (!validateAnaliseDadosFields()) {
+                      return
+                    }
+                    setShowDesenvolvimentosModal(false)
+                  }}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Salvar e Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowDesenvolvimentosModal(false)
+                    }
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Cadastro de Consultoria */}
+        {showConsultoriaModal && formData.serviceType === 'CONSULTORIA' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Informações de Consultoria</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowConsultoriaModal(false)
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Tipo de Contratação - Primeiro campo */}
+                <div>
+                  <label htmlFor="tipoContratacaoConsultoria" className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Contratação *
+                  </label>
+                  <select
+                    id="tipoContratacaoConsultoria"
+                    value={formData.tipoContratacao}
+                    onChange={(e) => {
+                      const newTipo = e.target.value
+                      setFormData({ 
+                        ...formData, 
+                        tipoContratacao: newTipo,
+                        parcelas: [],
+                        quantidadeParcelas: '',
+                        // Ajustar forma de faturamento conforme tipo
+                        formaFaturamento: newTipo === 'FIXO_RECORRENTE' ? 'MENSAL' : (newTipo === 'HORAS' ? 'ONESHOT' : formData.formaFaturamento || 'ONESHOT')
+                      })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="FIXO_RECORRENTE">Fixo Recorrente</option>
+                    <option value="HORAS">Por Horas</option>
+                    <option value="PROJETO">Por Projeto</option>
+                  </select>
+                </div>
+
+                {/* Campos para Fixo Recorrente */}
+                {formData.tipoContratacao === 'FIXO_RECORRENTE' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="valorPropostaConsultoriaFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Valor da Proposta *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                          <input
+                            type="text"
+                            id="valorPropostaConsultoriaFR"
+                            value={formData.valorProposta}
+                            onChange={(e) => {
+                              const formatted = formatCurrency(e.target.value)
+                              setFormData({ ...formData, valorProposta: formatted })
+                            }}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="0,00"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="horasEstimadasConsultoriaFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Horas Estimadas
+                        </label>
+                        <input
+                          type="text"
+                          id="horasEstimadasConsultoriaFR"
+                          value={formData.horasEstimadas}
+                          onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Ex: 40h, 1h30min, 50 horas"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Formato: 40h, 1h30min, 50 horas, etc.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="formaFaturamentoConsultoriaFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Forma de Faturamento
+                        </label>
+                        <input
+                          type="text"
+                          id="formaFaturamentoConsultoriaFR"
+                          value="Mensal"
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Fixo para Fixo Recorrente</p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioConsultoriaFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioConsultoriaFR"
+                          value={formData.inicio}
+                          onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioFaturamentoConsultoriaFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início de Faturamento *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioFaturamentoConsultoriaFR"
+                          value={formData.inicioFaturamento}
+                          onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="vencimentoConsultoriaFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Vencimento *
+                        </label>
+                        <input
+                          type="date"
+                          id="vencimentoConsultoriaFR"
+                          value={formData.vencimento}
+                          onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quantidade de Parcelas para Fixo Recorrente */}
+                    <div>
+                      <label htmlFor="quantidadeParcelasConsultoriaFR" className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantas parcelas deseja provisionar? *
+                      </label>
+                      <input
+                        type="number"
+                        id="quantidadeParcelasConsultoriaFR"
+                        min="1"
+                        value={formData.quantidadeParcelas}
+                        onChange={handleQuantidadeParcelasChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite a quantidade de parcelas"
+                        required
+                      />
+                    </div>
+
+                    {/* Lista de Parcelas para Fixo Recorrente */}
+                    {formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Campos para Por Horas */}
+                {formData.tipoContratacao === 'HORAS' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="valorPorHoraConsultoria" className="block text-sm font-medium text-gray-700 mb-2">
+                          Valor da Hora *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                          <input
+                            type="text"
+                            id="valorPorHoraConsultoria"
+                            value={formData.valorPorHora}
+                            onChange={(e) => {
+                              const formatted = formatCurrency(e.target.value)
+                              setFormData({ ...formData, valorPorHora: formatted })
+                            }}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="0,00"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="horasEstimadasConsultoriaH" className="block text-sm font-medium text-gray-700 mb-2">
+                          Horas Estimadas
+                        </label>
+                        <input
+                          type="text"
+                          id="horasEstimadasConsultoriaH"
+                          value={formData.horasEstimadas}
+                          onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Ex: 40h, 1h30min, 50 horas"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Formato: 40h, 1h30min, 50 horas, etc.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioConsultoriaH" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioConsultoriaH"
+                          value={formData.inicio}
+                          onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioFaturamentoConsultoriaH" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início de Faturamento *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioFaturamentoConsultoriaH"
+                          value={formData.inicioFaturamento}
+                          onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="vencimentoConsultoriaH" className="block text-sm font-medium text-gray-700 mb-2">
+                          Vencimento *
+                        </label>
+                        <input
+                          type="date"
+                          id="vencimentoConsultoriaH"
+                          value={formData.vencimento}
+                          onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quantidade de Parcelas para Por Horas */}
+                    <div>
+                      <label htmlFor="quantidadeParcelasConsultoriaH" className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantas parcelas deseja provisionar? *
+                      </label>
+                      <input
+                        type="number"
+                        id="quantidadeParcelasConsultoriaH"
+                        min="1"
+                        value={formData.quantidadeParcelas}
+                        onChange={handleQuantidadeParcelasChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite a quantidade de parcelas"
+                        required
+                      />
+                    </div>
+
+                    {/* Lista de Parcelas para Por Horas */}
+                    {formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Campos para Por Projeto */}
+                {formData.tipoContratacao === 'PROJETO' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="valorPropostaConsultoriaP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Valor da Proposta *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                          <input
+                            type="text"
+                            id="valorPropostaConsultoriaP"
+                            value={formData.valorProposta}
+                            onChange={(e) => {
+                              const formatted = formatCurrency(e.target.value)
+                              setFormData({ ...formData, valorProposta: formatted })
+                            }}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="0,00"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="horasEstimadasConsultoriaP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Horas Estimadas
+                        </label>
+                        <input
+                          type="text"
+                          id="horasEstimadasConsultoriaP"
+                          value={formData.horasEstimadas}
+                          onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Ex: 40h, 1h30min, 50 horas"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Formato: 40h, 1h30min, 50 horas, etc.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="formaFaturamentoConsultoriaP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Forma de Faturamento *
+                        </label>
+                        <select
+                          id="formaFaturamentoConsultoriaP"
+                          value={formData.formaFaturamento}
+                          onChange={(e) => {
+                            setFormData({ 
+                              ...formData, 
+                              formaFaturamento: e.target.value as 'ONESHOT' | 'PARCELADO',
+                              parcelas: [],
+                              quantidadeParcelas: ''
+                            })
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="ONESHOT">OneShot</option>
+                          <option value="PARCELADO">Parcelado</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioConsultoriaP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioConsultoriaP"
+                          value={formData.inicio}
+                          onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="previsaoConclusaoConsultoriaP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Previsão de Conclusão *
+                        </label>
+                        <input
+                          type="date"
+                          id="previsaoConclusaoConsultoriaP"
+                          value={formData.previsaoConclusao}
+                          onChange={(e) => setFormData({ ...formData, previsaoConclusao: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioFaturamentoConsultoriaP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início do Faturamento *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioFaturamentoConsultoriaP"
+                          value={formData.inicioFaturamento}
+                          onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="vencimentoConsultoriaP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Vencimento *
+                        </label>
+                        <input
+                          type="date"
+                          id="vencimentoConsultoriaP"
+                          value={formData.vencimento}
+                          onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quantidade de Parcelas para Por Projeto (se Parcelado) */}
+                    {formData.formaFaturamento === 'PARCELADO' && (
+                      <div>
+                        <label htmlFor="quantidadeParcelasConsultoriaP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Quantidade de Parcelas *
+                        </label>
+                        <input
+                          type="number"
+                          id="quantidadeParcelasConsultoriaP"
+                          min="1"
+                          value={formData.quantidadeParcelas}
+                          onChange={handleQuantidadeParcelasChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Digite a quantidade de parcelas"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    {/* Lista de Parcelas para Por Projeto (se Parcelado) */}
+                    {formData.formaFaturamento === 'PARCELADO' && formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Pergunta sobre prazos e observações - aparece para todos os tipos */}
+                {formData.tipoContratacao && (
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showValidadePropostaConsultoria}
+                          onChange={(e) => setShowValidadePropostaConsultoria(e.target.checked)}
+                          className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Deseja inserir a validade e observações?
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Campos de Validade da Proposta e Observações - aparecem apenas se selecionado */}
+                {showValidadePropostaConsultoria && formData.tipoContratacao && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                      
+                      <div>
+                        <label htmlFor="dataValidadeConsultoria" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data de Validade da Proposta
+                        </label>
+                        <input
+                          type="date"
+                          id="dataValidadeConsultoria"
+                          value={formData.dataValidade}
+                          onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="dataLimiteAceiteConsultoria" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data Limite para Aceite
+                        </label>
+                        <input
+                          type="date"
+                          id="dataLimiteAceiteConsultoria"
+                          value={formData.dataLimiteAceite}
+                          onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                      </div>
+                    </div>
+
+                    {/* Campo de Observações */}
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+                      <div>
+                        <label htmlFor="observacoesConsultoria" className="block text-sm font-medium text-gray-700 mb-2">
+                          Observações Específicas
+                        </label>
+                        <textarea
+                          id="observacoesConsultoria"
+                          value={formData.observacoes}
+                          onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Digite observações relevantes que serão incluídas no PDF da proposta..."
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Essas observações serão incluídas no PDF da proposta</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botões do modal */}
+              <div className="flex justify-end gap-4 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Validação básica antes de fechar
+                    if (!formData.tipoContratacao) {
+                      alert('Selecione o Tipo de Contratação')
+                      return
+                    }
+                    if (formData.tipoContratacao === 'FIXO_RECORRENTE') {
+                      if (!formData.valorProposta || getValorAsNumber(formData.valorProposta) === 0) {
+                        alert('Preencha o Valor da Proposta')
+                        return
+                      }
+                      if (!formData.inicio) {
+                        alert('Preencha o Início')
+                        return
+                      }
+                      if (!formData.inicioFaturamento) {
+                        alert('Preencha o Início de Faturamento')
+                        return
+                      }
+                      if (!formData.vencimento) {
+                        alert('Preencha o Vencimento')
+                        return
+                      }
+                      if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+                        alert('Informe a quantidade de parcelas')
+                        return
+                      }
+                    } else if (formData.tipoContratacao === 'HORAS') {
+                      if (!formData.valorPorHora || getValorAsNumber(formData.valorPorHora) === 0) {
+                        alert('Preencha o Valor da Hora')
+                        return
+                      }
+                      if (!formData.inicio) {
+                        alert('Preencha o Início')
+                        return
+                      }
+                      if (!formData.inicioFaturamento) {
+                        alert('Preencha o Início de Faturamento')
+                        return
+                      }
+                      if (!formData.vencimento) {
+                        alert('Preencha o Vencimento')
+                        return
+                      }
+                      if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+                        alert('Informe a quantidade de parcelas')
+                        return
+                      }
+                    } else if (formData.tipoContratacao === 'PROJETO') {
+                      if (!formData.valorProposta || getValorAsNumber(formData.valorProposta) === 0) {
+                        alert('Preencha o Valor da Proposta')
+                        return
+                      }
+                      if (!formData.formaFaturamento) {
+                        alert('Selecione a Forma de Faturamento')
+                        return
+                      }
+                      if (!formData.inicio) {
+                        alert('Preencha o Início')
+                        return
+                      }
+                      if (!formData.previsaoConclusao) {
+                        alert('Preencha a Previsão de Conclusão')
+                        return
+                      }
+                      if (!formData.inicioFaturamento) {
+                        alert('Preencha o Início do Faturamento')
+                        return
+                      }
+                      if (!formData.vencimento) {
+                        alert('Preencha o Vencimento')
+                        return
+                      }
+                      if (formData.formaFaturamento === 'PARCELADO') {
+                        if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+                          alert('Informe a quantidade de parcelas')
+                          return
+                        }
+                        if (formData.parcelas.length === 0) {
+                          alert('Configure as parcelas')
+                          return
+                        }
+                      }
+                    }
+                    setShowConsultoriaModal(false)
+                  }}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Salvar e Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowConsultoriaModal(false)
+                    }
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Cadastro de Treinamento */}
+        {showTreinamentoModal && formData.serviceType === 'TREINAMENTO' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Informações de Treinamento</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowTreinamentoModal(false)
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Tipo de Contratação - Primeiro campo */}
+                <div>
+                  <label htmlFor="tipoContratacaoTreinamento" className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Contratação *
+                  </label>
+                  <select
+                    id="tipoContratacaoTreinamento"
+                    value={formData.tipoContratacao}
+                    onChange={(e) => {
+                      const newTipo = e.target.value
+                      setFormData({ 
+                        ...formData, 
+                        tipoContratacao: newTipo,
+                        parcelas: [],
+                        quantidadeParcelas: '',
+                        // Ajustar forma de faturamento conforme tipo
+                        formaFaturamento: newTipo === 'FIXO_RECORRENTE' ? 'MENSAL' : (newTipo === 'HORAS' ? 'ONESHOT' : formData.formaFaturamento || 'ONESHOT')
+                      })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="FIXO_RECORRENTE">Fixo Recorrente</option>
+                    <option value="HORAS">Por Horas</option>
+                    <option value="PROJETO">Por Projeto</option>
+                  </select>
+                </div>
+
+                {/* Campos para Fixo Recorrente */}
+                {formData.tipoContratacao === 'FIXO_RECORRENTE' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="valorPropostaTreinamentoFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Valor da Proposta *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                          <input
+                            type="text"
+                            id="valorPropostaTreinamentoFR"
+                            value={formData.valorProposta}
+                            onChange={(e) => {
+                              const formatted = formatCurrency(e.target.value)
+                              setFormData({ ...formData, valorProposta: formatted })
+                            }}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="0,00"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="horasEstimadasTreinamentoFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Horas Estimadas
+                        </label>
+                        <input
+                          type="text"
+                          id="horasEstimadasTreinamentoFR"
+                          value={formData.horasEstimadas}
+                          onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Ex: 40h, 1h30min, 50 horas"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Formato: 40h, 1h30min, 50 horas, etc.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="formaFaturamentoTreinamentoFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Forma de Faturamento
+                        </label>
+                        <input
+                          type="text"
+                          id="formaFaturamentoTreinamentoFR"
+                          value="Mensal"
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Fixo para Fixo Recorrente</p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioTreinamentoFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioTreinamentoFR"
+                          value={formData.inicio}
+                          onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioFaturamentoTreinamentoFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início de Faturamento *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioFaturamentoTreinamentoFR"
+                          value={formData.inicioFaturamento}
+                          onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="vencimentoTreinamentoFR" className="block text-sm font-medium text-gray-700 mb-2">
+                          Vencimento *
+                        </label>
+                        <input
+                          type="date"
+                          id="vencimentoTreinamentoFR"
+                          value={formData.vencimento}
+                          onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quantidade de Parcelas para Fixo Recorrente */}
+                    <div>
+                      <label htmlFor="quantidadeParcelasTreinamentoFR" className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantas parcelas deseja provisionar? *
+                      </label>
+                      <input
+                        type="number"
+                        id="quantidadeParcelasTreinamentoFR"
+                        min="1"
+                        value={formData.quantidadeParcelas}
+                        onChange={handleQuantidadeParcelasChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite a quantidade de parcelas"
+                        required
+                      />
+                    </div>
+
+                    {/* Lista de Parcelas para Fixo Recorrente */}
+                    {formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Campos para Por Horas */}
+                {formData.tipoContratacao === 'HORAS' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="valorPorHoraTreinamento" className="block text-sm font-medium text-gray-700 mb-2">
+                          Valor da Hora *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                          <input
+                            type="text"
+                            id="valorPorHoraTreinamento"
+                            value={formData.valorPorHora}
+                            onChange={(e) => {
+                              const formatted = formatCurrency(e.target.value)
+                              setFormData({ ...formData, valorPorHora: formatted })
+                            }}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="0,00"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="horasEstimadasTreinamentoH" className="block text-sm font-medium text-gray-700 mb-2">
+                          Horas Estimadas
+                        </label>
+                        <input
+                          type="text"
+                          id="horasEstimadasTreinamentoH"
+                          value={formData.horasEstimadas}
+                          onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Ex: 40h, 1h30min, 50 horas"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Formato: 40h, 1h30min, 50 horas, etc.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioTreinamentoH" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioTreinamentoH"
+                          value={formData.inicio}
+                          onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioFaturamentoTreinamentoH" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início de Faturamento *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioFaturamentoTreinamentoH"
+                          value={formData.inicioFaturamento}
+                          onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="vencimentoTreinamentoH" className="block text-sm font-medium text-gray-700 mb-2">
+                          Vencimento *
+                        </label>
+                        <input
+                          type="date"
+                          id="vencimentoTreinamentoH"
+                          value={formData.vencimento}
+                          onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quantidade de Parcelas para Por Horas */}
+                    <div>
+                      <label htmlFor="quantidadeParcelasTreinamentoH" className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantas parcelas deseja provisionar? *
+                      </label>
+                      <input
+                        type="number"
+                        id="quantidadeParcelasTreinamentoH"
+                        min="1"
+                        value={formData.quantidadeParcelas}
+                        onChange={handleQuantidadeParcelasChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite a quantidade de parcelas"
+                        required
+                      />
+                    </div>
+
+                    {/* Lista de Parcelas para Por Horas */}
+                    {formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Campos para Por Projeto */}
+                {formData.tipoContratacao === 'PROJETO' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="valorPropostaTreinamentoP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Valor da Proposta *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                          <input
+                            type="text"
+                            id="valorPropostaTreinamentoP"
+                            value={formData.valorProposta}
+                            onChange={(e) => {
+                              const formatted = formatCurrency(e.target.value)
+                              setFormData({ ...formData, valorProposta: formatted })
+                            }}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="0,00"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="horasEstimadasTreinamentoP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Horas Estimadas
+                        </label>
+                        <input
+                          type="text"
+                          id="horasEstimadasTreinamentoP"
+                          value={formData.horasEstimadas}
+                          onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Ex: 40h, 1h30min, 50 horas"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Formato: 40h, 1h30min, 50 horas, etc.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="formaFaturamentoTreinamentoP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Forma de Faturamento *
+                        </label>
+                        <select
+                          id="formaFaturamentoTreinamentoP"
+                          value={formData.formaFaturamento}
+                          onChange={(e) => {
+                            setFormData({ 
+                              ...formData, 
+                              formaFaturamento: e.target.value as 'ONESHOT' | 'PARCELADO',
+                              parcelas: [],
+                              quantidadeParcelas: ''
+                            })
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="ONESHOT">OneShot</option>
+                          <option value="PARCELADO">Parcelado</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioTreinamentoP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioTreinamentoP"
+                          value={formData.inicio}
+                          onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="previsaoConclusaoTreinamentoP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Previsão de Conclusão *
+                        </label>
+                        <input
+                          type="date"
+                          id="previsaoConclusaoTreinamentoP"
+                          value={formData.previsaoConclusao}
+                          onChange={(e) => setFormData({ ...formData, previsaoConclusao: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="inicioFaturamentoTreinamentoP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Início do Faturamento *
+                        </label>
+                        <input
+                          type="date"
+                          id="inicioFaturamentoTreinamentoP"
+                          value={formData.inicioFaturamento}
+                          onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="vencimentoTreinamentoP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Vencimento *
+                        </label>
+                        <input
+                          type="date"
+                          id="vencimentoTreinamentoP"
+                          value={formData.vencimento}
+                          onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quantidade de Parcelas para Por Projeto (se Parcelado) */}
+                    {formData.formaFaturamento === 'PARCELADO' && (
+                      <div>
+                        <label htmlFor="quantidadeParcelasTreinamentoP" className="block text-sm font-medium text-gray-700 mb-2">
+                          Quantidade de Parcelas *
+                        </label>
+                        <input
+                          type="number"
+                          id="quantidadeParcelasTreinamentoP"
+                          min="1"
+                          value={formData.quantidadeParcelas}
+                          onChange={handleQuantidadeParcelasChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Digite a quantidade de parcelas"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    {/* Lista de Parcelas para Por Projeto (se Parcelado) */}
+                    {formData.formaFaturamento === 'PARCELADO' && formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Pergunta sobre prazos e observações - aparece para todos os tipos */}
+                {formData.tipoContratacao && (
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showValidadePropostaTreinamento}
+                          onChange={(e) => setShowValidadePropostaTreinamento(e.target.checked)}
+                          className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Deseja inserir a validade e observações?
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Campos de Validade da Proposta e Observações - aparecem apenas se selecionado */}
+                {showValidadePropostaTreinamento && formData.tipoContratacao && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                      
+                      <div>
+                        <label htmlFor="dataValidadeTreinamento" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data de Validade da Proposta
+                        </label>
+                        <input
+                          type="date"
+                          id="dataValidadeTreinamento"
+                          value={formData.dataValidade}
+                          onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="dataLimiteAceiteTreinamento" className="block text-sm font-medium text-gray-700 mb-2">
+                          Data Limite para Aceite
+                        </label>
+                        <input
+                          type="date"
+                          id="dataLimiteAceiteTreinamento"
+                          value={formData.dataLimiteAceite}
+                          onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                      </div>
+                    </div>
+
+                    {/* Campo de Observações */}
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+                      <div>
+                        <label htmlFor="observacoesTreinamento" className="block text-sm font-medium text-gray-700 mb-2">
+                          Observações Específicas
+                        </label>
+                        <textarea
+                          id="observacoesTreinamento"
+                          value={formData.observacoes}
+                          onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                          rows={6}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          placeholder="Digite observações relevantes que serão incluídas no PDF da proposta..."
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Essas observações serão incluídas no PDF da proposta</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botões do modal */}
+              <div className="flex justify-end gap-4 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Validação básica antes de fechar (igual ao de Consultoria)
+                    if (!formData.tipoContratacao) {
+                      alert('Selecione o Tipo de Contratação')
+                      return
+                    }
+                    if (formData.tipoContratacao === 'FIXO_RECORRENTE') {
+                      if (!formData.valorProposta || getValorAsNumber(formData.valorProposta) === 0) {
+                        alert('Preencha o Valor da Proposta')
+                        return
+                      }
+                      if (!formData.inicio) {
+                        alert('Preencha o Início')
+                        return
+                      }
+                      if (!formData.inicioFaturamento) {
+                        alert('Preencha o Início de Faturamento')
+                        return
+                      }
+                      if (!formData.vencimento) {
+                        alert('Preencha o Vencimento')
+                        return
+                      }
+                      if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+                        alert('Informe a quantidade de parcelas')
+                        return
+                      }
+                    } else if (formData.tipoContratacao === 'HORAS') {
+                      if (!formData.valorPorHora || getValorAsNumber(formData.valorPorHora) === 0) {
+                        alert('Preencha o Valor da Hora')
+                        return
+                      }
+                      if (!formData.inicio) {
+                        alert('Preencha o Início')
+                        return
+                      }
+                      if (!formData.inicioFaturamento) {
+                        alert('Preencha o Início de Faturamento')
+                        return
+                      }
+                      if (!formData.vencimento) {
+                        alert('Preencha o Vencimento')
+                        return
+                      }
+                      if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+                        alert('Informe a quantidade de parcelas')
+                        return
+                      }
+                    } else if (formData.tipoContratacao === 'PROJETO') {
+                      if (!formData.valorProposta || getValorAsNumber(formData.valorProposta) === 0) {
+                        alert('Preencha o Valor da Proposta')
+                        return
+                      }
+                      if (!formData.formaFaturamento) {
+                        alert('Selecione a Forma de Faturamento')
+                        return
+                      }
+                      if (!formData.inicio) {
+                        alert('Preencha o Início')
+                        return
+                      }
+                      if (!formData.previsaoConclusao) {
+                        alert('Preencha a Previsão de Conclusão')
+                        return
+                      }
+                      if (!formData.inicioFaturamento) {
+                        alert('Preencha o Início do Faturamento')
+                        return
+                      }
+                      if (!formData.vencimento) {
+                        alert('Preencha o Vencimento')
+                        return
+                      }
+                      if (formData.formaFaturamento === 'PARCELADO') {
+                        if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+                          alert('Informe a quantidade de parcelas')
+                          return
+                        }
+                        if (formData.parcelas.length === 0) {
+                          alert('Configure as parcelas')
+                          return
+                        }
+                      }
+                    }
+                    setShowTreinamentoModal(false)
+                  }}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Salvar e Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowTreinamentoModal(false)
+                    }
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal: Cadastro de Assinaturas */}
         {showAssinaturasModal && formData.serviceType === 'ASSINATURAS' && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -2763,24 +4748,6 @@ export default function NovaNegociacaoPage() {
                     setFormData((prev) => ({ ...prev, [field]: value }))
                   }}
                 />
-              </div>
-
-              {/* Campo Horas Estimadas */}
-              <div className="mb-6">
-                <label htmlFor="horasEstimadasAssinaturas" className="block text-sm font-medium text-gray-700 mb-2">
-                  Horas Estimadas
-                </label>
-                <input
-                  type="text"
-                  id="horasEstimadasAssinaturas"
-                  value={formData.horasEstimadas}
-                  onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Ex: 40h, 1h30min, 50 horas"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Formato: 40h, 1h30min, 50 horas, etc.
-                </p>
               </div>
 
               {/* Pergunta sobre prazos e observações */}

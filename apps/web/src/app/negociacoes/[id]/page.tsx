@@ -747,20 +747,93 @@ export default function NegotiationDetailsPage() {
     console.log('handleConfirmCloseNegotiation - tipo de parcelas:', typeof negotiation.parcelas)
     console.log('handleConfirmCloseNegotiation - isArray:', Array.isArray(negotiation.parcelas))
     
-    // Se parcelas é string (JSON), fazer parse
-    let parcelasArray = negotiation.parcelas
-    if (typeof negotiation.parcelas === 'string') {
-      try {
-        parcelasArray = JSON.parse(negotiation.parcelas)
-        console.log('Parcelas parseadas:', parcelasArray)
-      } catch (e) {
-        console.error('Erro ao fazer parse das parcelas:', e)
-        parcelasArray = []
+    // Lógica especial para ASSINATURAS e MANUTENCOES
+    if (negotiation.serviceType === 'ASSINATURAS' || negotiation.serviceType === 'MANUTENCOES') {
+      const inicioFaturamento = negotiation.inicioFaturamento || negotiation.dataFaturamento || negotiation.dataInicioAssinatura || negotiation.dataInicioManutencao
+      const dataRenovacao = negotiation.serviceType === 'ASSINATURAS' 
+        ? negotiation.vencimentoAssinatura 
+        : negotiation.vencimentoManutencao
+      
+      if (!inicioFaturamento || !dataRenovacao) {
+        alert('É necessário preencher o Início do Faturamento e a Data de Renovação para provisionar as parcelas.')
+        return
       }
-    }
-    
-    // Se a negociação tem parcelas salvas, usar essas
-    if (parcelasArray && Array.isArray(parcelasArray) && parcelasArray.length > 0) {
+      
+      // Obter valor mensal
+      let valorMensal = 0
+      if (negotiation.serviceType === 'ASSINATURAS') {
+        // Para ASSINATURAS, calcular a partir de quantidadeUsuarios * valorUnitarioUsuario ou usar valorProposta
+        if (negotiation.quantidadeUsuarios && negotiation.valorUnitarioUsuario) {
+          valorMensal = (negotiation.quantidadeUsuarios || 0) * (getValorAsNumber(negotiation.valorUnitarioUsuario) || 0)
+        } else {
+          valorMensal = getValorAsNumber(negotiation.valorProposta) || 
+                       getValorAsNumber(negotiation.valorTotal) || 0
+        }
+      } else {
+        // Para MANUTENCOES, usar valorMensalManutencao ou valorProposta
+        valorMensal = getValorAsNumber(negotiation.valorMensalManutencao) || 
+                     getValorAsNumber(negotiation.valorProposta) || 
+                     getValorAsNumber(negotiation.valorTotal) || 0
+      }
+      
+      if (valorMensal === 0) {
+        alert('É necessário preencher o valor mensal para provisionar as parcelas.')
+        return
+      }
+      
+      // Calcular número de meses entre início do faturamento e data de renovação (incluindo o mês de renovação)
+      const inicio = new Date(inicioFaturamento)
+      const renovacao = new Date(dataRenovacao)
+      
+      // Ajustar para o primeiro dia do mês para cálculo correto
+      const inicioMes = new Date(inicio.getFullYear(), inicio.getMonth(), 1)
+      const renovacaoMes = new Date(renovacao.getFullYear(), renovacao.getMonth(), 1)
+      
+      // Calcular diferença em meses (incluindo o mês de renovação)
+      const mesesDiff = (renovacaoMes.getFullYear() - inicioMes.getFullYear()) * 12 + 
+                        (renovacaoMes.getMonth() - inicioMes.getMonth()) + 1
+      
+      // Criar uma parcela por mês
+      for (let i = 0; i < mesesDiff; i++) {
+        const dataFaturamento = new Date(inicioMes)
+        dataFaturamento.setMonth(dataFaturamento.getMonth() + i)
+        
+        // Vencimento: último dia do mês de faturamento (ou usar campo vencimento se disponível)
+        const dataVencimento = new Date(dataFaturamento.getFullYear(), dataFaturamento.getMonth() + 1, 0)
+        
+        // Se houver campo vencimento na negociação, usar ele como base (adicionar dias ao faturamento)
+        if (negotiation.vencimento && typeof negotiation.vencimento === 'string') {
+          const vencimentoDias = parseInt(negotiation.vencimento) || 30
+          const dataVencimentoAjustada = new Date(dataFaturamento)
+          dataVencimentoAjustada.setDate(dataVencimentoAjustada.getDate() + vencimentoDias)
+          dataVencimento.setTime(dataVencimentoAjustada.getTime())
+        }
+        
+        parcels.push({
+          numero: i + 1,
+          valor: valorMensal,
+          dataFaturamento: dataFaturamento.toISOString().split('T')[0],
+          dataVencimento: dataVencimento.toISOString().split('T')[0],
+          clientId: negotiation.clientId,
+        })
+      }
+      
+      console.log('Parcelas criadas para', negotiation.serviceType, ':', parcels.length, 'parcelas')
+    } else {
+      // Se parcelas é string (JSON), fazer parse
+      let parcelasArray = negotiation.parcelas
+      if (typeof negotiation.parcelas === 'string') {
+        try {
+          parcelasArray = JSON.parse(negotiation.parcelas)
+          console.log('Parcelas parseadas:', parcelasArray)
+        } catch (e) {
+          console.error('Erro ao fazer parse das parcelas:', e)
+          parcelasArray = []
+        }
+      }
+      
+      // Se a negociação tem parcelas salvas, usar essas
+      if (parcelasArray && Array.isArray(parcelasArray) && parcelasArray.length > 0) {
       console.log('Usando parcelas da negociação:', parcelasArray.length, 'parcelas')
       parcels = parcelasArray.map((parcela: any, index: number) => ({
         numero: parcela.numero || index + 1,
