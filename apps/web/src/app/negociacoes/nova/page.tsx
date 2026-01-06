@@ -528,6 +528,32 @@ export default function NovaNegociacaoPage() {
         }
       }
 
+      // Campos específicos para Assinaturas
+      if (formData.serviceType === 'ASSINATURAS') {
+        payload.tipoProdutoAssinado = formData.tipoProdutoAssinado
+        payload.quantidadeUsuarios = formData.quantidadeUsuarios ? parseInt(formData.quantidadeUsuarios.toString()) : null
+        const valorUnitarioNumber = getValorAsNumber(formData.valorUnitarioUsuario)
+        if (valorUnitarioNumber !== null) {
+          payload.valorUnitarioUsuario = valorUnitarioNumber
+        }
+        payload.dataInicioAssinatura = formData.dataInicioAssinatura
+        payload.vencimentoAssinatura = formData.vencimentoAssinatura
+        payload.inicioFaturamento = formData.inicioFaturamento
+        payload.vencimento = formData.vencimento
+        // Calcular valor total se não foi preenchido
+        if (!formData.valorProposta && formData.quantidadeUsuarios && formData.valorUnitarioUsuario) {
+          const quantidade = parseInt(formData.quantidadeUsuarios.toString()) || 0
+          const valorUnitario = valorUnitarioNumber || 0
+          const valorTotal = quantidade * valorUnitario
+          payload.valorProposta = valorTotal
+        } else {
+          const valorPropostaNumber = getValorAsNumber(formData.valorProposta)
+          if (valorPropostaNumber !== null) {
+            payload.valorProposta = valorPropostaNumber
+          }
+        }
+      }
+
       // Campos específicos para Migração de Dados
       if (formData.serviceType === 'MIGRACAO_DADOS') {
         payload.sistemaOrigem = formData.sistemaOrigem
@@ -581,8 +607,8 @@ export default function NovaNegociacaoPage() {
 
       const response = await api.post('/negotiations', payload)
       const negotiationId = response.data.id
-      setSavedNegotiationId(negotiationId)
-      alert('Negociação criada com sucesso! Continue preenchendo os dados abaixo.')
+      // Redirecionar para a página de detalhes da negociação
+      router.push(`/negociacoes/${negotiationId}`)
     } catch (error: any) {
       console.error('Erro ao criar negociação:', error)
       alert(error.response?.data?.message || 'Erro ao criar negociação')
@@ -629,6 +655,12 @@ export default function NovaNegociacaoPage() {
         dataValidade: formData.dataValidade || null,
         dataLimiteAceite: formData.dataLimiteAceite || null,
         observacoes: formData.observacoes || null,
+        // Campos específicos para Assinaturas
+        tipoProdutoAssinado: formData.tipoProdutoAssinado,
+        quantidadeUsuarios: formData.quantidadeUsuarios ? parseInt(formData.quantidadeUsuarios.toString()) : null,
+        valorUnitarioUsuario: getValorAsNumber(formData.valorUnitarioUsuario),
+        dataInicioAssinatura: formData.dataInicioAssinatura,
+        vencimentoAssinatura: formData.vencimentoAssinatura,
         // Campos específicos para Migração de Dados
         sistemaOrigem: formData.sistemaOrigem,
         sistemaDestino: formData.sistemaDestino,
@@ -1077,6 +1109,87 @@ export default function NovaNegociacaoPage() {
   const handleCloseAnaliseDadosModal = () => {
     if (validateAnaliseDadosFields()) {
       setShowAnaliseDadosModal(false)
+    }
+  }
+
+  const handleCloseAssinaturasModal = async () => {
+    try {
+      setLoading(true)
+      // Se a negociação já foi salva, atualizar
+      if (savedNegotiationId) {
+        await handleUpdateNegotiation()
+        setShowAssinaturasModal(false)
+        setShowValidadeProposta(false)
+      } else {
+        // Se ainda não foi salva, criar primeiro
+        const companyId = getCompanyIdFromToken()
+        const userId = getUserIdFromToken()
+        
+        if (!companyId || !userId) {
+          alert('Erro: Não foi possível identificar a empresa ou usuário. Faça login novamente.')
+          router.push('/auth/login')
+          return
+        }
+
+        const payload: any = {
+          clientId: formData.clientId,
+          companyId: companyId,
+          userId: userId,
+          title: formData.serviceType,
+          serviceType: formData.serviceType,
+          status: 'RASCUNHO',
+        }
+
+        // Campos de validade e observações
+        if (formData.dataValidade) {
+          payload.dataValidade = formData.dataValidade
+        }
+        if (formData.dataLimiteAceite) {
+          payload.dataLimiteAceite = formData.dataLimiteAceite
+        }
+        if (formData.observacoes) {
+          payload.observacoes = formData.observacoes
+        }
+
+        // Campos específicos para Assinaturas
+        if (formData.serviceType === 'ASSINATURAS') {
+          payload.tipoProdutoAssinado = formData.tipoProdutoAssinado
+          payload.quantidadeUsuarios = formData.quantidadeUsuarios ? parseInt(formData.quantidadeUsuarios.toString()) : null
+          const valorUnitarioNumber = getValorAsNumber(formData.valorUnitarioUsuario)
+          if (valorUnitarioNumber !== null) {
+            payload.valorUnitarioUsuario = valorUnitarioNumber
+          }
+          payload.dataInicioAssinatura = formData.dataInicioAssinatura
+          payload.vencimentoAssinatura = formData.vencimentoAssinatura
+          payload.inicioFaturamento = formData.inicioFaturamento
+          payload.vencimento = formData.vencimento
+          // Calcular valor total se não foi preenchido
+          if (!formData.valorProposta && formData.quantidadeUsuarios && formData.valorUnitarioUsuario) {
+            const quantidade = parseInt(formData.quantidadeUsuarios.toString()) || 0
+            const valorUnitario = valorUnitarioNumber || 0
+            const valorTotal = quantidade * valorUnitario
+            payload.valorProposta = valorTotal
+          } else {
+            const valorPropostaNumber = getValorAsNumber(formData.valorProposta)
+            if (valorPropostaNumber !== null) {
+              payload.valorProposta = valorPropostaNumber
+            }
+          }
+        }
+
+        const response = await api.post('/negotiations', payload)
+        const negotiationId = response.data.id
+        setSavedNegotiationId(negotiationId)
+        setShowAssinaturasModal(false)
+        setShowValidadeProposta(false)
+        // Redirecionar para a página de detalhes
+        router.push(`/negociacoes/${negotiationId}`)
+      }
+    } catch (error: any) {
+      console.error('Erro ao salvar negociação:', error)
+      alert(error.response?.data?.message || 'Erro ao salvar negociação')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1544,504 +1657,7 @@ export default function NovaNegociacaoPage() {
             />
           )}
 
-          {/* Opção de Template (após criar) */}
-          {savedNegotiationId && useTemplate === null && (
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Como deseja preencher os dados?</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setUseTemplate(true)}
-                  className="p-6 border-2 border-primary-600 rounded-lg hover:bg-primary-50 transition-colors text-left"
-                >
-                  <div className="text-2xl mb-2">📋</div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Usar Template</h4>
-                  <p className="text-sm text-gray-600">Preencher automaticamente usando um template salvo</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUseTemplate(false)}
-                  className="p-6 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-left"
-                >
-                  <div className="text-2xl mb-2">✏️</div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Inserir Manualmente</h4>
-                  <p className="text-sm text-gray-600">Preencher os campos manualmente</p>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Seleção de Template */}
-          {savedNegotiationId && useTemplate === true && (
-            <div className="border-t border-gray-200 pt-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Selecione um Template</h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedTemplateId('')
-                    setUseTemplate(null)
-                  }}
-                  className="text-sm text-gray-600 hover:text-gray-900 underline"
-                >
-                  ← Voltar e escolher outra opção
-                </button>
-              </div>
-              {proposalTemplates.length === 0 ? (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-sm text-yellow-800">
-                    Nenhum template disponível. Você pode criar templates na seção de Administração.
-                  </p>
-                  <div className="mt-4 flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setUseTemplate(false)}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                    >
-                      Inserir Manualmente
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUseTemplate(null)
-                      }}
-                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                    >
-                      Voltar
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">Selecione um template...</option>
-                    {proposalTemplates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedTemplateId && (
-                    <div className="flex gap-4">
-                      <button
-                        type="button"
-                        onClick={handleApplyTemplate}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                      >
-                        Aplicar Template
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTemplateId('')
-                          setUseTemplate(false)
-                        }}
-                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                      >
-                        Inserir Manualmente
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTemplateId('')
-                          setUseTemplate(null)
-                        }}
-                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                      >
-                        Voltar
-                      </button>
-                    </div>
-                  )}
-                  {!selectedTemplateId && (
-                    <div className="flex gap-4">
-                      <button
-                        type="button"
-                        onClick={() => setUseTemplate(false)}
-                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                      >
-                        Inserir Manualmente
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Campos para preenchimento manual */}
-          {savedNegotiationId && useTemplate === false && (
-            <div className="border-t border-gray-200 pt-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Preenchendo Manualmente</h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUseTemplate(null)
-                  }}
-                  className="text-sm text-gray-600 hover:text-gray-900 underline"
-                >
-                  ← Voltar e escolher outra opção
-                </button>
-              </div>
-              
-              <div className="space-y-6 mt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Valor da Proposta */}
-                  <div>
-                    <label htmlFor="valorProposta" className="block text-sm font-medium text-gray-700 mb-2">
-                      Valor da Proposta
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-gray-500">R$</span>
-                      <input
-                        type="text"
-                        id="valorProposta"
-                        value={formData.valorProposta}
-                        onChange={(e) => {
-                          const formatted = formatCurrency(e.target.value)
-                          setFormData({ ...formData, valorProposta: formatted })
-                        }}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="0,00"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Valor por Hora */}
-                  <div>
-                    <label htmlFor="valorPorHora" className="block text-sm font-medium text-gray-700 mb-2">
-                      Valor por Hora
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-gray-500">R$</span>
-                      <input
-                        type="text"
-                        id="valorPorHora"
-                        value={formData.valorPorHora}
-                        onChange={(e) => {
-                          const formatted = formatCurrency(e.target.value)
-                          setFormData({ ...formData, valorPorHora: formatted })
-                        }}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="0,00"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tipo de Contratação */}
-                  <div>
-                    <label htmlFor="tipoContratacao" className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo de Contratação
-                    </label>
-                    <select
-                      id="tipoContratacao"
-                      value={formData.tipoContratacao}
-                      onChange={(e) => {
-                        const newTipo = e.target.value
-                        setFormData({ 
-                          ...formData, 
-                          tipoContratacao: newTipo,
-                          parcelas: [],
-                          quantidadeParcelas: '',
-                          // Limpar forma de faturamento se for Por Horas
-                          formaFaturamento: newTipo === 'HORAS' ? 'ONESHOT' : (newTipo === 'FIXO_RECORRENTE' ? 'MENSAL' : formData.formaFaturamento)
-                        })
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="">Selecione...</option>
-                      <option value="FIXO_RECORRENTE">Fixo Recorrente</option>
-                      <option value="HORAS">Por Horas</option>
-                      <option value="PROJETO">Por Projeto</option>
-                    </select>
-                  </div>
-
-                  {/* Forma de Faturamento */}
-                  {formData.tipoContratacao && formData.tipoContratacao !== 'HORAS' && (
-                    <div>
-                      <label htmlFor="formaFaturamento" className="block text-sm font-medium text-gray-700 mb-2">
-                        Forma de Faturamento
-                      </label>
-                      <select
-                        id="formaFaturamento"
-                        value={formData.formaFaturamento}
-                        onChange={(e) => {
-                          setFormData({ 
-                            ...formData, 
-                            formaFaturamento: e.target.value as 'ONESHOT' | 'PARCELADO' | 'MENSAL',
-                            parcelas: [],
-                            quantidadeParcelas: ''
-                          })
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value="ONESHOT">OneShot</option>
-                        <option value="PARCELADO">Parcelado</option>
-                        {formData.tipoContratacao === 'FIXO_RECORRENTE' && (
-                          <option value="MENSAL">Mensal</option>
-                        )}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Horas Estimadas */}
-                  <div>
-                    <label htmlFor="horasEstimadas" className="block text-sm font-medium text-gray-700 mb-2">
-                      Horas Estimadas
-                    </label>
-                    <input
-                      type="text"
-                      id="horasEstimadas"
-                      value={formData.horasEstimadas}
-                      onChange={(e) => setFormData({ ...formData, horasEstimadas: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="Ex: 40h, 1h30min, 50 horas"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Formato: 40h, 1h30min, 50 horas, etc.
-                    </p>
-                  </div>
-
-                  {/* Início */}
-                  <div>
-                    <label htmlFor="inicio" className="block text-sm font-medium text-gray-700 mb-2">
-                      Início
-                    </label>
-                    <input
-                      type="date"
-                      id="inicio"
-                      value={formData.inicio}
-                      onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
-                  {/* Previsão de Conclusão */}
-                  <div>
-                    <label htmlFor="previsaoConclusao" className="block text-sm font-medium text-gray-700 mb-2">
-                      Previsão de Conclusão
-                    </label>
-                    <input
-                      type="date"
-                      id="previsaoConclusao"
-                      value={formData.previsaoConclusao}
-                      onChange={(e) => setFormData({ ...formData, previsaoConclusao: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
-                  {/* Início de Faturamento */}
-                  <div>
-                    <label htmlFor="inicioFaturamento" className="block text-sm font-medium text-gray-700 mb-2">
-                      Início de Faturamento
-                    </label>
-                    <input
-                      type="date"
-                      id="inicioFaturamento"
-                      value={formData.inicioFaturamento}
-                      onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
-                  {/* Vencimento */}
-                  <div>
-                    <label htmlFor="vencimento" className="block text-sm font-medium text-gray-700 mb-2">
-                      Vencimento
-                    </label>
-                    <input
-                      type="date"
-                      id="vencimento"
-                      value={formData.vencimento}
-                      onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
-                  {/* Sistema de Origem */}
-                  <div>
-                    <label htmlFor="sistemaOrigem" className="block text-sm font-medium text-gray-700 mb-2">
-                      Sistema de Origem
-                    </label>
-                    <input
-                      type="text"
-                      id="sistemaOrigem"
-                      value={formData.sistemaOrigem}
-                      onChange={(e) => setFormData({ ...formData, sistemaOrigem: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="Ex: Sistema antigo"
-                    />
-                  </div>
-
-                  {/* Sistema de Destino */}
-                  <div>
-                    <label htmlFor="sistemaDestino" className="block text-sm font-medium text-gray-700 mb-2">
-                      Sistema de Destino
-                    </label>
-                    <input
-                      type="text"
-                      id="sistemaDestino"
-                      value={formData.sistemaDestino}
-                      onChange={(e) => setFormData({ ...formData, sistemaDestino: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="Ex: Sistema novo"
-                    />
-                  </div>
-
-                  {/* Data de Entrega da Homologação */}
-                  <div>
-                    <label htmlFor="dataEntregaHomologacao" className="block text-sm font-medium text-gray-700 mb-2">
-                      Data para Entrega da Homologação
-                    </label>
-                    <input
-                      type="date"
-                      id="dataEntregaHomologacao"
-                      value={formData.dataEntregaHomologacao}
-                      onChange={(e) => setFormData({ ...formData, dataEntregaHomologacao: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
-                  {/* Data de Entrega da Produção */}
-                  <div>
-                    <label htmlFor="dataEntregaProducao" className="block text-sm font-medium text-gray-700 mb-2">
-                      Data para Entrega da Produção
-                    </label>
-                    <input
-                      type="date"
-                      id="dataEntregaProducao"
-                      value={formData.dataEntregaProducao}
-                      onChange={(e) => setFormData({ ...formData, dataEntregaProducao: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Mensagem para tipo Por Horas */}
-                {formData.tipoContratacao === 'HORAS' && (
-                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>Informação:</strong> O faturamento será gerado a partir do registro de horas trabalhadas.
-                    </p>
-                  </div>
-                )}
-
-                {/* Confirmação para OneShot */}
-                {formData.tipoContratacao && formData.tipoContratacao !== 'HORAS' && formData.formaFaturamento === 'ONESHOT' && formData.valorProposta && formData.inicioFaturamento && formData.vencimento && (
-                  <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h4 className="text-sm font-semibold text-green-900 mb-3">Confirmação de Faturamento</h4>
-                    <div className="space-y-2 text-sm text-green-800">
-                      <p><strong>Valor Total:</strong> {formData.valorProposta}</p>
-                      <p><strong>Data de Faturamento:</strong> {new Date(formData.inicioFaturamento).toLocaleDateString('pt-BR')}</p>
-                      <p><strong>Vencimento:</strong> {new Date(formData.vencimento).toLocaleDateString('pt-BR')}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleUpdateNegotiation}
-                      disabled={loading}
-                      className="mt-4 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400"
-                    >
-                      {loading ? 'Salvando...' : 'Salvar Negociação'}
-                    </button>
-                  </div>
-                )}
-
-                {/* Campos para Parcelado */}
-                {formData.tipoContratacao && formData.tipoContratacao !== 'HORAS' && (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') && (
-                  <div className="mt-6 space-y-4">
-                    <div>
-                      <label htmlFor="quantidadeParcelas" className="block text-sm font-medium text-gray-700 mb-2">
-                        {formData.tipoContratacao === 'PROJETO' ? 'Quantidade de parcelas' : 'Quantas parcelas deseja provisionar?'}
-                      </label>
-                      <input
-                        type="number"
-                        id="quantidadeParcelas"
-                        min="1"
-                        value={formData.quantidadeParcelas}
-                        onChange={handleQuantidadeParcelasChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Digite a quantidade de parcelas"
-                      />
-                    </div>
-
-                    {/* Lista de Parcelas */}
-                    {formData.parcelas.length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
-                        <div className="space-y-3">
-                          {formData.parcelas.map((parcela, index) => (
-                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                  Parcela {parcela.numero}/{formData.parcelas.length}
-                                </label>
-                                <div className="text-sm font-semibold text-gray-700">
-                                  {parcela.numero}/{formData.parcelas.length}
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                  Data de Faturamento
-                                </label>
-                                <input
-                                  type="date"
-                                  value={parcela.dataFaturamento}
-                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                  Vencimento
-                                </label>
-                                <input
-                                  type="date"
-                                  value={parcela.dataVencimento}
-                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                  Valor da Parcela
-                                </label>
-                                <div className="relative">
-                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
-                                  <input
-                                    type="text"
-                                    value={parcela.valor}
-                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
-                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          <div className="pt-2 border-t border-gray-300">
-                            <div className="text-sm font-semibold text-gray-700">
-                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleUpdateNegotiation}
-                          disabled={loading}
-                          className="mt-4 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400"
-                        >
-                          {loading ? 'Salvando...' : 'Salvar Negociação'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Seções de Template e Preenchimento Manual removidas - dados já preenchidos nos modais */}
 
           {/* Botões */}
           <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
@@ -4827,13 +4443,23 @@ export default function NovaNegociacaoPage() {
               <div className="flex justify-end gap-4 mt-6 pt-4 border-t border-gray-200">
                 <button
                   type="button"
+                  onClick={handleCloseAssinaturasModal}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  disabled={loading}
+                >
+                  {loading ? 'Salvando...' : 'Salvar e Fechar'}
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
-                    setShowAssinaturasModal(false)
-                    setShowValidadeProposta(false)
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowAssinaturasModal(false)
+                      setShowValidadeProposta(false)
+                    }
                   }}
                   className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
-                  Fechar
+                  Cancelar
                 </button>
               </div>
             </div>
