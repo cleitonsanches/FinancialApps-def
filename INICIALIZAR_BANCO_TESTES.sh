@@ -75,6 +75,81 @@ if [ "$CONFIRM" != "s" ] && [ "$CONFIRM" != "S" ]; then
 fi
 
 echo ""
+echo "=========================================="
+echo "IMPORTANTE: Verificando Permissões"
+echo "=========================================="
+echo ""
+echo "Antes de inicializar, vamos testar a conexão..."
+echo ""
+
+# Criar script de teste rápido
+cat > /tmp/test-perms.js << 'TESTEOF'
+const sql = require('mssql');
+const config = {
+    server: process.env.DB_HOST,
+    database: process.env.DB_DATABASE,
+    user: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    port: 1433,
+    options: { encrypt: true, trustServerCertificate: false }
+};
+
+sql.connect(config).then(pool => {
+    return pool.request().query(`
+        SELECT 
+            HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE TABLE') as can_create,
+            IS_MEMBER('db_owner') as is_owner,
+            IS_MEMBER('db_ddladmin') as is_ddladmin
+    `);
+}).then(result => {
+    const perms = result.recordset[0];
+    if (perms.can_create || perms.is_owner || perms.is_ddladmin) {
+        console.log('✅ Usuário tem permissões necessárias!');
+        process.exit(0);
+    } else {
+        console.log('❌ Usuário NÃO tem permissão para criar tabelas!');
+        console.log('');
+        console.log('Soluções:');
+        console.log('1. Use o administrador do servidor');
+        console.log('2. Ou adicione o usuário ao role db_owner:');
+        console.log('   ALTER ROLE db_owner ADD MEMBER [seu-usuario];');
+        process.exit(1);
+    }
+}).catch(err => {
+    console.log('❌ Erro ao conectar:', err.message);
+    if (err.code === 'ELOGIN') {
+        console.log('');
+        console.log('Verifique:');
+        console.log('- Credenciais estão corretas?');
+        console.log('- Firewall do Azure permite o IP da VPS?');
+    }
+    process.exit(1);
+});
+TESTEOF
+
+DB_HOST="$DB_HOST" \
+DB_DATABASE="$DB_DATABASE" \
+DB_USERNAME="$DB_USERNAME" \
+DB_PASSWORD="$DB_PASSWORD" \
+node /tmp/test-perms.js
+
+TEST_EXIT=$?
+rm -f /tmp/test-perms.js
+
+if [ $TEST_EXIT -ne 0 ]; then
+    echo ""
+    echo "=========================================="
+    echo "❌ TESTE DE PERMISSÕES FALHOU"
+    echo "=========================================="
+    echo ""
+    echo "Execute o diagnóstico completo:"
+    echo "   sh TESTAR_CONEXAO_BANCO.sh"
+    echo ""
+    echo "Ou veja o guia: CONFIGURAR_PERMISSOES_BANCO.md"
+    exit 1
+fi
+
+echo ""
 echo "Inicializando banco de dados..."
 echo "Isso pode levar alguns minutos..."
 echo ""
