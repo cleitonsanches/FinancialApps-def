@@ -49,6 +49,10 @@ export default function NovaNegociacaoPage() {
   const [showTreinamentoModal, setShowTreinamentoModal] = useState(false)
   const [showValidadePropostaTreinamento, setShowValidadePropostaTreinamento] = useState(false)
   
+  // Estados para Validade e Observações - Manutenções e Migração de Dados
+  const [showValidadePropostaManutencao, setShowValidadePropostaManutencao] = useState(false)
+  const [showValidadePropostaMigracao, setShowValidadePropostaMigracao] = useState(false)
+  
   const [formData, setFormData] = useState({
     clientId: '',
     serviceType: '',
@@ -1643,18 +1647,174 @@ export default function NovaNegociacaoPage() {
 
           {/* Campos específicos por tipo de serviço - Não mostrar ASSINATURAS, ANALISE_DADOS, AUTOMACOES, CONSULTORIA, DESENVOLVIMENTOS e TREINAMENTO aqui, serão nos modais */}
           {formData.serviceType !== 'ASSINATURAS' && formData.serviceType !== 'ANALISE_DADOS' && formData.serviceType !== 'AUTOMACOES' && formData.serviceType !== 'CONSULTORIA' && formData.serviceType !== 'DESENVOLVIMENTOS' && formData.serviceType !== 'TREINAMENTO' && (
-            <ServiceTypeFieldsWrapper
-              serviceType={formData.serviceType}
-              formData={formData}
-              onChange={(field, value) => {
-                setFormData((prev) => ({ ...prev, [field]: value }))
-              }}
-              handleQuantidadeParcelasChange={handleQuantidadeParcelasChange}
-              handleParcelaDataFaturamentoChange={handleParcelaDataFaturamentoChange}
-              handleParcelaDataVencimentoChange={handleParcelaDataVencimentoChange}
-              handleParcelaValorChange={handleParcelaValorChange}
-              getValorAsNumber={getValorAsNumber}
-            />
+            <>
+              <ServiceTypeFieldsWrapper
+                serviceType={formData.serviceType}
+                formData={formData}
+                onChange={(field, value) => {
+                  setFormData((prev) => ({ ...prev, [field]: value }))
+                }}
+                handleQuantidadeParcelasChange={handleQuantidadeParcelasChange}
+                handleParcelaDataFaturamentoChange={handleParcelaDataFaturamentoChange}
+                handleParcelaDataVencimentoChange={handleParcelaDataVencimentoChange}
+                handleParcelaValorChange={handleParcelaValorChange}
+                getValorAsNumber={getValorAsNumber}
+              />
+              
+              {/* Pergunta sobre prazos e observações - Manutenções */}
+              {formData.serviceType === 'MANUTENCOES' && (
+                <>
+                  <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showValidadePropostaManutencao}
+                          onChange={(e) => setShowValidadePropostaManutencao(e.target.checked)}
+                          className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Deseja incluir prazos de validade e observações adicionais na proposta?
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Campos de Validade da Proposta e Observações - aparecem apenas se selecionado */}
+                  {showValidadePropostaManutencao && (
+                    <div className="space-y-4 mb-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                        
+                        <div>
+                          <label htmlFor="dataValidadeManutencao" className="block text-sm font-medium text-gray-700 mb-2">
+                            Data de Validade da Proposta
+                          </label>
+                          <input
+                            type="date"
+                            id="dataValidadeManutencao"
+                            value={formData.dataValidade}
+                            onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                        </div>
+
+                        <div>
+                          <label htmlFor="dataLimiteAceiteManutencao" className="block text-sm font-medium text-gray-700 mb-2">
+                            Data Limite para Aceite
+                          </label>
+                          <input
+                            type="date"
+                            id="dataLimiteAceiteManutencao"
+                            value={formData.dataLimiteAceite}
+                            onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                        </div>
+                      </div>
+
+                      {/* Campo de Observações */}
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+                        <div>
+                          <label htmlFor="observacoesManutencao" className="block text-sm font-medium text-gray-700 mb-2">
+                            Observações Adicionais
+                          </label>
+                          <textarea
+                            id="observacoesManutencao"
+                            value={formData.observacoes}
+                            onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                            rows={6}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Digite observações relevantes que serão incluídas no PDF da proposta..."
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Essas observações serão incluídas no PDF da proposta</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Pergunta sobre prazos e observações - Migração de Dados */}
+              {formData.serviceType === 'MIGRACAO_DADOS' && (
+                <>
+                  <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showValidadePropostaMigracao}
+                          onChange={(e) => setShowValidadePropostaMigracao(e.target.checked)}
+                          className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Deseja incluir prazos de validade e observações adicionais na proposta?
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Campos de Validade da Proposta e Observações - aparecem apenas se selecionado */}
+                  {showValidadePropostaMigracao && (
+                    <div className="space-y-4 mb-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                        
+                        <div>
+                          <label htmlFor="dataValidadeMigracao" className="block text-sm font-medium text-gray-700 mb-2">
+                            Data de Validade da Proposta
+                          </label>
+                          <input
+                            type="date"
+                            id="dataValidadeMigracao"
+                            value={formData.dataValidade}
+                            onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                        </div>
+
+                        <div>
+                          <label htmlFor="dataLimiteAceiteMigracao" className="block text-sm font-medium text-gray-700 mb-2">
+                            Data Limite para Aceite
+                          </label>
+                          <input
+                            type="date"
+                            id="dataLimiteAceiteMigracao"
+                            value={formData.dataLimiteAceite}
+                            onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                        </div>
+                      </div>
+
+                      {/* Campo de Observações */}
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+                        <div>
+                          <label htmlFor="observacoesMigracao" className="block text-sm font-medium text-gray-700 mb-2">
+                            Observações Adicionais
+                          </label>
+                          <textarea
+                            id="observacoesMigracao"
+                            value={formData.observacoes}
+                            onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                            rows={6}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Digite observações relevantes que serão incluídas no PDF da proposta..."
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Essas observações serão incluídas no PDF da proposta</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           )}
 
           {/* Seções de Template e Preenchimento Manual removidas - dados já preenchidos nos modais */}
@@ -1975,7 +2135,7 @@ export default function NovaNegociacaoPage() {
                         className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                       />
                       <span className="text-sm font-medium text-gray-700">
-                        Inserir prazos para a proposta e Observações específicas?
+                        Deseja incluir prazos de validade e observações adicionais na proposta?
                       </span>
                     </label>
                   </div>
@@ -2021,7 +2181,7 @@ export default function NovaNegociacaoPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
                       <div>
                         <label htmlFor="observacoesAnalise" className="block text-sm font-medium text-gray-700 mb-2">
-                          Observações Específicas
+                          Observações Adicionais
                         </label>
                         <textarea
                           id="observacoesAnalise"
@@ -2284,7 +2444,7 @@ export default function NovaNegociacaoPage() {
                         className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                       />
                       <span className="text-sm font-medium text-gray-700">
-                        Inserir prazos para a proposta e Observações específicas?
+                        Deseja incluir prazos de validade e observações adicionais na proposta?
                       </span>
                     </label>
                   </div>
@@ -2330,7 +2490,7 @@ export default function NovaNegociacaoPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
                       <div>
                         <label htmlFor="observacoesAutomacoes" className="block text-sm font-medium text-gray-700 mb-2">
-                          Observações Específicas
+                          Observações Adicionais
                         </label>
                         <textarea
                           id="observacoesAutomacoes"
@@ -2669,7 +2829,7 @@ export default function NovaNegociacaoPage() {
                         className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                       />
                       <span className="text-sm font-medium text-gray-700">
-                        Inserir prazos para a proposta e Observações específicas?
+                        Deseja incluir prazos de validade e observações adicionais na proposta?
                       </span>
                     </label>
                   </div>
@@ -2715,7 +2875,7 @@ export default function NovaNegociacaoPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
                       <div>
                         <label htmlFor="observacoesDesenvolvimentos" className="block text-sm font-medium text-gray-700 mb-2">
-                          Observações Específicas
+                          Observações Adicionais
                         </label>
                         <textarea
                           id="observacoesDesenvolvimentos"
@@ -3376,7 +3536,7 @@ export default function NovaNegociacaoPage() {
                           className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                         />
                         <span className="text-sm font-medium text-gray-700">
-                          Deseja inserir a validade e observações?
+                          Deseja incluir prazos de validade e observações adicionais na proposta?
                         </span>
                       </label>
                     </div>
@@ -3423,7 +3583,7 @@ export default function NovaNegociacaoPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
                       <div>
                         <label htmlFor="observacoesConsultoria" className="block text-sm font-medium text-gray-700 mb-2">
-                          Observações Específicas
+                          Observações Adicionais
                         </label>
                         <textarea
                           id="observacoesConsultoria"
@@ -4163,7 +4323,7 @@ export default function NovaNegociacaoPage() {
                           className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                         />
                         <span className="text-sm font-medium text-gray-700">
-                          Deseja inserir a validade e observações?
+                          Deseja incluir prazos de validade e observações adicionais na proposta?
                         </span>
                       </label>
                     </div>
@@ -4210,7 +4370,7 @@ export default function NovaNegociacaoPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
                       <div>
                         <label htmlFor="observacoesTreinamento" className="block text-sm font-medium text-gray-700 mb-2">
-                          Observações Específicas
+                          Observações Adicionais
                         </label>
                         <textarea
                           id="observacoesTreinamento"
@@ -4377,7 +4537,7 @@ export default function NovaNegociacaoPage() {
                       className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                     />
                     <span className="text-sm font-medium text-gray-700">
-                      Inserir prazos para a proposta e Observações específicas?
+                      Deseja incluir prazos de validade e observações adicionais na proposta?
                     </span>
                   </label>
                 </div>
@@ -4423,7 +4583,7 @@ export default function NovaNegociacaoPage() {
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
                     <div>
                       <label htmlFor="observacoesAssinaturas" className="block text-sm font-medium text-gray-700 mb-2">
-                        Observações Específicas
+                        Observações Adicionais
                       </label>
                       <textarea
                         id="observacoesAssinaturas"
