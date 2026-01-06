@@ -52,10 +52,17 @@ echo "Criando script para as tabelas faltantes usando TypeORM..."
 echo ""
 
 # Criar script Node.js para criar apenas as tabelas faltantes usando TypeORM
+# O script será executado a partir do diretório do projeto para ter acesso ao node_modules
 cat > /tmp/create-missing-tables.js << 'EOF'
+// Mudar para o diretório do projeto para ter acesso ao node_modules
+process.chdir(process.env.PROJECT_DIR || '/var/www/FinancialApps-def');
+
 const { DataSource } = require('typeorm');
-const { TaskComment } = require('../../apps/api/dist/database/entities/task-comment.entity');
-const { AccountPayableHistory } = require('../../apps/api/dist/database/entities/account-payable-history.entity');
+const path = require('path');
+
+// Importar as entidades do build
+const TaskComment = require(path.join(process.cwd(), 'apps/api/dist/database/entities/task-comment.entity')).TaskComment;
+const AccountPayableHistory = require(path.join(process.cwd(), 'apps/api/dist/database/entities/account-payable-history.entity')).AccountPayableHistory;
 
 async function createMissingTables() {
     const dataSource = new DataSource({
@@ -175,8 +182,10 @@ createMissingTables();
 EOF
 
 # Executar o script Node.js a partir do diretório do projeto
+# Isso garante que o node_modules esteja disponível
 cd /var/www/FinancialApps-def
 
+PROJECT_DIR="/var/www/FinancialApps-def" \
 DB_HOST="$DB_HOST" \
 DB_DATABASE="$DB_DATABASE" \
 DB_USERNAME="$DB_USERNAME" \

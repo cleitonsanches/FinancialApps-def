@@ -51,13 +51,18 @@ echo "Criando tabelas usando TypeORM..."
 echo ""
 
 # Criar script Node.js usando TypeORM (mesmo método do init-test-database)
+# O script será executado a partir do diretório do projeto
 cat > /tmp/create-missing-tables-v2.js << 'SCRIPTEOF'
+// Mudar para o diretório do projeto para ter acesso ao node_modules
+const projectDir = process.env.PROJECT_DIR || '/var/www/FinancialApps-def';
+process.chdir(projectDir);
+
 const { DataSource } = require('typeorm');
 const path = require('path');
 
 // Importar apenas as entidades que precisamos
-const TaskComment = require(path.join(process.cwd(), 'apps/api/dist/database/entities/task-comment.entity')).TaskComment;
-const AccountPayableHistory = require(path.join(process.cwd(), 'apps/api/dist/database/entities/account-payable-history.entity')).AccountPayableHistory;
+const TaskComment = require(path.join(projectDir, 'apps/api/dist/database/entities/task-comment.entity')).TaskComment;
+const AccountPayableHistory = require(path.join(projectDir, 'apps/api/dist/database/entities/account-payable-history.entity')).AccountPayableHistory;
 
 async function createMissingTables() {
     const dataSource = new DataSource({
@@ -127,7 +132,10 @@ async function createMissingTables() {
 createMissingTables();
 SCRIPTEOF
 
-# Executar o script
+# Executar o script a partir do diretório do projeto
+cd /var/www/FinancialApps-def
+
+PROJECT_DIR="/var/www/FinancialApps-def" \
 DB_HOST="$DB_HOST" \
 DB_DATABASE="$DB_DATABASE" \
 DB_USERNAME="$DB_USERNAME" \
