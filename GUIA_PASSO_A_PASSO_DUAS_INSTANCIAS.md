@@ -82,8 +82,19 @@ Antes de iniciar a instância de testes, precisamos criar todas as tabelas no ba
 ```bash
 # Fazer build da API primeiro
 npm run build --workspace=apps/api
+```
 
-# Executar script de inicialização do banco de testes
+**Executar script de inicialização do banco de testes:**
+
+#### ⚠️ IMPORTANTE: Como Executar Comandos de Múltiplas Linhas
+
+No Linux, quando você vê um comando com `\` (barra invertida) no final da linha, isso significa que o comando continua na próxima linha. Você tem 3 opções:
+
+**Opção 1: Copiar e Colar Tudo de Uma Vez (Mais Fácil) ✅**
+
+Copie TODO o bloco abaixo e cole de uma vez no terminal:
+
+```bash
 DB_TYPE=mssql \
 DB_HOST=seu-servidor.database.windows.net \
 DB_USERNAME=seu-usuario \
@@ -92,7 +103,45 @@ DB_DATABASE=free-db-financeapp-2 \
 node apps/api/dist/database/init-test-database.js
 ```
 
-**Ou usando npm:**
+**Como fazer:**
+1. Selecione TODO o bloco (incluindo as barras `\`)
+2. Copie (Ctrl+C ou botão direito > Copiar)
+3. Cole no terminal (botão direito > Colar ou Shift+Insert)
+4. Pressione Enter UMA VEZ no final
+
+**Opção 2: Digitar Linha por Linha (Com Backslash)**
+
+Se preferir digitar, digite cada linha e pressione Enter. O terminal mostrará `>` indicando que está esperando mais linhas:
+
+```bash
+DB_TYPE=mssql \
+```
+(Pressione Enter - aparecerá `>` no início da próxima linha)
+
+```bash
+> DB_HOST=seu-servidor.database.windows.net \
+```
+(Pressione Enter novamente)
+
+```bash
+> DB_USERNAME=seu-usuario \
+```
+(Continue até a última linha SEM o `\`)
+
+```bash
+> node apps/api/dist/database/init-test-database.js
+```
+(Pressione Enter - AGORA o comando será executado)
+
+**Opção 3: Tudo em Uma Linha (Alternativa Simples)**
+
+Se preferir, pode colocar tudo em uma única linha separada por espaços:
+
+```bash
+DB_TYPE=mssql DB_HOST=seu-servidor.database.windows.net DB_USERNAME=seu-usuario DB_PASSWORD=sua-senha DB_DATABASE=free-db-financeapp-2 node apps/api/dist/database/init-test-database.js
+```
+
+**Ou usando npm (mesma lógica):**
 
 ```bash
 DB_TYPE=mssql \
@@ -101,6 +150,12 @@ DB_USERNAME=seu-usuario \
 DB_PASSWORD=sua-senha \
 DB_DATABASE=free-db-financeapp-2 \
 npm run init:test-db --workspace=apps/api
+```
+
+**Ou em uma linha:**
+
+```bash
+DB_TYPE=mssql DB_HOST=seu-servidor.database.windows.net DB_USERNAME=seu-usuario DB_PASSWORD=sua-senha DB_DATABASE=free-db-financeapp-2 npm run init:test-db --workspace=apps/api
 ```
 
 **O que acontece:**

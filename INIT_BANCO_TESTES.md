@@ -26,6 +26,17 @@ npm run build --workspace=apps/api
 
 ### Passo 3: Executar o script de inicialização
 
+#### 📌 Como Executar Comandos de Múltiplas Linhas
+
+**IMPORTANTE:** No Linux, quando você vê `\` (barra invertida) no final da linha, o comando continua na próxima linha.
+
+**✅ RECOMENDADO: Copiar e Colar Tudo de Uma Vez**
+
+1. Selecione TODO o bloco abaixo (incluindo as barras `\`)
+2. Copie (Ctrl+Shift+C ou botão direito)
+3. Cole no terminal (botão direito ou Shift+Insert)
+4. Pressione Enter UMA VEZ no final
+
 **Opção A: Usando npm (mais fácil)**
 
 ```bash
@@ -47,6 +58,16 @@ DB_PASSWORD=sua-senha \
 DB_DATABASE=free-db-financeapp-2 \
 node apps/api/dist/database/init-test-database.js
 ```
+
+**Opção C: Tudo em Uma Linha (Alternativa)**
+
+Se preferir, pode colocar tudo em uma única linha:
+
+```bash
+DB_TYPE=mssql DB_HOST=seu-servidor.database.windows.net DB_USERNAME=seu-usuario DB_PASSWORD=sua-senha DB_DATABASE=free-db-financeapp-2 npm run init:test-db --workspace=apps/api
+```
+
+**💡 Dica:** Se ao colar aparecer `>` no início da linha, significa que o terminal está esperando mais linhas. Pressione Enter novamente para executar.
 
 **⚠️ IMPORTANTE:** Substitua:
 - `seu-servidor.database.windows.net` → Servidor real do Azure SQL Database
