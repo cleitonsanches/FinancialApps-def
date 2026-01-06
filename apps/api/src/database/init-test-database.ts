@@ -26,6 +26,7 @@ import { InvoiceAccountPayable } from './entities/invoice-account-payable.entity
 import { AccountPayable } from './entities/account-payable.entity';
 import { Reimbursement } from './entities/reimbursement.entity';
 import { TimeEntry } from './entities/time-entry.entity';
+import { TaskComment } from './entities/task-comment.entity';
 
 /**
  * Script para inicializar o banco de dados de testes com todas as tabelas
@@ -89,6 +90,7 @@ async function initTestDatabase() {
     AccountPayable,
     Reimbursement,
     TimeEntry,
+    TaskComment,
   ];
 
   // Criar DataSource com synchronize: true para criar todas as tabelas
@@ -103,8 +105,24 @@ async function initTestDatabase() {
     database: dbOptionsAny.database,
     entities: allEntities,
     synchronize: true, // ATENÇÃO: Apenas para inicialização do banco vazio
-    logging: true,
-    extra: dbOptionsAny.extra || {},
+    logging: false, // Desabilitar logging para evitar queries ao master
+    extra: {
+      ...(dbOptionsAny.extra || {}),
+      // Configurações específicas para Azure SQL Database
+      options: {
+        ...(dbOptionsAny.extra?.options || {}),
+        encrypt: true,
+        trustServerCertificate: false,
+        enableArithAbort: true,
+        // Evitar queries ao master database
+        database: dbOptionsAny.database,
+      },
+    },
+    // Desabilitar verificação de múltiplos bancos (evita query ao master)
+    options: {
+      encrypt: true,
+      trustServerCertificate: false,
+    },
   };
   
   const dataSource = new DataSource(dataSourceOptions);
