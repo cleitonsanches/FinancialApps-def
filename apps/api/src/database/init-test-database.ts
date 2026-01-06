@@ -92,12 +92,22 @@ async function initTestDatabase() {
   ];
 
   // Criar DataSource com synchronize: true para criar todas as tabelas
-  const dataSource = new DataSource({
-    ...dbOptions,
+  // Fazer cast para any para evitar problemas de tipos entre TypeOrmModuleOptions e DataSourceOptions
+  const dbOptionsAny = dbOptions as any;
+  const dataSourceOptions: any = {
+    type: dbOptionsAny.type,
+    host: dbOptionsAny.host,
+    port: dbOptionsAny.port,
+    username: dbOptionsAny.username,
+    password: dbOptionsAny.password,
+    database: dbOptionsAny.database,
     entities: allEntities,
     synchronize: true, // ATENÇÃO: Apenas para inicialização do banco vazio
     logging: true,
-  });
+    extra: dbOptionsAny.extra || {},
+  };
+  
+  const dataSource = new DataSource(dataSourceOptions);
 
   try {
     console.log('📡 Conectando ao banco de dados...');
