@@ -517,6 +517,12 @@ export default function NegotiationDetailsPage() {
   }
 
   const handleStatusChange = async (newStatus: string) => {
+    console.log('handleStatusChange chamado:', { 
+      currentStatus: negotiation.status, 
+      newStatus,
+      negotiationId: negotiationId 
+    })
+    
     // Se for FECHADA, usar lógica existente
     if (newStatus === 'FECHADA' && negotiation.status !== 'FECHADA') {
       setShowCloseNegotiationModal(true)
@@ -549,11 +555,25 @@ export default function NegotiationDetailsPage() {
 
     // Se status atual for FECHADA e novo status for RASCUNHO, REVISADA ou RE_ENVIADA
     // Precisa excluir parcelas provisionadas e projetos vinculados
-    if (negotiation.status === 'FECHADA' && (newStatus === 'RASCUNHO' || newStatus === 'REVISADA' || newStatus === 'RE_ENVIADA')) {
+    const isRevertingFromClosed = negotiation.status === 'FECHADA' && 
+                                   (newStatus === 'RASCUNHO' || newStatus === 'REVISADA' || newStatus === 'RE_ENVIADA')
+    
+    console.log('Verificando reversão:', {
+      currentStatus: negotiation.status,
+      newStatus,
+      isRevertingFromClosed
+    })
+    
+    if (isRevertingFromClosed) {
+      console.log('Detectada mudança de FECHADA para', newStatus)
       const invoices = await loadRelatedInvoices()
+      console.log('Invoices carregadas:', invoices)
       const provisionadas = invoices.provisionadas || []
       const faturadas = invoices.faturadas || []
       const recebidas = invoices.recebidas || []
+      
+      console.log('Parcelas provisionadas:', provisionadas.length)
+      console.log('Projetos:', projects.length)
       
       // Preparar dados do modal
       setRevertStatusData({
@@ -563,6 +583,7 @@ export default function NegotiationDetailsPage() {
         recebidas,
         projects: projects || []
       })
+      console.log('Abrindo modal de reversão de status')
       setShowRevertStatusModal(true)
       return
     }
