@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 // Detectar a URL base da API
-// Em produção (via Nginx), usar URL relativa '/api' que funciona automaticamente
+// Em produção (via Nginx), usar URL relativa que funciona automaticamente
 // Em desenvolvimento, usar variável de ambiente ou localhost:3001
 function getApiBaseURL(): string {
   // Se estiver definida a variável de ambiente, usar ela
@@ -10,8 +10,10 @@ function getApiBaseURL(): string {
   }
   
   // Se estiver no browser, usar URL relativa (funciona com Nginx)
+  // Se houver basePath (para instância de testes), usar ele
   if (typeof window !== 'undefined') {
-    return '/api'
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''
+    return `${basePath}/api`
   }
   
   // Fallback para desenvolvimento (SSR)

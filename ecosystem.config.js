@@ -1,7 +1,10 @@
 module.exports = {
   apps: [
+    // ============================================
+    // INSTÂNCIA DE PRODUÇÃO
+    // ============================================
     {
-      name: 'financial-api',
+      name: 'financial-api-prod',
       script: 'node',
       args: 'apps/api/dist/main.js',
       cwd: '/var/www/FinancialApps-def',
@@ -10,15 +13,24 @@ module.exports = {
       watch: false,
       max_memory_restart: '500M',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PORT: 3001,
+        // Banco de dados de produção
+        DB_TYPE: 'mssql',
+        DB_HOST: process.env.DB_HOST || 'seu-servidor.database.windows.net',
+        DB_PORT: process.env.DB_PORT || '1433',
+        DB_USERNAME: process.env.DB_USERNAME || 'seu-usuario',
+        DB_PASSWORD: process.env.DB_PASSWORD || 'sua-senha',
+        DB_DATABASE: process.env.DB_DATABASE_PROD || 'free-db-financeapp',
+        FRONTEND_URL: process.env.FRONTEND_URL_PROD || 'http://seu-ip:8080'
       },
-      error_file: '/var/www/FinancialApps-def/logs/api-error.log',
-      out_file: '/var/www/FinancialApps-def/logs/api-out.log',
+      error_file: '/var/www/FinancialApps-def/logs/api-prod-error.log',
+      out_file: '/var/www/FinancialApps-def/logs/api-prod-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true
     },
     {
-      name: 'financial-web',
+      name: 'financial-web-prod',
       script: 'npm',
       args: 'run start --workspace=apps/web',
       cwd: '/var/www/FinancialApps-def',
@@ -27,10 +39,61 @@ module.exports = {
       watch: false,
       max_memory_restart: '500M',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PORT: 3000,
+        NEXT_PUBLIC_API_URL: '/api'
       },
-      error_file: '/var/www/FinancialApps-def/logs/web-error.log',
-      out_file: '/var/www/FinancialApps-def/logs/web-out.log',
+      error_file: '/var/www/FinancialApps-def/logs/web-prod-error.log',
+      out_file: '/var/www/FinancialApps-def/logs/web-prod-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true
+    },
+    // ============================================
+    // INSTÂNCIA DE TESTES
+    // ============================================
+    {
+      name: 'financial-api-test',
+      script: 'node',
+      args: 'apps/api/dist/main.js',
+      cwd: '/var/www/FinancialApps-def',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3002,
+        // Banco de dados de testes
+        DB_TYPE: 'mssql',
+        DB_HOST: process.env.DB_HOST || 'seu-servidor.database.windows.net',
+        DB_PORT: process.env.DB_PORT || '1433',
+        DB_USERNAME: process.env.DB_USERNAME || 'seu-usuario',
+        DB_PASSWORD: process.env.DB_PASSWORD || 'sua-senha',
+        DB_DATABASE: process.env.DB_DATABASE_TEST || 'free-db-financeapp-2',
+        FRONTEND_URL: process.env.FRONTEND_URL_TEST || 'http://seu-ip:8080/test'
+      },
+      error_file: '/var/www/FinancialApps-def/logs/api-test-error.log',
+      out_file: '/var/www/FinancialApps-def/logs/api-test-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true
+    },
+    {
+      name: 'financial-web-test',
+      script: 'npm',
+      args: 'run start --workspace=apps/web',
+      cwd: '/var/www/FinancialApps-def',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3003,
+        NEXT_PUBLIC_BASE_PATH: '/test',
+        NEXT_PUBLIC_API_URL: '/test/api'
+      },
+      error_file: '/var/www/FinancialApps-def/logs/web-test-out.log',
+      out_file: '/var/www/FinancialApps-def/logs/web-test-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true
     }
