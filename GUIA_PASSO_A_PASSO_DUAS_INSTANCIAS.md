@@ -79,6 +79,25 @@ env: {
 
 Antes de iniciar a instância de testes, precisamos criar todas as tabelas no banco vazio:
 
+**✅ MÉTODO RÁPIDO (Recomendado):**
+
+```bash
+# Dar permissão de execução
+chmod +x INICIALIZAR_BANCO_TESTES.sh
+
+# Executar (use sh se bash não funcionar)
+sh INICIALIZAR_BANCO_TESTES.sh
+# OU
+./INICIALIZAR_BANCO_TESTES.sh
+```
+
+O script irá:
+- Verificar se o build existe (faz build se necessário)
+- Ler credenciais do `ecosystem.config.js`
+- Executar a inicialização do banco
+
+**✅ MÉTODO MANUAL (Se o script não funcionar):**
+
 ```bash
 # Fazer build da API primeiro
 npm run build --workspace=apps/api
