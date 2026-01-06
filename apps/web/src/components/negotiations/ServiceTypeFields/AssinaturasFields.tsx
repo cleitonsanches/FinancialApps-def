@@ -155,7 +155,7 @@ export default function AssinaturasFields({ formData, onChange }: AssinaturasFie
         </div>
         <div>
           <label htmlFor="vencimentoAssinatura" className="block text-sm font-medium text-gray-700 mb-2">
-            Vencimento da Proposta (12 meses a partir do início)
+            Data de Renovação
           </label>
           <input
             type="date"
@@ -164,7 +164,7 @@ export default function AssinaturasFields({ formData, onChange }: AssinaturasFie
             onChange={(e) => onChange('vencimentoAssinatura', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
           />
-          <p className="mt-1 text-xs text-gray-500">Ajustável manualmente se necessário</p>
+          <p className="mt-1 text-xs text-gray-500">Calculado automaticamente (12 meses a partir do início). Ajustável manualmente se necessário</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">

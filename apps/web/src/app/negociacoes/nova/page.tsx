@@ -25,6 +25,13 @@ export default function NovaNegociacaoPage() {
   const [selectedProjectTemplateId, setSelectedProjectTemplateId] = useState<string>('')
   const [projectCreationMode, setProjectCreationMode] = useState<'template' | 'manual' | null>(null)
   
+  // Estados para modal de Assinaturas
+  const [showAssinaturasModal, setShowAssinaturasModal] = useState(false)
+  const [showValidadeProposta, setShowValidadeProposta] = useState(false)
+  
+  // Estados para modal de Análise de Dados
+  const [showAnaliseDadosModal, setShowAnaliseDadosModal] = useState(false)
+  
   const [formData, setFormData] = useState({
     clientId: '',
     serviceType: '',
@@ -278,6 +285,57 @@ export default function NovaNegociacaoPage() {
         payload.dataLimiteAceite = formData.dataLimiteAceite
       }
 
+      // Campos específicos para Análise de Dados
+      if (formData.serviceType === 'ANALISE_DADOS') {
+        payload.dataInicioAnalise = formData.dataInicioAnalise
+        payload.dataProgramadaHomologacao = formData.dataProgramadaHomologacao
+        payload.dataProgramadaProducao = formData.dataProgramadaProducao
+        payload.tipoContratacao = 'PROJETO' // Fixo para Análise de Dados
+        payload.formaFaturamento = formData.formaFaturamento
+        payload.inicio = formData.dataInicioAnalise // Usar data de início da análise
+        payload.inicioFaturamento = formData.inicioFaturamento
+        payload.vencimento = formData.vencimento
+        const valorPropostaNumber = getValorAsNumber(formData.valorProposta)
+        if (valorPropostaNumber !== null) {
+          payload.valorProposta = valorPropostaNumber
+        }
+        
+        // Incluir parcelas se forma de pagamento for Parcelado
+        if (formData.formaFaturamento === 'PARCELADO') {
+          if (formData.parcelas.length > 0) {
+            payload.parcelas = formData.parcelas.map(p => ({
+              numero: p.numero,
+              valor: getValorAsNumber(p.valor) || 0,
+              dataFaturamento: p.dataFaturamento,
+              dataVencimento: p.dataVencimento,
+            }))
+          } else if (formData.quantidadeParcelas) {
+            const quantidade = parseInt(formData.quantidadeParcelas) || 0
+            const valorTotal = getValorAsNumber(formData.valorProposta) || 0
+            const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
+            const dataInicio = formData.inicioFaturamento || formData.dataInicioAnalise || new Date().toISOString().split('T')[0]
+            const dataInicioObj = new Date(dataInicio)
+            const vencimentoDias = formData.vencimento ? parseInt(formData.vencimento.toString()) : 30
+            
+            payload.parcelas = []
+            for (let i = 0; i < quantidade; i++) {
+              const dataFaturamento = new Date(dataInicioObj)
+              dataFaturamento.setMonth(dataFaturamento.getMonth() + i)
+              
+              const dataVencimento = new Date(dataFaturamento)
+              dataVencimento.setDate(dataVencimento.getDate() + vencimentoDias)
+              
+              payload.parcelas.push({
+                numero: i + 1,
+                valor: valorPorParcela,
+                dataFaturamento: dataFaturamento.toISOString().split('T')[0],
+                dataVencimento: dataVencimento.toISOString().split('T')[0],
+              })
+            }
+          }
+        }
+      }
+
       // Campos específicos para Migração de Dados
       if (formData.serviceType === 'MIGRACAO_DADOS') {
         payload.sistemaOrigem = formData.sistemaOrigem
@@ -371,6 +429,10 @@ export default function NovaNegociacaoPage() {
         inicioFaturamento: formData.inicioFaturamento,
         vencimento: formData.vencimento,
         formaFaturamento: formData.formaFaturamento,
+        // Campos específicos para Análise de Dados
+        dataInicioAnalise: formData.dataInicioAnalise,
+        dataProgramadaHomologacao: formData.dataProgramadaHomologacao,
+        dataProgramadaProducao: formData.dataProgramadaProducao,
         // Campos específicos para Migração de Dados
         sistemaOrigem: formData.sistemaOrigem,
         sistemaDestino: formData.sistemaDestino,
@@ -381,7 +443,7 @@ export default function NovaNegociacaoPage() {
         dataVencimento: formData.dataVencimento,
       }
 
-      // Incluir parcelas se existirem
+      // Incluir parcelas se existirem (para qualquer tipo de serviço com forma de faturamento parcelado)
       if (formData.formaFaturamento === 'PARCELADO' || formData.formaFaturamento === 'MENSAL') {
         if (formData.parcelas.length > 0) {
           // Se tem parcelas preenchidas, usar essas
@@ -396,9 +458,29 @@ export default function NovaNegociacaoPage() {
           const quantidade = parseInt(formData.quantidadeParcelas) || 0
           const valorTotal = getValorAsNumber(formData.valorProposta) || 0
           const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
-          const dataInicio = formData.inicioFaturamento || formData.dataFaturamento || formData.inicio || new Date().toISOString().split('T')[0]
+          
+          // Determinar data base dependendo do tipo de serviço
+          let dataInicio = formData.inicioFaturamento || formData.dataFaturamento || formData.inicio
+          if (formData.serviceType === 'ANALISE_DADOS') {
+            dataInicio = formData.inicioFaturamento || formData.dataInicioAnalise || new Date().toISOString().split('T')[0]
+          } else {
+            dataInicio = dataInicio || new Date().toISOString().split('T')[0]
+          }
+          
           const dataInicioObj = new Date(dataInicio)
-          const vencimentoDias = formData.vencimento ? parseInt(formData.vencimento.toString()) : 30
+          
+          // Calcular vencimento - pode ser data ou dias
+          let vencimentoDias = 30
+          if (formData.vencimento) {
+            if (formData.vencimento.includes('-')) {
+              // É uma data, calcular diferença em dias
+              const vencimentoDate = new Date(formData.vencimento)
+              const diffTime = vencimentoDate.getTime() - dataInicioObj.getTime()
+              vencimentoDias = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            } else {
+              vencimentoDias = parseInt(formData.vencimento.toString()) || 30
+            }
+          }
           
           payload.parcelas = []
           for (let i = 0; i < quantidade; i++) {
@@ -613,6 +695,9 @@ export default function NovaNegociacaoPage() {
     // Para Migração de Dados com PARCELADO, usar dataFaturamento como base
     const dataFaturamentoBase = formData.dataFaturamento || formData.inicioFaturamento
     
+    // Para Análise de Dados, usar inicioFaturamento como base
+    const dataFaturamentoBaseAnalise = formData.inicioFaturamento || formData.dataInicioAnalise
+    
     if (formData.tipoContratacao === 'FIXO_RECORRENTE') {
       // Fixo Recorrente: valor da proposta para cada parcela
       const valorFormatado = valorTotal.toLocaleString('pt-BR', {
@@ -652,7 +737,7 @@ export default function NovaNegociacaoPage() {
         })
       }
     } else {
-      // Projeto ou Migração de Dados: dividir valor da proposta pela quantidade
+      // Projeto, Migração de Dados ou Análise de Dados: dividir valor da proposta pela quantidade
       const valorPorParcela = quantidade > 0 ? valorTotal / quantidade : 0
       const valorFormatado = valorPorParcela.toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
@@ -662,7 +747,12 @@ export default function NovaNegociacaoPage() {
       for (let i = 1; i <= quantidade; i++) {
         // Calcular data de faturamento
         let dataFaturamento = ''
-        if (dataFaturamentoBase) {
+        if (formData.serviceType === 'ANALISE_DADOS' && dataFaturamentoBaseAnalise) {
+          // Para Análise de Dados, usar inicioFaturamento como base
+          const dataBase = new Date(dataFaturamentoBaseAnalise)
+          dataBase.setMonth(dataBase.getMonth() + (i - 1))
+          dataFaturamento = dataBase.toISOString().split('T')[0]
+        } else if (dataFaturamentoBase) {
           // Para Migração de Dados, usar dataFaturamento como base
           const dataBase = new Date(dataFaturamentoBase)
           dataBase.setMonth(dataBase.getMonth() + (i - 1))
@@ -676,10 +766,18 @@ export default function NovaNegociacaoPage() {
         // Calcular vencimento baseado em vencimento (dias após faturamento)
         let dataVencimento = ''
         if (dataFaturamento && formData.vencimento) {
-          const vencimentoDias = parseInt(formData.vencimento.toString()) || 30
-          const dataBase = new Date(dataFaturamento)
-          dataBase.setDate(dataBase.getDate() + vencimentoDias)
-          dataVencimento = dataBase.toISOString().split('T')[0]
+          // Se vencimento é uma data, usar diretamente e somar meses
+          if (formData.vencimento.includes('-')) {
+            const dataBase = new Date(formData.vencimento)
+            dataBase.setMonth(dataBase.getMonth() + (i - 1))
+            dataVencimento = dataBase.toISOString().split('T')[0]
+          } else {
+            // Se vencimento é número (dias), calcular dias após faturamento
+            const vencimentoDias = parseInt(formData.vencimento.toString()) || 30
+            const dataBase = new Date(dataFaturamento)
+            dataBase.setDate(dataBase.getDate() + vencimentoDias)
+            dataVencimento = dataBase.toISOString().split('T')[0]
+          }
         }
         
         novasParcelas.push({
@@ -714,6 +812,66 @@ export default function NovaNegociacaoPage() {
     const novasParcelas = [...formData.parcelas]
     novasParcelas[index].dataVencimento = data
     setFormData({ ...formData, parcelas: novasParcelas })
+  }
+
+  const validateAnaliseDadosFields = (): boolean => {
+    // Validar campos obrigatórios básicos
+    if (!formData.dataInicioAnalise) {
+      alert('Preencha a Data de Início')
+      return false
+    }
+    if (!formData.dataProgramadaHomologacao) {
+      alert('Preencha a Data Programada para Homologação')
+      return false
+    }
+    if (!formData.dataProgramadaProducao) {
+      alert('Preencha a Data Programada para Produção')
+      return false
+    }
+    if (!formData.valorProposta || getValorAsNumber(formData.valorProposta) === 0) {
+      alert('Preencha o Valor da Proposta')
+      return false
+    }
+    if (!formData.formaFaturamento) {
+      alert('Selecione a Forma de Pagamento')
+      return false
+    }
+    if (!formData.inicioFaturamento) {
+      alert('Preencha o Início do Faturamento')
+      return false
+    }
+    if (!formData.vencimento) {
+      alert('Preencha o Vencimento')
+      return false
+    }
+    
+    // Validar campos específicos para Parcelado
+    if (formData.formaFaturamento === 'PARCELADO') {
+      if (!formData.quantidadeParcelas || parseInt(formData.quantidadeParcelas) <= 0) {
+        alert('Informe a quantidade de parcelas')
+        return false
+      }
+      if (formData.parcelas.length === 0) {
+        alert('Configure as parcelas')
+        return false
+      }
+      // Validar se todas as parcelas têm dados completos
+      const parcelasIncompletas = formData.parcelas.filter(p => 
+        !p.dataFaturamento || !p.dataVencimento || !p.valor || getValorAsNumber(p.valor) === 0
+      )
+      if (parcelasIncompletas.length > 0) {
+        alert('Preencha todos os dados das parcelas (valor, data de faturamento e vencimento)')
+        return false
+      }
+    }
+    
+    return true
+  }
+
+  const handleCloseAnaliseDadosModal = () => {
+    if (validateAnaliseDadosFields()) {
+      setShowAnaliseDadosModal(false)
+    }
   }
 
   const isMigracaoDados = formData.serviceType === 'MIGRACAO_DADOS'
@@ -769,7 +927,26 @@ export default function NovaNegociacaoPage() {
             <select
               id="serviceType"
               value={formData.serviceType}
-              onChange={(e) => setFormData({ ...formData, serviceType: e.target.value, parcelas: [] })}
+              onChange={(e) => {
+                const newServiceType = e.target.value
+                setFormData({ ...formData, serviceType: newServiceType, parcelas: [] })
+                // Abrir modal automaticamente para ASSINATURAS
+                if (newServiceType === 'ASSINATURAS') {
+                  setShowAssinaturasModal(true)
+                  setShowAnaliseDadosModal(false)
+                } else if (newServiceType === 'ANALISE_DADOS') {
+                  // Abrir modal automaticamente para ANALISE_DADOS
+                  setShowAnaliseDadosModal(true)
+                  setShowAssinaturasModal(false)
+                  setShowValidadeProposta(false)
+                  // Definir tipo de contratação fixo como "Por Projeto"
+                  setFormData(prev => ({ ...prev, tipoContratacao: 'PROJETO' }))
+                } else {
+                  setShowAssinaturasModal(false)
+                  setShowAnaliseDadosModal(false)
+                  setShowValidadeProposta(false)
+                }
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               required
             >
@@ -780,39 +957,6 @@ export default function NovaNegociacaoPage() {
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Campos de Validade da Proposta */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-            <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
-            
-            <div>
-              <label htmlFor="dataValidade" className="block text-sm font-medium text-gray-700 mb-2">
-                Data de Validade da Proposta
-              </label>
-              <input
-                type="date"
-                id="dataValidade"
-                value={formData.dataValidade}
-                onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
-            </div>
-
-            <div>
-              <label htmlFor="dataLimiteAceite" className="block text-sm font-medium text-gray-700 mb-2">
-                Data Limite para Aceite
-              </label>
-              <input
-                type="date"
-                id="dataLimiteAceite"
-                value={formData.dataLimiteAceite}
-                onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
-            </div>
           </div>
 
           {/* Campos específicos para Migração de Dados */}
@@ -1136,14 +1280,16 @@ export default function NovaNegociacaoPage() {
             </div>
           )}
 
-          {/* Campos específicos por tipo de serviço */}
-          <ServiceTypeFieldsWrapper
-            serviceType={formData.serviceType}
-            formData={formData}
-            onChange={(field, value) => {
-              setFormData((prev) => ({ ...prev, [field]: value }))
-            }}
-          />
+          {/* Campos específicos por tipo de serviço - Não mostrar ASSINATURAS e ANALISE_DADOS aqui, serão nos modais */}
+          {formData.serviceType !== 'ASSINATURAS' && formData.serviceType !== 'ANALISE_DADOS' && (
+            <ServiceTypeFieldsWrapper
+              serviceType={formData.serviceType}
+              formData={formData}
+              onChange={(field, value) => {
+                setFormData((prev) => ({ ...prev, [field]: value }))
+              }}
+            />
+          )}
 
           {/* Opção de Template (após criar) */}
           {savedNegotiationId && useTemplate === null && (
@@ -1691,6 +1837,370 @@ export default function NovaNegociacaoPage() {
             )}
           </div>
         </form>
+
+        {/* Modal: Cadastro de Análise de Dados */}
+        {showAnaliseDadosModal && formData.serviceType === 'ANALISE_DADOS' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Informações de Análise de Dados</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowAnaliseDadosModal(false)
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Bloco azul de Informações de Análise de Dados */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações de Análise de Dados</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="dataInicioAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data de Início *
+                      </label>
+                      <input
+                        type="date"
+                        id="dataInicioAnalise"
+                        value={formData.dataInicioAnalise}
+                        onChange={(e) => setFormData({ ...formData, dataInicioAnalise: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="dataProgramadaHomologacao" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data Programada para Homologação *
+                      </label>
+                      <input
+                        type="date"
+                        id="dataProgramadaHomologacao"
+                        value={formData.dataProgramadaHomologacao}
+                        onChange={(e) => setFormData({ ...formData, dataProgramadaHomologacao: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="dataProgramadaProducao" className="block text-sm font-medium text-gray-700 mb-2">
+                        Data Programada para Produção *
+                      </label>
+                      <input
+                        type="date"
+                        id="dataProgramadaProducao"
+                        value={formData.dataProgramadaProducao}
+                        onChange={(e) => setFormData({ ...formData, dataProgramadaProducao: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Campos Financeiros */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="valorPropostaAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                      Valor da Proposta *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                      <input
+                        type="text"
+                        id="valorPropostaAnalise"
+                        value={formData.valorProposta}
+                        onChange={(e) => {
+                          const formatted = formatCurrency(e.target.value)
+                          setFormData({ ...formData, valorProposta: formatted })
+                        }}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="0,00"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="tipoContratacaoAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Contratação
+                    </label>
+                    <input
+                      type="text"
+                      id="tipoContratacaoAnalise"
+                      value="Por Projeto"
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Fixo para Análise de Dados</p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="formaFaturamentoAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                      Forma de Pagamento *
+                    </label>
+                    <select
+                      id="formaFaturamentoAnalise"
+                      value={formData.formaFaturamento}
+                      onChange={(e) => {
+                        setFormData({ 
+                          ...formData, 
+                          formaFaturamento: e.target.value as 'ONESHOT' | 'PARCELADO',
+                          parcelas: [],
+                          quantidadeParcelas: ''
+                        })
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="ONESHOT">OneShot</option>
+                      <option value="PARCELADO">Parcelado</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="inicioFaturamentoAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                      Início do Faturamento *
+                    </label>
+                    <input
+                      type="date"
+                      id="inicioFaturamentoAnalise"
+                      value={formData.inicioFaturamento}
+                      onChange={(e) => setFormData({ ...formData, inicioFaturamento: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="vencimentoAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                      Vencimento *
+                    </label>
+                    <input
+                      type="date"
+                      id="vencimentoAnalise"
+                      value={formData.vencimento}
+                      onChange={(e) => setFormData({ ...formData, vencimento: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Campos para Parcelado */}
+                {formData.formaFaturamento === 'PARCELADO' && (
+                  <div className="mt-6 space-y-4">
+                    <div>
+                      <label htmlFor="quantidadeParcelasAnalise" className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantidade de Parcelas *
+                      </label>
+                      <input
+                        type="number"
+                        id="quantidadeParcelasAnalise"
+                        min="1"
+                        value={formData.quantidadeParcelas}
+                        onChange={handleQuantidadeParcelasChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite a quantidade de parcelas"
+                        required
+                      />
+                    </div>
+
+                    {/* Lista de Parcelas */}
+                    {formData.parcelas.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Parcelas</h4>
+                        <div className="space-y-3">
+                          {formData.parcelas.map((parcela, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border border-gray-200">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Parcela {parcela.numero}/{formData.parcelas.length}
+                                </label>
+                                <div className="text-sm font-semibold text-gray-700">
+                                  {parcela.numero}/{formData.parcelas.length}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Data de Faturamento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataFaturamento}
+                                  onChange={(e) => handleParcelaDataFaturamentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Vencimento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={parcela.dataVencimento}
+                                  onChange={(e) => handleParcelaDataVencimentoChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Valor da Parcela
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1 text-xs text-gray-500">R$</span>
+                                  <input
+                                    type="text"
+                                    value={parcela.valor}
+                                    onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                    className="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t border-gray-300">
+                            <div className="text-sm font-semibold text-gray-700">
+                              Total das Parcelas: {formData.parcelas.reduce((sum, p) => sum + (getValorAsNumber(p.valor) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Botões do modal */}
+              <div className="flex justify-end gap-4 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={handleCloseAnaliseDadosModal}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Salvar e Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja fechar sem salvar? Os dados não salvos serão perdidos.')) {
+                      setShowAnaliseDadosModal(false)
+                    }
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Cadastro de Assinaturas */}
+        {showAssinaturasModal && formData.serviceType === 'ASSINATURAS' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Informações de Assinatura</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAssinaturasModal(false)
+                    setShowValidadeProposta(false)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Bloco azul de Informações de Assinatura */}
+              <div className="mb-6">
+                <ServiceTypeFieldsWrapper
+                  serviceType={formData.serviceType}
+                  formData={formData}
+                  onChange={(field, value) => {
+                    setFormData((prev) => ({ ...prev, [field]: value }))
+                  }}
+                />
+              </div>
+
+              {/* Pergunta sobre prazos e observações */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showValidadeProposta}
+                      onChange={(e) => setShowValidadeProposta(e.target.checked)}
+                      className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Inserir prazos para a proposta e Observações específicas?
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Campos de Validade da Proposta - aparecem apenas se selecionado */}
+              {showValidadeProposta && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <h3 className="col-span-full text-lg font-semibold text-gray-900 mb-2">Validade da Proposta</h3>
+                  
+                  <div>
+                    <label htmlFor="dataValidade" className="block text-sm font-medium text-gray-700 mb-2">
+                      Data de Validade da Proposta
+                    </label>
+                    <input
+                      type="date"
+                      id="dataValidade"
+                      value={formData.dataValidade}
+                      onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Data até quando a proposta é válida</p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="dataLimiteAceite" className="block text-sm font-medium text-gray-700 mb-2">
+                      Data Limite para Aceite
+                    </label>
+                    <input
+                      type="date"
+                      id="dataLimiteAceite"
+                      value={formData.dataLimiteAceite}
+                      onChange={(e) => setFormData({ ...formData, dataLimiteAceite: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Início dos trabalhos condicionado ao aceite até esta data</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Botões do modal */}
+              <div className="flex justify-end gap-4 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAssinaturasModal(false)
+                    setShowValidadeProposta(false)
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal: Diálogo de Criação de Projeto */}
         {showProjectDialog && (

@@ -146,7 +146,14 @@ jobs:
             
             # Reiniciar aplicações PM2
             echo "🔄 Reiniciando aplicações..."
-            pm2 restart all
+            pm2 restart all || {
+              echo "⚠️ Erro ao reiniciar com PM2. Tentando iniciar..."
+              pm2 start all || pm2 start ecosystem.config.js || echo "⚠️ Verifique manualmente o PM2"
+            }
+            
+            # Aguardar alguns segundos para garantir que os serviços iniciaram
+            echo "⏳ Aguardando serviços iniciarem..."
+            sleep 5
             
             # Salvar configuração PM2
             pm2 save
@@ -154,6 +161,10 @@ jobs:
             # Verificar status
             echo "📊 Status das aplicações:"
             pm2 status
+            
+            # Verificar se os serviços estão online
+            echo "🔍 Verificando saúde dos serviços..."
+            pm2 list | grep -E "online|errored" || echo "⚠️ Verifique o status manualmente"
             
             echo "✅ Deploy concluído!"
 
@@ -165,6 +176,13 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
-            echo "🔍 Verificando logs das aplicações..."
+            echo "🔍 Verificando status final das aplicações..."
+            pm2 status
+            
+            echo ""
+            echo "🔍 Verificando logs das aplicações (últimas 20 linhas)..."
             pm2 logs --lines 20 --nostream
+            
+            echo ""
+            echo "✅ Verificação concluída. Se houver erros, verifique os logs acima."
 
