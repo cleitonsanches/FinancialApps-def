@@ -57,6 +57,7 @@ import { ProposalAditivosModule } from './modules/proposal-aditivos/proposal-adi
 import { AccountsPayableModule } from './modules/accounts-payable/accounts-payable.module';
 import { ReimbursementsModule } from './modules/reimbursements/reimbursements.module';
 import { PhasesModule } from './modules/phases/phases.module';
+import { HealthModule } from './modules/health/health.module';
 
 // Função para encontrar o arquivo .env.local em múltiplos locais
 function findEnvFile(): string[] {
@@ -100,6 +101,7 @@ function findEnvFile(): string[] {
     AccountsPayableModule,
     ReimbursementsModule,
     PhasesModule,
+    HealthModule,
   ],
 })
 export class AppModule implements OnModuleInit {
