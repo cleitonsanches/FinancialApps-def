@@ -169,24 +169,34 @@ EOF
 echo "✅ nginx-instancia-unica.conf criado"
 echo ""
 
-echo "PASSO 5: Verificando se server.js existe..."
-if [ ! -f "apps/web/.next/standalone/apps/web/server.js" ]; then
-    echo "⚠️  server.js não encontrado! Fazendo rebuild..."
-    rm -rf apps/web/.next
-    cd apps/web
-    npm run build
-    if [ $? -ne 0 ]; then
-        echo "❌ Erro no build do Web!"
-        exit 1
-    fi
-    cd ../..
-    
-    if [ ! -f "apps/web/.next/standalone/apps/web/server.js" ]; then
-        echo "❌ server.js AINDA não encontrado após rebuild!"
-        exit 1
-    fi
+echo "PASSO 5: Removendo basePath do next.config.js e fazendo rebuild..."
+# Remover basePath do next.config.js
+cd apps/web
+if grep -q "basePath" next.config.js; then
+    echo "   Removendo basePath do next.config.js..."
+    sed -i '/basePath:/d' next.config.js
+    sed -i '/Suportar path base/d' next.config.js
 fi
-echo "✅ server.js encontrado"
+cd ../..
+
+# Limpar build anterior
+rm -rf apps/web/.next
+
+# Fazer rebuild
+echo "   Fazendo rebuild do Web..."
+cd apps/web
+npm run build
+if [ $? -ne 0 ]; then
+    echo "❌ Erro no build do Web!"
+    exit 1
+fi
+cd ../..
+
+if [ ! -f "apps/web/.next/standalone/apps/web/server.js" ]; then
+    echo "❌ server.js não encontrado após rebuild!"
+    exit 1
+fi
+echo "✅ server.js encontrado e build atualizado"
 echo ""
 
 echo "PASSO 6: Aplicando configuração do Nginx..."

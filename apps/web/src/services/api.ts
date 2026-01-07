@@ -10,10 +10,8 @@ function getApiBaseURL(): string {
   }
   
   // Se estiver no browser, usar URL relativa (funciona com Nginx)
-  // Se houver basePath (para instância de testes), usar ele
   if (typeof window !== 'undefined') {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''
-    return `${basePath}/api`
+    return '/api'
   }
   
   // Fallback para desenvolvimento (SSR)
