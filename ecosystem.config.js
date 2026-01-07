@@ -82,9 +82,9 @@ module.exports = {
     },
     {
       name: 'financial-web-test',
-      script: 'npm',
-      args: 'run start --workspace=apps/web',
-      cwd: '/var/www/FinancialApps-def',
+      script: 'node_modules/.bin/next',
+      args: 'start -p 3003',
+      cwd: '/var/www/FinancialApps-def/apps/web',
       instances: 1,
       autorestart: true,
       watch: false,
@@ -95,7 +95,7 @@ module.exports = {
         NEXT_PUBLIC_BASE_PATH: '/test',
         NEXT_PUBLIC_API_URL: '/test/api'
       },
-      error_file: '/var/www/FinancialApps-def/logs/web-test-out.log',
+      error_file: '/var/www/FinancialApps-def/logs/web-test-error.log',
       out_file: '/var/www/FinancialApps-def/logs/web-test-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true
