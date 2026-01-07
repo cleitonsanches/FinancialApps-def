@@ -22,15 +22,22 @@ echo ""
 echo "Lendo credenciais do ecosystem.config.js (produção)..."
 echo ""
 
-DB_HOST_ECOSYSTEM=$(grep -A 20 "financial-api-prod" ecosystem.config.js | grep "DB_HOST" | head -1 | sed "s/.*DB_HOST.*'\(.*\)'.*/\1/" | sed "s/.*||.*'\''\(.*\)'\''.*/\1/")
-DB_USERNAME_ECOSYSTEM=$(grep -A 20 "financial-api-prod" ecosystem.config.js | grep "DB_USERNAME" | head -1 | sed "s/.*DB_USERNAME.*'\(.*\)'.*/\1/" | sed "s/.*||.*'\''\(.*\)'\''.*/\1/")
-DB_PASSWORD_ECOSYSTEM=$(grep -A 20 "financial-api-prod" ecosystem.config.js | grep "DB_PASSWORD" | head -1 | sed "s/.*DB_PASSWORD.*'\(.*\)'.*/\1/" | sed "s/.*||.*'\''\(.*\)'\''.*/\1/")
-DB_DATABASE_ECOSYSTEM=$(grep -A 20 "financial-api-prod" ecosystem.config.js | grep "DB_DATABASE" | head -1 | sed "s/.*DB_DATABASE.*'\(.*\)'.*/\1/" | sed "s/.*||.*'\''\(.*\)'\''.*/\1/")
+# Ler credenciais do ecosystem.config.js (usando sed compatível com sh)
+DB_HOST_ECOSYSTEM=$(grep -A 20 "financial-api-prod" ecosystem.config.js | grep "DB_HOST" | head -1 | sed "s/.*DB_HOST.*['\"]\([^'\"]*\)['\"].*/\1/" | sed "s/.*||.*['\"]\([^'\"]*\)['\"].*/\1/")
+DB_USERNAME_ECOSYSTEM=$(grep -A 20 "financial-api-prod" ecosystem.config.js | grep "DB_USERNAME" | head -1 | sed "s/.*DB_USERNAME.*['\"]\([^'\"]*\)['\"].*/\1/" | sed "s/.*||.*['\"]\([^'\"]*\)['\"].*/\1/")
+DB_PASSWORD_ECOSYSTEM=$(grep -A 20 "financial-api-prod" ecosystem.config.js | grep "DB_PASSWORD" | head -1 | sed "s/.*DB_PASSWORD.*['\"]\([^'\"]*\)['\"].*/\1/" | sed "s/.*||.*['\"]\([^'\"]*\)['\"].*/\1/")
+DB_DATABASE_ECOSYSTEM=$(grep -A 20 "financial-api-prod" ecosystem.config.js | grep "DB_DATABASE" | head -1 | sed "s/.*DB_DATABASE.*['\"]\([^'\"]*\)['\"].*/\1/" | sed "s/.*||.*['\"]\([^'\"]*\)['\"].*/\1/")
 
 echo "Credenciais no ecosystem.config.js:"
 echo "   DB_HOST: $DB_HOST_ECOSYSTEM"
 echo "   DB_USERNAME: $DB_USERNAME_ECOSYSTEM"
-echo "   DB_PASSWORD: ${DB_PASSWORD_ECOSYSTEM:0:3}*** (oculto)"
+# Mostrar apenas primeiros 3 caracteres da senha (compatível com sh)
+if [ -n "$DB_PASSWORD_ECOSYSTEM" ]; then
+    DB_PASSWORD_PREVIEW=$(echo "$DB_PASSWORD_ECOSYSTEM" | cut -c1-3)
+    echo "   DB_PASSWORD: ${DB_PASSWORD_PREVIEW}*** (oculto)"
+else
+    echo "   DB_PASSWORD: (vazio)"
+fi
 echo "   DB_DATABASE: $DB_DATABASE_ECOSYSTEM"
 echo ""
 
