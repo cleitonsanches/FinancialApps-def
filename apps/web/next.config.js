@@ -10,6 +10,22 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  
+  // Transpilar recharts para resolver problemas de build
+  transpilePackages: ['recharts'],
+  
+  // Configurações do webpack para recharts
+  webpack: (config, { isServer }) => {
+    // Resolver problemas com recharts no build
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
+    }
+    
+    return config;
+  },
 }
 
 module.exports = nextConfig
