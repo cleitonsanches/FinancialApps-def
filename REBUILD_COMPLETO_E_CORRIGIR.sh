@@ -30,12 +30,21 @@ rm -rf apps/web/node_modules/.cache
 echo "✅ Builds e cache limpos"
 echo ""
 
-echo "PASSO 3: Reinstalando dependências (se necessário)..."
+echo "PASSO 3: Reinstalando dependências..."
 echo ""
+# Limpar node_modules do web para garantir instalação limpa
+rm -rf apps/web/node_modules
 npm install --legacy-peer-deps
 if [ $? -ne 0 ]; then
     echo "⚠️  Aviso: npm install teve problemas, mas continuando..."
 fi
+
+# Garantir que react-is está instalado no workspace web
+echo "Verificando dependências do web..."
+cd apps/web
+npm install react-is --legacy-peer-deps
+cd ../..
+echo "✅ Dependências instaladas"
 echo ""
 
 echo "PASSO 4: Fazendo build da API..."

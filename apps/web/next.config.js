@@ -24,6 +24,13 @@ const nextConfig = {
       };
     }
     
+    // Garantir que módulos do recharts sejam resolvidos corretamente
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      'node_modules',
+      'apps/web/node_modules',
+    ];
+    
     return config;
   },
 }
