@@ -1,5 +1,17 @@
 // Carregar variáveis de ambiente de um arquivo .env.pm2 (não versionado)
-require('dotenv').config({ path: '.env.pm2' });
+// Procurar primeiro no diretório do projeto, depois no home do usuário
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+let envPath = path.join(process.cwd(), '.env.pm2');
+if (!fs.existsSync(envPath)) {
+  envPath = path.join(os.homedir(), '.env-pm2');
+}
+
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath });
+}
 
 module.exports = {
   apps: [

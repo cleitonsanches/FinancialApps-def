@@ -14,20 +14,33 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-echo "DIAGNÓSTICO 1: Verificando arquivo .env.pm2..."
+echo "DIAGNÓSTICO 1: Verificando arquivo .env.pm2 ou .env-pm2..."
 echo ""
+# Procurar em dois locais: diretório atual e home do usuário
+ENV_FILE=""
 if [ -f ".env.pm2" ]; then
-    echo "✅ Arquivo .env.pm2 existe"
-    echo "   Verificando se tem credenciais..."
-    if grep -q "DB_HOST" .env.pm2 && ! grep -q "seu-servidor" .env.pm2; then
-        echo "✅ Credenciais configuradas"
-    else
-        echo "❌ Credenciais NÃO configuradas ou com valores placeholder!"
-        echo "   Execute: CONFIGURAR_VARIAVEIS_AMBIENTE.sh"
-        exit 1
-    fi
+    ENV_FILE=".env.pm2"
+    echo "✅ Arquivo .env.pm2 encontrado no diretório atual"
+elif [ -f "$HOME/.env-pm2" ]; then
+    ENV_FILE="$HOME/.env-pm2"
+    echo "✅ Arquivo .env-pm2 encontrado no home: $HOME/.env-pm2"
+    echo "   Criando link simbólico no diretório atual para facilitar..."
+    ln -sf "$HOME/.env-pm2" ".env.pm2" 2>/dev/null || cp "$HOME/.env-pm2" ".env.pm2" 2>/dev/null
+    ENV_FILE=".env.pm2"
+fi
+
+if [ -z "$ENV_FILE" ]; then
+    echo "❌ Arquivo .env.pm2 NÃO encontrado em nenhum local!"
+    echo "   Execute: CONFIGURAR_VARIAVEIS_AMBIENTE.sh"
+    exit 1
+fi
+
+echo "   Verificando se tem credenciais válidas..."
+if grep -q "DB_HOST" "$ENV_FILE" && ! grep -q "seu-servidor" "$ENV_FILE"; then
+    echo "✅ Credenciais configuradas e válidas"
 else
-    echo "❌ Arquivo .env.pm2 NÃO existe!"
+    echo "❌ Credenciais NÃO configuradas ou com valores placeholder!"
+    echo "   Arquivo: $ENV_FILE"
     echo "   Execute: CONFIGURAR_VARIAVEIS_AMBIENTE.sh"
     exit 1
 fi
@@ -228,7 +241,7 @@ echo "DIAGNÓSTICO COMPLETO!"
 echo "=========================================="
 echo ""
 echo "Se ainda houver problemas:"
-echo "  1. Verificar .env.pm2: cat .env.pm2"
+echo "  1. Verificar .env.pm2: cat .env.pm2 || cat ~/.env-pm2"
 echo "  2. Ver logs completos: pm2 logs --lines 50"
 echo "  3. Verificar Nginx: sudo nginx -t && sudo tail -f /var/log/nginx/error.log"
 echo ""
