@@ -21,11 +21,13 @@ pm2 delete all 2>/dev/null || echo "   Nenhuma instância para deletar"
 echo "✅ PM2 parado"
 echo ""
 
-echo "PASSO 2: Limpando builds anteriores..."
+echo "PASSO 2: Limpando builds anteriores e cache..."
 echo ""
 rm -rf apps/web/.next
 rm -rf apps/api/dist
-echo "✅ Builds limpos"
+rm -rf node_modules/.cache
+rm -rf apps/web/node_modules/.cache
+echo "✅ Builds e cache limpos"
 echo ""
 
 echo "PASSO 3: Reinstalando dependências (se necessário)..."
