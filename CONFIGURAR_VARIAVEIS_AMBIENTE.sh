@@ -63,53 +63,73 @@ read FRONTEND_URL_TEST
 FRONTEND_URL_TEST=${FRONTEND_URL_TEST:-http://localhost:8080/test}
 
 # Criar arquivo de variáveis de ambiente
+# IMPORTANTE: Formato para dotenv (sem export, apenas CHAVE=valor)
 cat > "$HOME/.env-pm2" << EOF
 # Variáveis de Ambiente para PM2
 # Configurado em: $(date)
 # NÃO COMMITAR ESTE ARQUIVO NO GIT!
+# Formato: CHAVE=valor (sem export, para compatibilidade com dotenv)
 
 # Credenciais comuns
-export DB_TYPE=mssql
-export DB_HOST=$DB_HOST
-export DB_PORT=1433
-export DB_USERNAME=$DB_USERNAME
-export DB_PASSWORD=$DB_PASSWORD
+DB_TYPE=mssql
+DB_HOST=$DB_HOST
+DB_PORT=1433
+DB_USERNAME=$DB_USERNAME
+DB_PASSWORD=$DB_PASSWORD
 
 # Banco de Produção
-export DB_DATABASE_PROD=$DB_DATABASE_PROD
-export FRONTEND_URL_PROD=$FRONTEND_URL_PROD
+DB_DATABASE_PROD=$DB_DATABASE_PROD
+FRONTEND_URL_PROD=$FRONTEND_URL_PROD
 
 # Banco de Testes
-export DB_DATABASE_TEST=$DB_DATABASE_TEST
-export FRONTEND_URL_TEST=$FRONTEND_URL_TEST
+DB_DATABASE_TEST=$DB_DATABASE_TEST
+FRONTEND_URL_TEST=$FRONTEND_URL_TEST
 EOF
 
 echo ""
 echo "✅ Arquivo .env-pm2 criado em $HOME/.env-pm2"
 echo ""
 
-# Adicionar ao .bashrc se não estiver lá
-if ! grep -q ".env-pm2" "$HOME/.bashrc" 2>/dev/null; then
+# Adicionar ao .bashrc se não estiver lá (usar .env-pm2.sh para shell)
+if ! grep -q ".env-pm2.sh" "$HOME/.bashrc" 2>/dev/null; then
     echo "" >> "$HOME/.bashrc"
     echo "# Carregar variáveis de ambiente do PM2" >> "$HOME/.bashrc"
-    echo "if [ -f \"\$HOME/.env-pm2\" ]; then" >> "$HOME/.bashrc"
-    echo "    source \"\$HOME/.env-pm2\"" >> "$HOME/.bashrc"
+    echo "if [ -f \"\$HOME/.env-pm2.sh\" ]; then" >> "$HOME/.bashrc"
+    echo "    source \"\$HOME/.env-pm2.sh\"" >> "$HOME/.bashrc"
     echo "fi" >> "$HOME/.bashrc"
     echo "✅ Adicionado ao .bashrc"
 fi
 
 # Adicionar ao .profile também
-if ! grep -q ".env-pm2" "$HOME/.profile" 2>/dev/null; then
+if ! grep -q ".env-pm2.sh" "$HOME/.profile" 2>/dev/null; then
     echo "" >> "$HOME/.profile"
     echo "# Carregar variáveis de ambiente do PM2" >> "$HOME/.profile"
-    echo "if [ -f \"\$HOME/.env-pm2\" ]; then" >> "$HOME/.profile"
-    echo "    source \"\$HOME/.env-pm2\"" >> "$HOME/.profile"
+    echo "if [ -f \"\$HOME/.env-pm2.sh\" ]; then" >> "$HOME/.profile"
+    echo "    source \"\$HOME/.env-pm2.sh\"" >> "$HOME/.profile"
     echo "fi" >> "$HOME/.profile"
     echo "✅ Adicionado ao .profile"
 fi
 
-# Carregar agora
-source "$HOME/.env-pm2"
+# Criar também um arquivo com export para uso em shell (opcional)
+cat > "$HOME/.env-pm2.sh" << EOF
+# Variáveis de Ambiente para PM2 (formato shell com export)
+# Gerado automaticamente - use .env-pm2 para dotenv
+
+export DB_TYPE=mssql
+export DB_HOST=$DB_HOST
+export DB_PORT=1433
+export DB_USERNAME=$DB_USERNAME
+export DB_PASSWORD=$DB_PASSWORD
+export DB_DATABASE_PROD=$DB_DATABASE_PROD
+export FRONTEND_URL_PROD=$FRONTEND_URL_PROD
+export DB_DATABASE_TEST=$DB_DATABASE_TEST
+export FRONTEND_URL_TEST=$FRONTEND_URL_TEST
+EOF
+
+# Carregar o arquivo shell para uso imediato
+if [ -f "$HOME/.env-pm2.sh" ]; then
+    source "$HOME/.env-pm2.sh"
+fi
 
 echo ""
 echo "=========================================="
