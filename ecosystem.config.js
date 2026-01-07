@@ -35,7 +35,7 @@ module.exports = {
     {
       name: 'financial-web-prod',
       script: 'node',
-      args: '.next/standalone/server.js',
+      args: '.next/standalone/apps/web/server.js',
       cwd: '/var/www/FinancialApps-def/apps/web',
       instances: 1,
       autorestart: true,
@@ -84,7 +84,7 @@ module.exports = {
     {
       name: 'financial-web-test',
       script: 'node',
-      args: '.next/standalone/server.js',
+      args: '.next/standalone/apps/web/server.js',
       cwd: '/var/www/FinancialApps-def/apps/web',
       instances: 1,
       autorestart: true,
