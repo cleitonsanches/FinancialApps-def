@@ -162,20 +162,111 @@ cd ../..
 echo "✅ Web buildado"
 echo ""
 
-echo "PASSO 9: Verificando ecosystem.config.js..."
+echo "PASSO 9: Verificando e corrigindo ecosystem.config.js..."
 if [ -f "ecosystem.config.js" ]; then
     echo "✅ ecosystem.config.js existe"
+    
+    # Verificar se está usando npm run start (incorreto para standalone)
+    if grep -q "npm.*start\|next start" ecosystem.config.js; then
+        echo "⚠️  ecosystem.config.js está usando npm/next start (incorreto para standalone)"
+        echo "   Corrigindo para usar node server.js diretamente..."
+        
+        # Criar backup
+        cp ecosystem.config.js ecosystem.config.js.backup
+        
+        # Corrigir o script da web para usar node server.js
+        # Procurar o caminho do server.js
+        if [ -f "apps/web/.next/standalone/apps/web/server.js" ]; then
+            SERVER_PATH=".next/standalone/apps/web/server.js"
+        else
+            SERVER_PATH=$(find apps/web/.next/standalone -name "server.js" 2>/dev/null | head -1 | sed 's|apps/web/||')
+        fi
+        
+        if [ -z "$SERVER_PATH" ]; then
+            echo "❌ server.js não encontrado para ajustar ecosystem.config.js"
+        else
+            # Substituir npm/next start por node server.js
+            sed -i "s|script:.*npm.*|script: 'node',|g" ecosystem.config.js
+            sed -i "s|args:.*start.*|args: '$SERVER_PATH',|g" ecosystem.config.js
+            echo "✅ ecosystem.config.js corrigido para usar: node $SERVER_PATH"
+        fi
+    else
+        echo "✅ ecosystem.config.js já está usando node server.js"
+    fi
+    
     echo "   Verificando quantas apps estão configuradas..."
     APP_COUNT=$(grep -c '"name":' ecosystem.config.js || echo "0")
     echo "   Apps: $APP_COUNT"
-    
-    # Verificar se precisa ajustar para instância única
-    if grep -q "financial-api-test\|financial-web-test" ecosystem.config.js; then
-        echo "⚠️  Ainda há instâncias de teste no arquivo"
-        echo "   Mas vamos tentar iniciar mesmo assim..."
-    fi
 else
     echo "⚠️  ecosystem.config.js não encontrado"
+    echo "   Criando um básico..."
+    # Criar um ecosystem.config.js básico
+    cat > ecosystem.config.js << 'ECOSYSTEMEOF'
+// Carregar variáveis de ambiente
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+let envPath = path.join(process.cwd(), '.env.pm2');
+if (!fs.existsSync(envPath)) {
+  envPath = path.join(os.homedir(), '.env-pm2');
+}
+
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath });
+}
+
+module.exports = {
+  apps: [
+    {
+      name: 'financial-api',
+      script: 'node',
+      args: 'apps/api/dist/main.js',
+      cwd: '/var/www/FinancialApps-def',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3001,
+        DB_TYPE: process.env.DB_TYPE || 'mssql',
+        DB_HOST: process.env.DB_HOST_PROD || process.env.DB_HOST || 'seu-servidor.database.windows.net',
+        DB_PORT: process.env.DB_PORT_PROD || process.env.DB_PORT || '1433',
+        DB_USERNAME: process.env.DB_USERNAME_PROD || process.env.DB_USERNAME || 'seu-usuario',
+        DB_PASSWORD: process.env.DB_PASSWORD_PROD || process.env.DB_PASSWORD || 'sua-senha',
+        DB_DATABASE: process.env.DB_DATABASE_PROD || process.env.DB_DATABASE || 'free-db-financeapp',
+        FRONTEND_URL: process.env.FRONTEND_URL_PROD || process.env.FRONTEND_URL || 'http://localhost:8080'
+      },
+      error_file: '/var/www/FinancialApps-def/logs/api-error.log',
+      out_file: '/var/www/FinancialApps-def/logs/api-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true
+    },
+    {
+      name: 'financial-web',
+      script: 'node',
+      args: '.next/standalone/apps/web/server.js',
+      cwd: '/var/www/FinancialApps-def/apps/web',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000,
+        NEXT_PUBLIC_API_URL: '/api',
+        HOSTNAME: 'localhost'
+      },
+      error_file: '/var/www/FinancialApps-def/logs/web-error.log',
+      out_file: '/var/www/FinancialApps-def/logs/web-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true
+    }
+  ]
+}
+ECOSYSTEMEOF
+    echo "✅ ecosystem.config.js criado"
 fi
 echo ""
 
