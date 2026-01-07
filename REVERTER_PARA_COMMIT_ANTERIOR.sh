@@ -80,6 +80,13 @@ npm install --legacy-peer-deps
 if [ $? -ne 0 ]; then
     echo "⚠️  npm install teve problemas, mas continuando..."
 fi
+
+# Garantir que react-is está instalado no workspace web
+echo "   Garantindo que react-is está instalado..."
+cd apps/web
+npm install react-is --legacy-peer-deps
+cd ../..
+echo "✅ Dependências instaladas"
 echo ""
 
 echo "PASSO 7: Fazendo build da API..."
@@ -91,7 +98,60 @@ fi
 echo "✅ API buildada"
 echo ""
 
-echo "PASSO 8: Fazendo build do Web..."
+echo "PASSO 8: Verificando e corrigindo next.config.js se necessário..."
+cd apps/web
+# Verificar se precisa adicionar configurações do recharts
+if ! grep -q "transpilePackages.*recharts" next.config.js 2>/dev/null; then
+    echo "   Adicionando configurações do recharts ao next.config.js..."
+    # Criar backup
+    cp next.config.js next.config.js.backup
+    
+    # Adicionar transpilePackages e webpack config
+    cat > next.config.js << 'NEXTCONFIGEOF'
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Configurações de produção
+  output: 'standalone',
+  
+  // Configurações de imagens
+  images: {
+    unoptimized: true,
+  },
+  
+  // Transpilar recharts para resolver problemas de build
+  transpilePackages: ['recharts'],
+  
+  // Configurações do webpack para recharts
+  webpack: (config, { isServer }) => {
+    // Resolver problemas com recharts no build
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
+    }
+    
+    // Garantir que módulos do recharts sejam resolvidos corretamente
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      'node_modules',
+      'apps/web/node_modules',
+    ];
+    
+    return config;
+  },
+}
+
+module.exports = nextConfig
+NEXTCONFIGEOF
+    echo "✅ next.config.js atualizado com configurações do recharts"
+else
+    echo "✅ next.config.js já tem configurações do recharts"
+fi
+cd ../..
+echo ""
+
+echo "PASSO 9: Fazendo build do Web..."
 cd apps/web
 npm run build
 if [ $? -ne 0 ]; then
