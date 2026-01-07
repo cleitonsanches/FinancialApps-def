@@ -34,8 +34,8 @@ module.exports = {
     },
     {
       name: 'financial-web-prod',
-      script: 'node_modules/.bin/next',
-      args: 'start -p 3000',
+      script: 'node',
+      args: '.next/standalone/server.js',
       cwd: '/var/www/FinancialApps-def/apps/web',
       instances: 1,
       autorestart: true,
@@ -44,7 +44,8 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
-        NEXT_PUBLIC_API_URL: '/api'
+        NEXT_PUBLIC_API_URL: '/api',
+        HOSTNAME: 'localhost'
       },
       error_file: '/var/www/FinancialApps-def/logs/web-prod-error.log',
       out_file: '/var/www/FinancialApps-def/logs/web-prod-out.log',
@@ -82,8 +83,8 @@ module.exports = {
     },
     {
       name: 'financial-web-test',
-      script: 'node_modules/.bin/next',
-      args: 'start -p 3003',
+      script: 'node',
+      args: '.next/standalone/server.js',
       cwd: '/var/www/FinancialApps-def/apps/web',
       instances: 1,
       autorestart: true,
@@ -93,7 +94,8 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3003,
         NEXT_PUBLIC_BASE_PATH: '/test',
-        NEXT_PUBLIC_API_URL: '/test/api'
+        NEXT_PUBLIC_API_URL: '/test/api',
+        HOSTNAME: 'localhost'
       },
       error_file: '/var/www/FinancialApps-def/logs/web-test-error.log',
       out_file: '/var/www/FinancialApps-def/logs/web-test-out.log',
