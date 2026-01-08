@@ -371,7 +371,8 @@ export default function AgendaPage() {
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('day')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
-  const [selectedTab, setSelectedTab] = useState<'TODAS' | 'PENDENTES' | 'EM_PROGRESSO' | 'BLOQUEADAS' | 'CONCLUIDAS' | 'CANCELADAS'>('TODAS')
+  const [selectedTab, setSelectedTab] = useState<'ATRASADAS' | 'PENDENTES' | 'EM_PROGRESSO' | 'BLOQUEADAS' | 'CONCLUIDAS' | 'TODAS'>('ATRASADAS')
+  const [activeTotalizer, setActiveTotalizer] = useState<string | null>('ATRASADAS')
   const [filterTipo, setFilterTipo] = useState<string>('')
   const [filterProject, setFilterProject] = useState<string>('')
   const [filterClient, setFilterClient] = useState<string>('')
@@ -381,13 +382,26 @@ export default function AgendaPage() {
 
   const handleClearFilters = () => {
     setFilterTipo('')
-    setSelectedTab('TODAS')
+    setSelectedTab('ATRASADAS')
+    setActiveTotalizer('ATRASADAS')
     setFilterProject('')
     setFilterClient('')
     setStartDate('')
     setEndDate('')
     setSortBy('data')
     setSortOrder('desc')
+  }
+
+  const handleTotalizerClick = (type: string) => {
+    if (activeTotalizer === type) {
+      // Se já está ativo, desativa e volta para TODAS
+      setActiveTotalizer(null)
+      setSelectedTab('TODAS')
+    } else {
+      // Ativa o filtro
+      setActiveTotalizer(type)
+      setSelectedTab(type as any)
+    }
   }
   const [tasksWithHours, setTasksWithHours] = useState<Record<string, any[]>>({})
   const [clients, setClients] = useState<any[]>([])
@@ -883,22 +897,70 @@ export default function AgendaPage() {
     return taskDateStr < todayStr
   }
 
+  // Calcular contadores por status (aplicando apenas filtros de tipo, projeto e cliente, não status)
+  const tasksForCounters = tasks.filter((task) => {
+    if (filterTipo) {
+      const taskTipo = task.tipo || 'ATIVIDADE'
+      if (taskTipo !== filterTipo) return false
+    }
+    if (filterProject && task.project?.id !== filterProject) return false
+    if (filterClient) {
+      if (filterProject) {
+        const selectedProject = projects.find(p => p.id === filterProject)
+        if (selectedProject?.clientId !== filterClient) return false
+      } else {
+        if (task.project?.clientId !== filterClient) return false
+      }
+    }
+    if (startDate || endDate) {
+      const dateToUse = task.dataConclusao || task.dataFimPrevista || task.dataInicio
+      let taskDate: string | null = null
+      if (dateToUse) {
+        if (typeof dateToUse === 'string') {
+          taskDate = dateToUse.split('T')[0].split(' ')[0]
+        } else if (dateToUse instanceof Date) {
+          const year = dateToUse.getFullYear()
+          const month = String(dateToUse.getMonth() + 1).padStart(2, '0')
+          const day = String(dateToUse.getDate()).padStart(2, '0')
+          taskDate = `${year}-${month}-${day}`
+        }
+      }
+      if (!taskDate) return false
+      if (startDate && taskDate < startDate) return false
+      if (endDate && taskDate > endDate) return false
+    }
+    return true
+  })
+
+  const totalizadores = {
+    ATRASADAS: tasksForCounters.filter((task) => isTaskOverdue(task)).length,
+    PENDENTES: tasksForCounters.filter((task) => task.status === 'PENDENTE').length,
+    EM_PROGRESSO: tasksForCounters.filter((task) => task.status === 'EM_PROGRESSO').length,
+    BLOQUEADAS: tasksForCounters.filter((task) => task.status === 'BLOQUEADA').length,
+    CONCLUIDAS: tasksForCounters.filter((task) => task.status === 'CONCLUIDA').length,
+    TODAS: tasksForCounters.length,
+  }
+
   // Filtrar tarefas
   const filteredTasks = tasks.filter((task) => {
     if (filterTipo) {
       const taskTipo = task.tipo || 'ATIVIDADE' // Default para ATIVIDADE se não tiver tipo
       if (taskTipo !== filterTipo) return false
     }
-    // Filtrar por aba selecionada
+    // Filtrar por card selecionado
     if (selectedTab !== 'TODAS') {
-      const statusMap: Record<string, string> = {
-        'PENDENTES': 'PENDENTE',
-        'EM_PROGRESSO': 'EM_PROGRESSO',
-        'BLOQUEADAS': 'BLOQUEADA',
-        'CONCLUIDAS': 'CONCLUIDA',
-        'CANCELADAS': 'CANCELADA',
+      if (selectedTab === 'ATRASADAS') {
+        // Lógica especial para atrasadas
+        if (!isTaskOverdue(task)) return false
+      } else {
+        const statusMap: Record<string, string> = {
+          'PENDENTES': 'PENDENTE',
+          'EM_PROGRESSO': 'EM_PROGRESSO',
+          'BLOQUEADAS': 'BLOQUEADA',
+          'CONCLUIDAS': 'CONCLUIDA',
+        }
+        if (task.status !== statusMap[selectedTab]) return false
       }
-      if (task.status !== statusMap[selectedTab]) return false
     }
     if (filterProject && task.project?.id !== filterProject) return false
     if (filterClient) {
@@ -1150,33 +1212,115 @@ export default function AgendaPage() {
           </div>
         </div>
 
-        {/* Abas de Status */}
-        <div className="bg-white rounded-lg shadow-md mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex flex-wrap -mb-px" aria-label="Tabs">
-              {[
-                { value: 'TODAS', label: 'Todas' },
-                { value: 'PENDENTES', label: 'Pendentes' },
-                { value: 'EM_PROGRESSO', label: 'Em Progresso' },
-                { value: 'BLOQUEADAS', label: 'Bloqueadas' },
-                { value: 'CONCLUIDAS', label: 'Concluídas' },
-                { value: 'CANCELADAS', label: 'Canceladas' },
-              ].map((tab) => (
-                <button
-                  key={tab.value}
-                  onClick={() => setSelectedTab(tab.value as any)}
-                  className={`
-                    px-4 py-3 text-sm font-medium border-b-2 transition-colors
-                    ${selectedTab === tab.value
-                      ? 'border-primary-600 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }
-                  `}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+        {/* Cards de Status com Contadores */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg border-2 border-red-200 ${
+              activeTotalizer === 'ATRASADAS' ? 'ring-2 ring-red-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('ATRASADAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Atrasadas</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {totalizadores.ATRASADAS}
+                </p>
+              </div>
+              <div className="bg-red-100 rounded-full p-3">
+                <span className="text-red-600 text-2xl">⚠️</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'PENDENTES' ? 'ring-2 ring-yellow-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('PENDENTES')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Pendentes</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {totalizadores.PENDENTES}
+                </p>
+              </div>
+              <div className="bg-yellow-100 rounded-full p-3">
+                <span className="text-yellow-600 text-2xl">⏳</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'EM_PROGRESSO' ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('EM_PROGRESSO')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Em Progresso</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {totalizadores.EM_PROGRESSO}
+                </p>
+              </div>
+              <div className="bg-blue-100 rounded-full p-3">
+                <span className="text-blue-600 text-2xl">🔄</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'BLOQUEADAS' ? 'ring-2 ring-orange-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('BLOQUEADAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Bloqueadas</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {totalizadores.BLOQUEADAS}
+                </p>
+              </div>
+              <div className="bg-orange-100 rounded-full p-3">
+                <span className="text-orange-600 text-2xl">🚫</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'CONCLUIDAS' ? 'ring-2 ring-green-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('CONCLUIDAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Concluídas</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {totalizadores.CONCLUIDAS}
+                </p>
+              </div>
+              <div className="bg-green-100 rounded-full p-3">
+                <span className="text-green-600 text-2xl">✅</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'TODAS' ? 'ring-2 ring-gray-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('TODAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Todas</p>
+                <p className="text-2xl font-bold text-gray-600">
+                  {totalizadores.TODAS}
+                </p>
+              </div>
+              <div className="bg-gray-100 rounded-full p-3">
+                <span className="text-gray-600 text-2xl">📋</span>
+              </div>
+            </div>
           </div>
         </div>
 
