@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    # Evitar deploy automático em cada push, apenas quando explicitamente necessário
-    # Para ativar: descomente as linhas acima e comente o workflow_dispatch abaixo
   workflow_dispatch:
     # Permite deploy manual pelo GitHub Actions UI
 
@@ -109,12 +107,30 @@ jobs:
             echo "📦 Instalando dependências..."
             npm install
             
+            # Limpar builds e cache anteriores
+            echo "🧹 Limpando builds e cache anteriores..."
+            rm -rf apps/api/dist 2>/dev/null || true
+            rm -rf apps/web/.next 2>/dev/null || true
+            rm -rf apps/web/out 2>/dev/null || true
+            rm -rf apps/web/.next/cache 2>/dev/null || true
+            rm -rf node_modules/.cache 2>/dev/null || true
+            echo "✅ Cache limpo"
+            
             # Rebuild do projeto
             echo "🔨 Fazendo build da API..."
             npm run build --workspace=apps/api
             
-            echo "🔨 Fazendo build do Web..."
-            npm run build --workspace=apps/web
+            echo "🔨 Fazendo build do Web (Next.js)..."
+            cd apps/web
+            npm run build
+            cd ../..
+            
+            # Verificar se o build do Next.js foi criado
+            if [ ! -d "apps/web/.next" ]; then
+              echo "❌ ERRO: Build do Next.js não foi criado!"
+              exit 1
+            fi
+            echo "✅ Build do Next.js concluído com sucesso"
             
             # Verificar se o banco de dados existe APÓS o pull
             # NÃO criar banco novo se já existe um em qualquer local
@@ -144,16 +160,27 @@ jobs:
             echo "🔄 Executando migrações..."
             npm run migrate:proposal-observacoes --workspace=apps/api || echo "⚠️ Migração pode já ter sido executada"
             
-            # Reiniciar aplicações PM2
-            echo "🔄 Reiniciando aplicações..."
-            pm2 restart all || {
-              echo "⚠️ Erro ao reiniciar com PM2. Tentando iniciar..."
-              pm2 start all || pm2 start ecosystem.config.js || echo "⚠️ Verifique manualmente o PM2"
-            }
+            # Parar aplicações PM2 completamente antes de reiniciar
+            echo "🛑 Parando aplicações PM2..."
+            pm2 stop all 2>/dev/null || true
+            pm2 delete all 2>/dev/null || true
+            
+            # Reiniciar aplicações PM2 do zero
+            echo "🔄 Reiniciando aplicações PM2..."
+            if [ -f "ecosystem.config.js" ]; then
+              pm2 start ecosystem.config.js
+            else
+              # Iniciar manualmente se não houver ecosystem.config.js
+              cd apps/api
+              pm2 start npm --name "financial-app" -- start
+              cd ../web
+              pm2 start npm --name "financial-web" -- start
+              cd ../..
+            fi
             
             # Aguardar alguns segundos para garantir que os serviços iniciaram
             echo "⏳ Aguardando serviços iniciarem..."
-            sleep 5
+            sleep 8
             
             # Salvar configuração PM2
             pm2 save
