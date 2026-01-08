@@ -178,34 +178,58 @@ jobs:
             echo "📦 Instalando dependências..."
             npm install
             
-            # Limpar builds e cache anteriores
+            # Parar PM2 ANTES de limpar (para evitar conflitos)
+            echo "🛑 Parando PM2 antes do rebuild..."
+            pm2 stop all 2>/dev/null || true
+            pm2 delete all 2>/dev/null || true
+            sleep 2
+            
+            # Limpar builds e cache anteriores COMPLETAMENTE
             echo "🧹 Limpando builds e cache anteriores..."
             rm -rf apps/api/dist 2>/dev/null || true
             rm -rf apps/web/.next 2>/dev/null || true
             rm -rf apps/web/out 2>/dev/null || true
             rm -rf apps/web/.next/cache 2>/dev/null || true
             rm -rf node_modules/.cache 2>/dev/null || true
-            echo "✅ Cache limpo"
+            echo "✅ Cache limpo completamente"
             
-            # Rebuild do projeto
+            # Instalar/atualizar dependências ANTES do build
+            echo "📦 Instalando dependências da raiz..."
+            npm install --legacy-peer-deps || {
+              echo "⚠️ Erro ao instalar dependências da raiz, continuando..."
+            }
+            
+            # Rebuild do projeto - API
             echo "🔨 Fazendo build da API..."
             cd apps/api
             
-            # Limpar build anterior
+            # Limpar build anterior novamente (garantir)
             rm -rf dist 2>/dev/null || true
             
-            # Verificar se node_modules existe
-            if [ ! -d "node_modules" ]; then
-              echo "⚠️ node_modules não encontrado, instalando dependências..."
-              npm install --legacy-peer-deps
+            # Instalar dependências específicas da API
+            echo "📦 Instalando dependências da API..."
+            if [ ! -d "node_modules" ] || [ ! -f "node_modules/.package-lock.json" ]; then
+              echo "Instalando dependências da API..."
+              npm install --legacy-peer-deps || {
+                echo "⚠️ Erro ao instalar dependências da API, tentando continuar..."
+              }
+            else
+              echo "✅ node_modules da API já existe"
             fi
             
-            # Executar build com output detalhado e capturar erros
+            # Verificar se nest CLI está disponível
+            if ! command -v nest &> /dev/null && [ ! -f "node_modules/.bin/nest" ]; then
+              echo "⚠️ NestJS CLI não encontrado, instalando..."
+              npm install --legacy-peer-deps || {
+                echo "❌ ERRO: Não foi possível instalar dependências!"
+                exit 1
+              }
+            fi
+            
+            # Executar build com output detalhado
             echo "Executando: npm run build"
-            set +e  # Não parar em erros temporariamente
             npm run build 2>&1 | tee /tmp/api-build.log
             BUILD_EXIT_CODE=${PIPESTATUS[0]}
-            set -e  # Voltar a parar em erros
             
             # Verificar código de saída
             if [ $BUILD_EXIT_CODE -ne 0 ]; then
@@ -261,11 +285,44 @@ jobs:
             echo "🔨 Fazendo build do Web (Next.js)..."
             cd apps/web
             
+            # Limpar build anterior
+            rm -rf .next out 2>/dev/null || true
+            
+            # Instalar dependências específicas do Web
+            echo "📦 Instalando dependências do Web..."
+            if [ ! -d "node_modules" ] || [ ! -f "node_modules/.package-lock.json" ]; then
+              echo "Instalando dependências do Web..."
+              npm install --legacy-peer-deps || {
+                echo "⚠️ Erro ao instalar dependências do Web, tentando continuar..."
+              }
+            else
+              echo "✅ node_modules do Web já existe"
+            fi
+            
+            # Verificar se next está disponível
+            if ! command -v next &> /dev/null && [ ! -f "node_modules/.bin/next" ]; then
+              echo "⚠️ Next.js CLI não encontrado, instalando dependências..."
+              npm install --legacy-peer-deps || {
+                echo "❌ ERRO: Não foi possível instalar dependências do Next.js!"
+                exit 1
+              }
+            fi
+            
             # Executar build e capturar saída
-            npm run build 2>&1 | tee /tmp/web-build.log || {
-              BUILD_ERROR=$?
-              echo "⚠️ Build retornou código $BUILD_ERROR, mas vamos verificar o resultado..."
-            }
+            echo "Executando: npm run build"
+            npm run build 2>&1 | tee /tmp/web-build.log
+            BUILD_WEB_EXIT_CODE=${PIPESTATUS[0]}
+            
+            # Verificar código de saída
+            if [ $BUILD_WEB_EXIT_CODE -ne 0 ]; then
+              echo "❌ ERRO: Build do Next.js falhou com código $BUILD_WEB_EXIT_CODE"
+              echo "=========================================="
+              echo "ÚLTIMAS 100 LINHAS DO LOG DE BUILD:"
+              echo "=========================================="
+              tail -100 /tmp/web-build.log
+              echo "=========================================="
+              exit 1
+            fi
             
             # Voltar para raiz
             cd ../..
@@ -341,12 +398,7 @@ jobs:
             echo "🔄 Executando migrações..."
             npm run migrate:proposal-observacoes --workspace=apps/api || echo "⚠️ Migração pode já ter sido executada"
             
-            # Parar aplicações PM2 completamente antes de reiniciar
-            echo "🛑 Parando aplicações PM2..."
-            pm2 stop all 2>/dev/null || true
-            pm2 delete all 2>/dev/null || true
-            
-            # Verificar novamente se os builds existem antes de iniciar PM2
+            # PM2 já foi parado antes do rebuild, então só verificar builds agora
             echo "🔍 Verificação final dos builds antes de iniciar PM2..."
             
             # Verificar API
