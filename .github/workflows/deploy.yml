@@ -44,10 +44,40 @@ jobs:
         run: npm install
 
       - name: Build API
-        run: npm run build --workspace=apps/api
+        run: |
+          cd apps/api
+          echo "🔨 Iniciando build da API..."
+          npm run build
+          echo "Verificando resultado do build..."
+          if [ ! -f "dist/main.js" ]; then
+            echo "❌ ERRO: dist/main.js não foi criado!"
+            exit 1
+          fi
+          SIZE=$(stat -c%s "dist/main.js" 2>/dev/null || echo "0")
+          echo "Tamanho do dist/main.js: $SIZE bytes"
+          if [ "$SIZE" -lt 1000 ]; then
+            echo "❌ ERRO: dist/main.js muito pequeno ($SIZE bytes) - build falhou!"
+            echo "Conteúdo do arquivo:"
+            head -50 dist/main.js
+            exit 1
+          fi
+          echo "✅ Build da API concluído: $(du -h dist/main.js | cut -f1)"
 
       - name: Build Web
-        run: npm run build --workspace=apps/web
+        run: |
+          cd apps/web
+          echo "🔨 Iniciando build do Web..."
+          npm run build
+          echo "Verificando resultado do build..."
+          if [ ! -d ".next" ]; then
+            echo "❌ ERRO: Diretório .next não foi criado!"
+            exit 1
+          fi
+          if [ ! -f ".next/BUILD_ID" ]; then
+            echo "❌ ERRO: BUILD_ID não foi criado!"
+            exit 1
+          fi
+          echo "✅ Build do Web concluído"
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.0
@@ -119,15 +149,42 @@ jobs:
             # Rebuild do projeto
             echo "🔨 Fazendo build da API..."
             cd apps/api
-            npm run build
-            if [ $? -ne 0 ]; then
-              echo "❌ ERRO: Build da API falhou!"
+            
+            # Limpar build anterior
+            rm -rf dist 2>/dev/null || true
+            
+            # Verificar se node_modules existe
+            if [ ! -d "node_modules" ]; then
+              echo "⚠️ node_modules não encontrado, instalando dependências..."
+              npm install --legacy-peer-deps
+            fi
+            
+            # Executar build com output detalhado e capturar erros
+            echo "Executando: npm run build"
+            set +e  # Não parar em erros temporariamente
+            npm run build 2>&1 | tee /tmp/api-build.log
+            BUILD_EXIT_CODE=${PIPESTATUS[0]}
+            set -e  # Voltar a parar em erros
+            
+            # Verificar código de saída
+            if [ $BUILD_EXIT_CODE -ne 0 ]; then
+              echo "❌ ERRO: Build da API falhou com código $BUILD_EXIT_CODE"
+              echo "=========================================="
+              echo "ÚLTIMAS 100 LINHAS DO LOG DE BUILD:"
+              echo "=========================================="
+              tail -100 /tmp/api-build.log
+              echo "=========================================="
               exit 1
             fi
             
             # Verificar se o build da API foi criado
             if [ ! -f "dist/main.js" ]; then
               echo "❌ ERRO: dist/main.js não foi criado! Build da API falhou."
+              echo "Conteúdo do diretório dist:"
+              ls -la dist/ 2>/dev/null || echo "Diretório dist não existe"
+              echo ""
+              echo "Log completo do build:"
+              cat /tmp/api-build.log
               exit 1
             fi
             
@@ -135,6 +192,14 @@ jobs:
             MAIN_JS_SIZE=$(stat -c%s "dist/main.js" 2>/dev/null || echo "0")
             if [ "$MAIN_JS_SIZE" -lt 1000 ]; then
               echo "❌ ERRO: dist/main.js muito pequeno ($MAIN_JS_SIZE bytes) - build falhou!"
+              echo "Primeiras 50 linhas do arquivo:"
+              head -50 dist/main.js
+              echo ""
+              echo "=========================================="
+              echo "LOG COMPLETO DO BUILD:"
+              echo "=========================================="
+              cat /tmp/api-build.log
+              echo "=========================================="
               exit 1
             fi
             echo "✅ Build da API concluído com sucesso (dist/main.js: $(du -h dist/main.js | cut -f1))"
