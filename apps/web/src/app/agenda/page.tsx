@@ -371,11 +371,12 @@ export default function AgendaPage() {
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('day')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
-  const [selectedTab, setSelectedTab] = useState<'ATRASADAS' | 'PENDENTES' | 'EM_PROGRESSO' | 'BLOQUEADAS' | 'CONCLUIDAS' | 'TODAS'>('ATRASADAS')
+  const [selectedTab, setSelectedTab] = useState<'ATRASADAS' | 'PENDENTES' | 'EM_PROGRESSO' | 'BLOQUEADAS' | 'CONCLUIDAS' | 'COM_COMENTARIOS' | 'TODAS'>('ATRASADAS')
   const [activeTotalizer, setActiveTotalizer] = useState<string | null>('ATRASADAS')
   const [filterTipo, setFilterTipo] = useState<string>('')
   const [filterProject, setFilterProject] = useState<string>('')
   const [filterClient, setFilterClient] = useState<string>('')
+  const [filterComentarios, setFilterComentarios] = useState<boolean>(false)
   const [sortBy, setSortBy] = useState<'data' | 'cliente' | 'projeto' | 'status'>('data')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [showSortDropdown, setShowSortDropdown] = useState(false)
@@ -386,6 +387,7 @@ export default function AgendaPage() {
     setActiveTotalizer('ATRASADAS')
     setFilterProject('')
     setFilterClient('')
+    setFilterComentarios(false)
     setStartDate('')
     setEndDate('')
     setSortBy('data')
@@ -397,10 +399,20 @@ export default function AgendaPage() {
       // Se já está ativo, desativa e volta para TODAS
       setActiveTotalizer(null)
       setSelectedTab('TODAS')
+      if (type === 'COM_COMENTARIOS') {
+        setFilterComentarios(false)
+      }
     } else {
       // Ativa o filtro
       setActiveTotalizer(type)
       setSelectedTab(type as any)
+      // Sincronizar checkbox de comentários
+      if (type === 'COM_COMENTARIOS') {
+        setFilterComentarios(true)
+      } else if (type !== 'COM_COMENTARIOS' && filterComentarios) {
+        // Se selecionar outro card, desmarcar o checkbox (mas manter o filtro se já estava marcado)
+        // Não desmarcar automaticamente para não confundir o usuário
+      }
     }
   }
   const [tasksWithHours, setTasksWithHours] = useState<Record<string, any[]>>({})
@@ -938,6 +950,7 @@ export default function AgendaPage() {
     EM_PROGRESSO: tasksForCounters.filter((task) => task.status === 'EM_PROGRESSO').length,
     BLOQUEADAS: tasksForCounters.filter((task) => task.status === 'BLOQUEADA').length,
     CONCLUIDAS: tasksForCounters.filter((task) => task.status === 'CONCLUIDA').length,
+    COM_COMENTARIOS: tasksForCounters.filter((task) => (commentsCount[task.id] || 0) > 0).length,
     TODAS: tasksForCounters.length,
   }
 
@@ -952,6 +965,9 @@ export default function AgendaPage() {
       if (selectedTab === 'ATRASADAS') {
         // Lógica especial para atrasadas
         if (!isTaskOverdue(task)) return false
+      } else if (selectedTab === 'COM_COMENTARIOS') {
+        // Lógica especial para tarefas com comentários
+        if ((commentsCount[task.id] || 0) === 0) return false
       } else {
         const statusMap: Record<string, string> = {
           'PENDENTES': 'PENDENTE',
@@ -962,6 +978,9 @@ export default function AgendaPage() {
         if (task.status !== statusMap[selectedTab]) return false
       }
     }
+    
+    // Filtro de comentários (checkbox)
+    if (filterComentarios && (commentsCount[task.id] || 0) === 0) return false
     if (filterProject && task.project?.id !== filterProject) return false
     if (filterClient) {
       // Se um projeto está selecionado, verificar se o cliente do projeto corresponde
@@ -1212,118 +1231,6 @@ export default function AgendaPage() {
           </div>
         </div>
 
-        {/* Cards de Status com Contadores */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
-          <div 
-            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg border-2 border-red-200 ${
-              activeTotalizer === 'ATRASADAS' ? 'ring-2 ring-red-500 ring-offset-2' : ''
-            }`}
-            onClick={() => handleTotalizerClick('ATRASADAS')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Atrasadas</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {totalizadores.ATRASADAS}
-                </p>
-              </div>
-              <div className="bg-red-100 rounded-full p-3">
-                <span className="text-red-600 text-2xl">⚠️</span>
-              </div>
-            </div>
-          </div>
-          <div 
-            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
-              activeTotalizer === 'PENDENTES' ? 'ring-2 ring-yellow-500 ring-offset-2' : ''
-            }`}
-            onClick={() => handleTotalizerClick('PENDENTES')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Pendentes</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {totalizadores.PENDENTES}
-                </p>
-              </div>
-              <div className="bg-yellow-100 rounded-full p-3">
-                <span className="text-yellow-600 text-2xl">⏳</span>
-              </div>
-            </div>
-          </div>
-          <div 
-            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
-              activeTotalizer === 'EM_PROGRESSO' ? 'ring-2 ring-blue-500 ring-offset-2' : ''
-            }`}
-            onClick={() => handleTotalizerClick('EM_PROGRESSO')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Em Progresso</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {totalizadores.EM_PROGRESSO}
-                </p>
-              </div>
-              <div className="bg-blue-100 rounded-full p-3">
-                <span className="text-blue-600 text-2xl">🔄</span>
-              </div>
-            </div>
-          </div>
-          <div 
-            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
-              activeTotalizer === 'BLOQUEADAS' ? 'ring-2 ring-orange-500 ring-offset-2' : ''
-            }`}
-            onClick={() => handleTotalizerClick('BLOQUEADAS')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Bloqueadas</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {totalizadores.BLOQUEADAS}
-                </p>
-              </div>
-              <div className="bg-orange-100 rounded-full p-3">
-                <span className="text-orange-600 text-2xl">🚫</span>
-              </div>
-            </div>
-          </div>
-          <div 
-            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
-              activeTotalizer === 'CONCLUIDAS' ? 'ring-2 ring-green-500 ring-offset-2' : ''
-            }`}
-            onClick={() => handleTotalizerClick('CONCLUIDAS')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Concluídas</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {totalizadores.CONCLUIDAS}
-                </p>
-              </div>
-              <div className="bg-green-100 rounded-full p-3">
-                <span className="text-green-600 text-2xl">✅</span>
-              </div>
-            </div>
-          </div>
-          <div 
-            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
-              activeTotalizer === 'TODAS' ? 'ring-2 ring-gray-500 ring-offset-2' : ''
-            }`}
-            onClick={() => handleTotalizerClick('TODAS')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Todas</p>
-                <p className="text-2xl font-bold text-gray-600">
-                  {totalizadores.TODAS}
-                </p>
-              </div>
-              <div className="bg-gray-100 rounded-full p-3">
-                <span className="text-gray-600 text-2xl">📋</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end mb-4">
@@ -1436,6 +1343,34 @@ export default function AgendaPage() {
               </div>
             </div>
           </div>
+          {/* Filtro de comentários */}
+          <div className="pt-4 border-t border-gray-200">
+            <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors">
+              <input
+                type="checkbox"
+                checked={filterComentarios}
+                onChange={(e) => {
+                  setFilterComentarios(e.target.checked)
+                  // Se ativar o filtro de comentários, também selecionar o card correspondente
+                  if (e.target.checked) {
+                    setSelectedTab('COM_COMENTARIOS')
+                    setActiveTotalizer('COM_COMENTARIOS')
+                  } else {
+                    // Se desativar, voltar para o filtro padrão se estiver no card de comentários
+                    if (selectedTab === 'COM_COMENTARIOS') {
+                      setSelectedTab('ATRASADAS')
+                      setActiveTotalizer('ATRASADAS')
+                    }
+                  }
+                }}
+                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <span>💬</span>
+                Apenas atividades/eventos com comentários
+              </span>
+            </label>
+          </div>
           {/* Contador e botão em linha separada */}
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <span className="text-sm text-gray-600 font-medium">
@@ -1511,6 +1446,136 @@ export default function AgendaPage() {
               >
                 + Nova Atividade
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Cards de Status com Contadores */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4 mb-6">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg border-2 border-red-200 ${
+              activeTotalizer === 'ATRASADAS' ? 'ring-2 ring-red-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('ATRASADAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Atrasadas</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {totalizadores.ATRASADAS}
+                </p>
+              </div>
+              <div className="bg-red-100 rounded-full p-3">
+                <span className="text-red-600 text-2xl">⚠️</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'PENDENTES' ? 'ring-2 ring-yellow-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('PENDENTES')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Pendentes</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {totalizadores.PENDENTES}
+                </p>
+              </div>
+              <div className="bg-yellow-100 rounded-full p-3">
+                <span className="text-yellow-600 text-2xl">⏳</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'EM_PROGRESSO' ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('EM_PROGRESSO')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Em Progresso</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {totalizadores.EM_PROGRESSO}
+                </p>
+              </div>
+              <div className="bg-blue-100 rounded-full p-3">
+                <span className="text-blue-600 text-2xl">🔄</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'BLOQUEADAS' ? 'ring-2 ring-orange-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('BLOQUEADAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Bloqueadas</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {totalizadores.BLOQUEADAS}
+                </p>
+              </div>
+              <div className="bg-orange-100 rounded-full p-3">
+                <span className="text-orange-600 text-2xl">🚫</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'CONCLUIDAS' ? 'ring-2 ring-green-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('CONCLUIDAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Concluídas</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {totalizadores.CONCLUIDAS}
+                </p>
+              </div>
+              <div className="bg-green-100 rounded-full p-3">
+                <span className="text-green-600 text-2xl">✅</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'COM_COMENTARIOS' ? 'ring-2 ring-indigo-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('COM_COMENTARIOS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Com Comentários</p>
+                <p className="text-2xl font-bold text-indigo-600">
+                  {totalizadores.COM_COMENTARIOS}
+                </p>
+              </div>
+              <div className="bg-indigo-100 rounded-full p-3">
+                <span className="text-indigo-600 text-2xl">💬</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'TODAS' ? 'ring-2 ring-gray-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('TODAS')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Todas</p>
+                <p className="text-2xl font-bold text-gray-600">
+                  {totalizadores.TODAS}
+                </p>
+              </div>
+              <div className="bg-gray-100 rounded-full p-3">
+                <span className="text-gray-600 text-2xl">📋</span>
+              </div>
             </div>
           </div>
         </div>
