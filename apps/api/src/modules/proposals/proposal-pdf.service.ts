@@ -686,7 +686,7 @@ export class ProposalPdfService {
       ENVIADA: 'Enviada',
       RE_ENVIADA: 'Re-enviada',
       REVISADA: 'Revisada',
-      FECHADA: 'Fechada',
+      FECHADA: 'Contratada',
       DECLINADA: 'Declinada',
       CANCELADA: 'Cancelada',
     };

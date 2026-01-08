@@ -9,6 +9,7 @@ import { Phase } from '../../database/entities/phase.entity';
 import { Client } from '../../database/entities/client.entity';
 import { ServiceType } from '../../database/entities/service-type.entity';
 import { TimeEntry } from '../../database/entities/time-entry.entity';
+import { Invoice } from '../../database/entities/invoice.entity';
 
 @Injectable()
 export class ProposalsService {
@@ -31,6 +32,8 @@ export class ProposalsService {
     private serviceTypeRepository: Repository<ServiceType>,
     @InjectRepository(TimeEntry)
     private timeEntryRepository: Repository<TimeEntry>,
+    @InjectRepository(Invoice)
+    private invoiceRepository: Repository<Invoice>,
   ) {}
 
   // Função helper para limpar campos: UUID, numéricos e datas
@@ -325,9 +328,37 @@ export class ProposalsService {
       // Status ENVIADA, RE_ENVIADA e REVISADA não realizam ações, apenas registram a data
       // (já registrado acima)
 
-      // Se status mudou de FECHADA para outro (RASCUNHO, ENVIADA, etc.), deletar projetos e tarefas
+      // Se status mudou de FECHADA para outro (RASCUNHO, ENVIADA, etc.), tratar invoices e deletar projetos
       if (existingProposal.status === 'FECHADA' && 
           ['RASCUNHO', 'ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(cleanedUpdateData.status)) {
+        
+        // 1. Buscar todas as invoices vinculadas a esta negociação
+        const relatedInvoices = await this.invoiceRepository.find({
+          where: { proposalId: id },
+        });
+        
+        // 2. Separar invoices por status
+        const provisionadas = relatedInvoices.filter(inv => inv.status === 'PROVISIONADA');
+        const faturadas = relatedInvoices.filter(inv => inv.status === 'FATURADA');
+        const recebidas = relatedInvoices.filter(inv => inv.status === 'RECEBIDA');
+        
+        // 3. Cancelar ou deletar invoices PROVISIONADAS
+        if (provisionadas.length > 0) {
+          const provisionadaIds = provisionadas.map(inv => inv.id);
+          // Cancelar ao invés de deletar para manter histórico
+          await this.invoiceRepository.update(
+            { id: In(provisionadaIds) },
+            { status: 'CANCELADA' }
+          );
+          console.log(`✅ ${provisionadas.length} invoice(s) PROVISIONADA(s) cancelada(s) da negociação ${id}`);
+        }
+        
+        // 4. Registrar aviso sobre invoices FATURADAS e RECEBIDAS (não cancelar)
+        if (faturadas.length > 0 || recebidas.length > 0) {
+          console.warn(`⚠️ ATENÇÃO: Negociação ${id} possui ${faturadas.length} invoice(s) FATURADA(s) e ${recebidas.length} RECEBIDA(s) que não serão canceladas automaticamente`);
+        }
+        
+        // 5. Deletar projetos e tarefas
         for (const project of linkedProjects) {
           if (project.tasks) {
             // Deletar time_entries primeiro (foreign key constraint)

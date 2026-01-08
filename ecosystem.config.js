@@ -46,8 +46,8 @@ module.exports = {
     },
     {
       name: 'financial-web',
-      script: 'node',
-      args: '.next/standalone/apps/web/server.js',
+      script: 'npm',
+      args: 'start',
       cwd: '/var/www/FinancialApps-def/apps/web',
       instances: 1,
       autorestart: true,

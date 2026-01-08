@@ -88,7 +88,7 @@ export default function NegociacoesPage() {
       RE_ENVIADA: 'Re-enviada',
       REVISADA: 'Revisada',
       EM_NEGOCIACAO: 'Em Negociação',
-      FECHADA: 'Fechada',
+      FECHADA: 'Contratada',
       CANCELADA: 'Cancelada',
       DECLINADA: 'Declinada',
     }
@@ -279,7 +279,7 @@ export default function NegociacoesPage() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Fechada
+                Contratada
               </button>
             </nav>
           </div>
@@ -328,7 +328,7 @@ export default function NegociacoesPage() {
                   : `Nenhuma negociação ${activeTab === 'RASCUNHO' ? 'em rascunho' : 
                       activeTab === 'ENVIADA' ? 'enviada/re-enviada/revisada' :
                       activeTab === 'CANCELADA' ? 'cancelada' :
-                      activeTab === 'DECLINADA' ? 'declinada' : 'fechada'} cadastrada`}
+                      activeTab === 'DECLINADA' ? 'declinada' : 'contratada'} cadastrada`}
               </p>
               {!filter && (
                 <Link
@@ -404,7 +404,7 @@ export default function NegociacoesPage() {
                         <option value="ENVIADA">Enviada</option>
                         <option value="RE_ENVIADA">Re-enviada</option>
                         <option value="REVISADA">Revisada</option>
-                        <option value="FECHADA">Fechada</option>
+                        <option value="FECHADA">Contratada</option>
                         <option value="CANCELADA">Cancelada</option>
                         <option value="DECLINADA">Declinada</option>
                       </select>

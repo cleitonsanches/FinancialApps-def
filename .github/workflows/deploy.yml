@@ -118,19 +118,55 @@ jobs:
             
             # Rebuild do projeto
             echo "🔨 Fazendo build da API..."
-            npm run build --workspace=apps/api
+            cd apps/api
+            npm run build
+            if [ $? -ne 0 ]; then
+              echo "❌ ERRO: Build da API falhou!"
+              exit 1
+            fi
+            
+            # Verificar se o build da API foi criado
+            if [ ! -f "dist/main.js" ]; then
+              echo "❌ ERRO: dist/main.js não foi criado! Build da API falhou."
+              exit 1
+            fi
+            
+            # Verificar tamanho do arquivo (deve ser > 1KB)
+            MAIN_JS_SIZE=$(stat -c%s "dist/main.js" 2>/dev/null || echo "0")
+            if [ "$MAIN_JS_SIZE" -lt 1000 ]; then
+              echo "❌ ERRO: dist/main.js muito pequeno ($MAIN_JS_SIZE bytes) - build falhou!"
+              exit 1
+            fi
+            echo "✅ Build da API concluído com sucesso (dist/main.js: $(du -h dist/main.js | cut -f1))"
+            cd ../..
             
             echo "🔨 Fazendo build do Web (Next.js)..."
             cd apps/web
             npm run build
+            if [ $? -ne 0 ]; then
+              echo "❌ ERRO: Build do Next.js falhou!"
+              exit 1
+            fi
             cd ../..
             
             # Verificar se o build do Next.js foi criado
             if [ ! -d "apps/web/.next" ]; then
-              echo "❌ ERRO: Build do Next.js não foi criado!"
+              echo "❌ ERRO: Build do Next.js não foi criado (.next não existe)!"
               exit 1
             fi
-            echo "✅ Build do Next.js concluído com sucesso"
+            
+            # Verificar se o standalone foi gerado (modo standalone)
+            if [ ! -f "apps/web/.next/standalone/apps/web/server.js" ]; then
+              echo "⚠️ AVISO: Modo standalone não encontrado. Verificando estrutura do build..."
+              # Se não estiver em standalone, verificar se existe o BUILD_ID
+              if [ ! -f "apps/web/.next/BUILD_ID" ]; then
+                echo "❌ ERRO: BUILD_ID não encontrado! Build do Next.js falhou."
+                exit 1
+              fi
+              echo "✅ Build do Next.js concluído (modo padrão)"
+            else
+              echo "✅ Build do Next.js concluído com sucesso (modo standalone)"
+            fi
             
             # Verificar se o banco de dados existe APÓS o pull
             # NÃO criar banco novo se já existe um em qualquer local
@@ -165,10 +201,28 @@ jobs:
             pm2 stop all 2>/dev/null || true
             pm2 delete all 2>/dev/null || true
             
+            # Verificar novamente se os builds existem antes de iniciar PM2
+            if [ ! -f "apps/api/dist/main.js" ]; then
+              echo "❌ ERRO CRÍTICO: apps/api/dist/main.js não existe! Não é possível iniciar a API."
+              exit 1
+            fi
+            
             # Reiniciar aplicações PM2 do zero
             echo "🔄 Reiniciando aplicações PM2..."
             if [ -f "ecosystem.config.js" ]; then
-              pm2 start ecosystem.config.js
+              # Verificar se o standalone existe, senão usar npm start
+              if [ -f "apps/web/.next/standalone/apps/web/server.js" ]; then
+                echo "  ✅ Usando modo standalone do Next.js"
+                pm2 start ecosystem.config.js
+              else
+                echo "  ⚠️ Standalone não encontrado, usando npm start para web"
+                # Iniciar API normalmente
+                pm2 start ecosystem.config.js --only financial-api
+                # Iniciar Web com npm start
+                cd apps/web
+                pm2 start npm --name "financial-web" -- start
+                cd ../..
+              fi
             else
               # Iniciar manualmente se não houver ecosystem.config.js
               cd apps/api

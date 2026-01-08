@@ -218,7 +218,7 @@ export default function NovoProjetoPage() {
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Apenas negociações com status FECHADA são exibidas. Ao selecionar, o cliente e data de início serão preenchidos automaticamente.
+                Apenas negociações com status Contratada são exibidas. Ao selecionar, o cliente e data de início serão preenchidos automaticamente.
               </p>
             </div>
 

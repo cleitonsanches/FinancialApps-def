@@ -391,7 +391,7 @@ export default function NegotiationDetailsPage() {
       ENVIADA: 'Enviada',
       RE_ENVIADA: 'Re-enviada',
       REVISADA: 'Revisada',
-      FECHADA: 'Fechada',
+      FECHADA: 'Contratada',
       CANCELADA: 'Cancelada',
       DECLINADA: 'Declinada',
     }
@@ -450,7 +450,7 @@ export default function NegotiationDetailsPage() {
       ENVIADA: 'Data do Envio',
       RE_ENVIADA: 'Data do Re-envio',
       REVISADA: 'Data da Revisão',
-      FECHADA: 'Data do Fechamento',
+      FECHADA: 'Data da Contratação',
       DECLINADA: 'Data do Declínio',
       CANCELADA: 'Data do Cancelamento',
     }
@@ -663,53 +663,41 @@ export default function NegotiationDetailsPage() {
     try {
       setLoading(true)
       
-      // 1. Excluir parcelas provisionadas
-      if (revertStatusData.provisionadas.length > 0) {
-        for (const invoice of revertStatusData.provisionadas) {
-          try {
-            await api.delete(`/invoices/${invoice.id}`)
-          } catch (error) {
-            console.error(`Erro ao excluir invoice ${invoice.id}:`, error)
-          }
-        }
-      }
-
-      // 2. Excluir projetos vinculados
-      if (revertStatusData.projects.length > 0) {
-        for (const project of revertStatusData.projects) {
-          try {
-            await api.delete(`/projects/${project.id}`)
-          } catch (error) {
-            console.error(`Erro ao excluir projeto ${project.id}:`, error)
-          }
-        }
-      }
-
-      // 3. Avisar sobre parcelas faturadas/recebidas se houver
-      if (revertStatusData.faturadas.length > 0 || revertStatusData.recebidas.length > 0) {
-        let mensagem = 'Atenção:\n\n'
-        if (revertStatusData.faturadas.length > 0) {
-          mensagem += `- ${revertStatusData.faturadas.length} parcela(s) FATURADA(s) não foram excluídas.\n`
-        }
-        if (revertStatusData.recebidas.length > 0) {
-          mensagem += `- ${revertStatusData.recebidas.length} parcela(s) RECEBIDA(s) não foram excluídas.\n`
-        }
-        mensagem += '\nEssas parcelas permanecerão no sistema.'
-        alert(mensagem)
-      }
-
-      // 4. Atualizar status da negociação
+      // O backend agora trata automaticamente as invoices e projetos quando o status é atualizado
+      // Apenas atualizar o status da negociação - o backend fará o resto
       await api.put(`/negotiations/${negotiationId}`, { status: revertStatusData.newStatus })
       
-      // 5. Recarregar dados
+      // Recarregar dados para ver as mudanças
       await loadNegotiation()
       await loadProjects()
       await loadTasks()
       await loadRelatedInvoices()
       
+      // Preparar mensagem de sucesso
+      let mensagemSucesso = 'Status atualizado com sucesso!\n\n'
+      
+      if (revertStatusData.provisionadas.length > 0) {
+        mensagemSucesso += `✅ ${revertStatusData.provisionadas.length} parcela(s) PROVISIONADA(s) foi(ram) cancelada(s).\n`
+      }
+      
+      if (revertStatusData.projects.length > 0) {
+        mensagemSucesso += `✅ ${revertStatusData.projects.length} projeto(s) vinculado(s) foi(ram) excluído(s).\n\n`
+      }
+      
+      // Avisar sobre parcelas faturadas/recebidas se houver
+      if (revertStatusData.faturadas.length > 0 || revertStatusData.recebidas.length > 0) {
+        mensagemSucesso += 'Atenção:\n'
+        if (revertStatusData.faturadas.length > 0) {
+          mensagemSucesso += `- ${revertStatusData.faturadas.length} parcela(s) FATURADA(s) não foram canceladas e permanecem no sistema.\n`
+        }
+        if (revertStatusData.recebidas.length > 0) {
+          mensagemSucesso += `- ${revertStatusData.recebidas.length} parcela(s) RECEBIDA(s) não foram canceladas e permanecem no sistema.\n`
+        }
+      }
+      
       setShowRevertStatusModal(false)
       setRevertStatusData({ newStatus: '', provisionadas: [], faturadas: [], recebidas: [], projects: [] })
-      alert('Status atualizado com sucesso! Parcelas provisionadas e projetos foram excluídos.')
+      alert(mensagemSucesso)
     } catch (error: any) {
       console.error('Erro ao reverter status:', error)
       alert(error.response?.data?.message || 'Erro ao atualizar status')
@@ -1102,11 +1090,11 @@ export default function NegotiationDetailsPage() {
         })
         setShowManutencaoModal(true)
       } else {
-        alert('Negociação fechada com sucesso!')
+        alert('Negociação contratada com sucesso!')
       }
     } catch (error: any) {
-      console.error('Erro ao fechar negociação:', error)
-      alert('Erro ao fechar negociação')
+      console.error('Erro ao contratar negociação:', error)
+      alert('Erro ao contratar negociação')
     }
   }
 
@@ -1226,10 +1214,10 @@ export default function NegotiationDetailsPage() {
       await api.put(`/proposals/${negotiationId}`, { status: 'FECHADA' })
       await loadNegotiation()
       await loadProjects()
-      alert('Negociação fechada com sucesso!')
+      alert('Negociação contratada com sucesso!')
     } catch (error: any) {
-      console.error('Erro ao fechar negociação:', error)
-      alert('Erro ao fechar negociação')
+      console.error('Erro ao contratar negociação:', error)
+      alert('Erro ao contratar negociação')
     }
   }
 
@@ -1549,7 +1537,7 @@ export default function NegotiationDetailsPage() {
                     <option value="ENVIADA">Enviada</option>
                     <option value="RE_ENVIADA">Re-enviada</option>
                     <option value="REVISADA">Revisada</option>
-                    <option value="FECHADA">Fechada</option>
+                    <option value="FECHADA">Contratada</option>
                     <option value="DECLINADA">Declinada</option>
                     <option value="CANCELADA">Cancelada</option>
                   </select>
@@ -1820,7 +1808,7 @@ export default function NegotiationDetailsPage() {
           }
 
           const getStatusLabel = (status: string | null) => {
-            if (!status) return 'Aguardando fechamento'
+            if (!status) return 'Aguardando contratação'
             const labels: Record<string, string> = {
               PROVISIONADA: 'Provisionada',
               FATURADA: 'Faturada',
@@ -1944,7 +1932,7 @@ export default function NegotiationDetailsPage() {
           </div>
         )}
 
-        {/* Projetos Vinculados - Só mostrar se status for FECHADA, DECLINADA ou CANCELADA */}
+        {/* Projetos Vinculados - Só mostrar se status for CONTRATADA, DECLINADA ou CANCELADA */}
         {shouldShowLinkedItems && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <div className="flex justify-between items-center mb-4">
@@ -2005,7 +1993,7 @@ export default function NegotiationDetailsPage() {
           </div>
         )}
 
-        {/* Horas Trabalhadas - Só mostrar se status for FECHADA, DECLINADA ou CANCELADA */}
+        {/* Horas Trabalhadas - Só mostrar se status for CONTRATADA, DECLINADA ou CANCELADA */}
         {shouldShowLinkedItems && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <div className="flex justify-between items-center mb-4">
@@ -2116,11 +2104,11 @@ export default function NegotiationDetailsPage() {
           </div>
         )}
 
-        {/* Modal de Confirmação de Fechamento */}
+        {/* Modal de Confirmação de Contratação */}
         {showCloseNegotiationModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
-              <h2 className="text-2xl font-bold mb-4">Confirmar Fechamento da Negociação</h2>
+              <h2 className="text-2xl font-bold mb-4">Confirmar Contratação da Negociação</h2>
               <div className="space-y-2 mb-6">
                 <p><strong>Cliente:</strong> {negotiation.client?.razaoSocial || negotiation.client?.name || '-'}</p>
                 {negotiation.serviceType && (
@@ -2318,7 +2306,7 @@ export default function NegotiationDetailsPage() {
                   className="w-full px-4 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-left"
                 >
                   <div className="font-semibold">Não vincular projeto no momento e criar manualmente</div>
-                  <div className="text-sm text-gray-600">Fechar a negociação sem criar projeto. Você poderá criar o projeto manualmente depois na seção de Projetos.</div>
+                  <div className="text-sm text-gray-600">Contratar a negociação sem criar projeto. Você poderá criar o projeto manualmente depois na seção de Projetos.</div>
                 </button>
               </div>
               <div className="flex gap-2 justify-end">
@@ -2603,7 +2591,7 @@ export default function NegotiationDetailsPage() {
           </div>
         )}
 
-        {/* Modal de Confirmação para Reverter Status (FECHADA -> RASCUNHO/REVISADA/RE_ENVIADA) */}
+        {/* Modal de Confirmação para Reverter Status (CONTRATADA -> RASCUNHO/REVISADA/RE_ENVIADA) */}
         {showRevertStatusModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
@@ -2613,7 +2601,7 @@ export default function NegotiationDetailsPage() {
               
               <div className="mb-6">
                 <p className="text-gray-700 mb-4">
-                  Ao alterar o status de <strong>FECHADA</strong> para <strong>{getStatusLabel(revertStatusData.newStatus)}</strong>, 
+                  Ao alterar o status de <strong>Contratada</strong> para <strong>{getStatusLabel(revertStatusData.newStatus)}</strong>, 
                   os seguintes itens serão <strong className="text-red-600">EXCLUÍDOS</strong> do sistema:
                 </p>
 
@@ -2682,8 +2670,8 @@ export default function NegotiationDetailsPage() {
 
                 <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                   <p className="text-sm text-gray-700">
-                    <strong>Importante:</strong> Se a negociação voltar a ser FECHADA no futuro, 
-                    as parcelas e projetos serão recriados automaticamente seguindo a lógica normal de fechamento.
+                    <strong>Importante:</strong> Se a negociação voltar a ser Contratada no futuro, 
+                    as parcelas e projetos serão recriados automaticamente seguindo a lógica normal de contratação.
                   </p>
                 </div>
               </div>
