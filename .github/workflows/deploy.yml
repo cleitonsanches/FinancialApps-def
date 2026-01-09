@@ -174,10 +174,6 @@ jobs:
               git merge -X theirs origin/main || echo "⚠️ Erro no merge (continuando...)"
             }
             
-            # Instalar dependências (se necessário)
-            echo "📦 Instalando dependências..."
-            npm install
-            
             # Parar PM2 ANTES de limpar (para evitar conflitos)
             echo "🛑 Parando PM2 antes do rebuild..."
             pm2 stop all 2>/dev/null || true
@@ -193,42 +189,41 @@ jobs:
             rm -rf node_modules/.cache 2>/dev/null || true
             echo "✅ Cache limpo completamente"
             
-            # Instalar/atualizar dependências ANTES do build
-            echo "📦 Instalando dependências da raiz..."
+            # Instalar/atualizar dependências na RAIZ (workspace do npm)
+            echo "📦 Instalando dependências na raiz (workspace)..."
             npm install --legacy-peer-deps || {
-              echo "⚠️ Erro ao instalar dependências da raiz, continuando..."
-            }
-            
-            # Rebuild do projeto - API
-            echo "🔨 Fazendo build da API..."
-            cd apps/api
-            
-            # Limpar build anterior novamente (garantir)
-            rm -rf dist 2>/dev/null || true
-            
-            # Instalar dependências específicas da API
-            echo "📦 Instalando dependências da API..."
-            if [ ! -d "node_modules" ] || [ ! -f "node_modules/.package-lock.json" ]; then
-              echo "Instalando dependências da API..."
+              echo "❌ ERRO: Falha ao instalar dependências na raiz!"
+              echo "Tentando reinstalar limpo..."
+              rm -rf node_modules package-lock.json
               npm install --legacy-peer-deps || {
-                echo "⚠️ Erro ao instalar dependências da API, tentando continuar..."
+                echo "❌ ERRO CRÍTICO: Não foi possível instalar dependências!"
+                exit 1
               }
-            else
-              echo "✅ node_modules da API já existe"
-            fi
+            }
+            echo "✅ Dependências instaladas com sucesso"
             
-            # Verificar se nest CLI está disponível
-            if ! command -v nest &> /dev/null && [ ! -f "node_modules/.bin/nest" ]; then
-              echo "⚠️ NestJS CLI não encontrado, instalando..."
-              npm install --legacy-peer-deps || {
-                echo "❌ ERRO: Não foi possível instalar dependências!"
+            # Verificar se nest CLI está disponível (deve estar em node_modules/.bin/nest após instalação)
+            if [ ! -f "node_modules/.bin/nest" ] && [ ! -f "apps/api/node_modules/.bin/nest" ]; then
+              echo "⚠️ NestJS CLI não encontrado após instalação de dependências!"
+              echo "Verificando estrutura de node_modules..."
+              find . -name "nest" -type f 2>/dev/null | head -5
+              echo "Tentando instalar @nestjs/cli globalmente..."
+              npm install -g @nestjs/cli || {
+                echo "❌ ERRO: Não foi possível instalar @nestjs/cli!"
                 exit 1
               }
             fi
+            echo "✅ NestJS CLI encontrado"
             
-            # Executar build com output detalhado
-            echo "Executando: npm run build"
-            npm run build 2>&1 | tee /tmp/api-build.log
+            # Rebuild do projeto - API usando workspace (da raiz)
+            echo "🔨 Fazendo build da API..."
+            
+            # Limpar build anterior novamente (garantir)
+            rm -rf apps/api/dist 2>/dev/null || true
+            
+            # Executar build usando workspace (da raiz do projeto)
+            echo "Executando: npm run build --workspace=apps/api"
+            npm run build --workspace=apps/api 2>&1 | tee /tmp/api-build.log
             BUILD_EXIT_CODE=${PIPESTATUS[0]}
             
             # Verificar código de saída
@@ -242,22 +237,22 @@ jobs:
               exit 1
             fi
             
-            # Verificar se main.js foi criado
-            if [ ! -f "dist/main.js" ]; then
-              echo "❌ ERRO: dist/main.js não foi criado! Build da API falhou."
-              echo "Conteúdo do diretório dist:"
-              ls -la dist/ 2>/dev/null || echo "Diretório dist não existe"
+            # Verificar se main.js foi criado (da raiz do projeto)
+            if [ ! -f "apps/api/dist/main.js" ]; then
+              echo "❌ ERRO: apps/api/dist/main.js não foi criado! Build da API falhou."
+              echo "Conteúdo do diretório apps/api/dist:"
+              ls -la apps/api/dist/ 2>/dev/null || echo "Diretório apps/api/dist não existe"
               echo ""
               echo "Log completo do build:"
               cat /tmp/api-build.log
               exit 1
             fi
             
-            # Verificar se app.module.js foi criado (indica que os módulos foram compilados)
-            if [ ! -f "dist/app.module.js" ]; then
-              echo "❌ ERRO: dist/app.module.js não foi criado - módulos não foram compilados!"
-              echo "Conteúdo do diretório dist:"
-              ls -la dist/ 2>/dev/null | head -30
+            # Verificar se app.module.js foi criado
+            if [ ! -f "apps/api/dist/app.module.js" ]; then
+              echo "❌ ERRO: apps/api/dist/app.module.js não foi criado - módulos não foram compilados!"
+              echo "Conteúdo do diretório apps/api/dist:"
+              ls -la apps/api/dist/ 2>/dev/null | head -30
               echo ""
               echo "Log completo do build:"
               cat /tmp/api-build.log
@@ -265,11 +260,11 @@ jobs:
             fi
             
             # Verificar se há módulos compilados
-            MODULES_COUNT=$(find dist/modules -name "*.js" 2>/dev/null | wc -l || echo "0")
+            MODULES_COUNT=$(find apps/api/dist/modules -name "*.js" 2>/dev/null | wc -l || echo "0")
             if [ "$MODULES_COUNT" -eq 0 ]; then
-              echo "❌ ERRO: Nenhum módulo foi compilado em dist/modules/"
-              echo "Conteúdo do diretório dist:"
-              ls -la dist/ 2>/dev/null | head -30
+              echo "❌ ERRO: Nenhum módulo foi compilado em apps/api/dist/modules/"
+              echo "Conteúdo do diretório apps/api/dist:"
+              ls -la apps/api/dist/ 2>/dev/null | head -30
               echo ""
               echo "Log completo do build:"
               cat /tmp/api-build.log
@@ -277,40 +272,28 @@ jobs:
             fi
             
             echo "✅ Build da API concluído com sucesso:"
-            echo "   - main.js: $(du -h dist/main.js | cut -f1)"
-            echo "   - app.module.js: $(du -h dist/app.module.js | cut -f1)"
+            echo "   - main.js: $(du -h apps/api/dist/main.js | cut -f1)"
+            echo "   - app.module.js: $(du -h apps/api/dist/app.module.js | cut -f1)"
             echo "   - Módulos compilados: $MODULES_COUNT arquivos"
-            cd ../..
             
             echo "🔨 Fazendo build do Web (Next.js)..."
-            cd apps/web
             
             # Limpar build anterior
-            rm -rf .next out 2>/dev/null || true
+            rm -rf apps/web/.next apps/web/out 2>/dev/null || true
             
-            # Instalar dependências específicas do Web
-            echo "📦 Instalando dependências do Web..."
-            if [ ! -d "node_modules" ] || [ ! -f "node_modules/.package-lock.json" ]; then
-              echo "Instalando dependências do Web..."
-              npm install --legacy-peer-deps || {
-                echo "⚠️ Erro ao instalar dependências do Web, tentando continuar..."
-              }
+            # Verificar se next está disponível (já instalado via workspace na raiz)
+            if [ ! -f "node_modules/.bin/next" ] && [ ! -f "apps/web/node_modules/.bin/next" ] && ! command -v next &> /dev/null; then
+              echo "⚠️ Next.js CLI não encontrado após instalação de dependências!"
+              echo "Verificando estrutura de node_modules..."
+              find . -name "next" -type f 2>/dev/null | head -5
+              echo "⚠️ Continuando build mesmo assim (pode funcionar via workspace)"
             else
-              echo "✅ node_modules do Web já existe"
+              echo "✅ Next.js CLI encontrado"
             fi
             
-            # Verificar se next está disponível
-            if ! command -v next &> /dev/null && [ ! -f "node_modules/.bin/next" ]; then
-              echo "⚠️ Next.js CLI não encontrado, instalando dependências..."
-              npm install --legacy-peer-deps || {
-                echo "❌ ERRO: Não foi possível instalar dependências do Next.js!"
-                exit 1
-              }
-            fi
-            
-            # Executar build e capturar saída
-            echo "Executando: npm run build"
-            npm run build 2>&1 | tee /tmp/web-build.log
+            # Executar build usando workspace (da raiz do projeto)
+            echo "Executando: npm run build --workspace=apps/web"
+            npm run build --workspace=apps/web 2>&1 | tee /tmp/web-build.log
             BUILD_WEB_EXIT_CODE=${PIPESTATUS[0]}
             
             # Verificar código de saída
@@ -323,9 +306,6 @@ jobs:
               echo "=========================================="
               exit 1
             fi
-            
-            # Voltar para raiz
-            cd ../..
             
             echo "Verificando resultado do build do Next.js..."
             
