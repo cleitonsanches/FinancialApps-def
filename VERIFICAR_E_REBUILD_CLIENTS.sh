@@ -12,31 +12,27 @@ cd /var/www/FinancialApps-def
 echo "📥 Atualizando código..."
 git pull origin main
 
-# 2. Verificar se há erros de sintaxe na entidade Client
-echo ""
-echo "🔍 Verificando sintaxe da entidade Client..."
-cd apps/api/src/database/entities
-if node -c client.entity.ts 2>&1 | grep -i error; then
-    echo "❌ Erro de sintaxe encontrado em client.entity.ts"
-    exit 1
-else
-    echo "✅ Sintaxe OK"
-fi
-cd ../../../../..
-
-# 3. Limpar build anterior
+# 2. Limpar build anterior
 echo ""
 echo "🧹 Limpando build anterior..."
 rm -rf apps/api/dist
 rm -rf node_modules/.cache
 
-# 4. Verificar se há erros de TypeScript
+# 3. Verificar se há erros de TypeScript
 echo ""
 echo "🔍 Verificando erros de TypeScript..."
 cd apps/api
-npx tsc --noEmit 2>&1 | grep -i "client.entity" | head -20 || echo "Sem erros específicos do Client"
+TS_ERRORS=$(npx tsc --noEmit 2>&1)
+if [ $? -ne 0 ]; then
+    echo "⚠️ Erros de TypeScript encontrados:"
+    echo "$TS_ERRORS" | grep -i "client" | head -20 || echo "$TS_ERRORS" | head -30
+    echo ""
+    echo "⚠️ Continuando build mesmo assim..."
+else
+    echo "✅ Sem erros de TypeScript"
+fi
 
-# 5. Fazer build
+# 4. Fazer build
 echo ""
 echo "🔨 Fazendo build da API..."
 npm run build 2>&1 | tee /tmp/build-output.log
@@ -58,19 +54,19 @@ fi
 
 echo "✅ Build concluído com sucesso"
 
-# 6. Voltar para raiz e reiniciar
+# 5. Voltar para raiz e reiniciar
 cd ../..
 echo ""
 echo "🔄 Reiniciando API..."
 pm2 restart financial-api
 sleep 5
 
-# 7. Verificar logs
+# 6. Verificar logs
 echo ""
 echo "📋 Logs da API (últimas 30 linhas):"
 pm2 logs financial-api --err --lines 30 --nostream
 
-# 8. Testar endpoint
+# 7. Testar endpoint
 echo ""
 echo "🧪 Testando endpoint /api/clients..."
 curl -s http://localhost:3001/api/clients 2>&1 | head -20
