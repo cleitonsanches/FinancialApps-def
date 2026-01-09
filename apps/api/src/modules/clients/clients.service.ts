@@ -11,22 +11,40 @@ export class ClientsService {
   ) {}
 
   async findAll(companyId?: string, isCliente?: boolean, isFornecedor?: boolean): Promise<Client[]> {
-    console.log('ClientsService.findAll - companyId:', companyId, 'isCliente:', isCliente, 'isFornecedor:', isFornecedor);
-    
-    const where: any = {};
-    if (companyId) {
-      where.companyId = companyId;
+    try {
+      console.log('ClientsService.findAll - companyId:', companyId, 'isCliente:', isCliente, 'isFornecedor:', isFornecedor);
+      
+      const where: any = {};
+      if (companyId) {
+        where.companyId = companyId;
+      }
+      if (isCliente !== undefined) {
+        where.isCliente = isCliente;
+      }
+      if (isFornecedor !== undefined) {
+        where.isFornecedor = isFornecedor;
+      }
+      
+      console.log('ClientsService.findAll - condições where:', JSON.stringify(where));
+      
+      const clients = await this.clientRepository.find({ where });
+      console.log('ClientsService.findAll - encontrados:', clients.length, 'clientes');
+      
+      if (clients.length > 0) {
+        console.log('ClientsService.findAll - primeiro cliente:', {
+          id: clients[0].id,
+          name: clients[0].name,
+          isCliente: clients[0].isCliente,
+          isFornecedor: clients[0].isFornecedor
+        });
+      }
+      
+      return clients;
+    } catch (error: any) {
+      console.error('ClientsService.findAll - ERRO:', error.message);
+      console.error('ClientsService.findAll - Stack:', error.stack);
+      throw error;
     }
-    if (isCliente !== undefined) {
-      where.isCliente = isCliente;
-    }
-    if (isFornecedor !== undefined) {
-      where.isFornecedor = isFornecedor;
-    }
-    
-    const clients = await this.clientRepository.find({ where });
-    console.log('ClientsService.findAll - encontrados:', clients.length);
-    return clients;
   }
 
   async findOne(id: string): Promise<Client> {

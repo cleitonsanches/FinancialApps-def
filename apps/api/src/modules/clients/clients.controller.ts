@@ -13,11 +13,19 @@ export class ClientsController {
     @Query('isFornecedor') isFornecedor?: string,
     @Request() req?: any
   ): Promise<Client[]> {
-    const effectiveCompanyId = companyId || req?.user?.companyId;
-    console.log('ClientsController.findAll - companyId:', companyId, 'req?.user?.companyId:', req?.user?.companyId, 'effectiveCompanyId:', effectiveCompanyId);
-    const clients = await this.clientsService.findAll(effectiveCompanyId, isCliente === 'true', isFornecedor === 'true');
-    console.log('ClientsController.findAll - encontrados:', clients.length, 'clientes');
-    return clients;
+    try {
+      const effectiveCompanyId = companyId || req?.user?.companyId;
+      console.log('ClientsController.findAll - companyId:', companyId, 'req?.user?.companyId:', req?.user?.companyId, 'effectiveCompanyId:', effectiveCompanyId);
+      console.log('ClientsController.findAll - isCliente:', isCliente, 'isFornecedor:', isFornecedor);
+      
+      const clients = await this.clientsService.findAll(effectiveCompanyId, isCliente === 'true', isFornecedor === 'true');
+      console.log('ClientsController.findAll - encontrados:', clients.length, 'clientes');
+      return clients;
+    } catch (error: any) {
+      console.error('ClientsController.findAll - ERRO:', error.message);
+      console.error('ClientsController.findAll - Stack:', error.stack);
+      throw error;
+    }
   }
 
   @Get(':id')
