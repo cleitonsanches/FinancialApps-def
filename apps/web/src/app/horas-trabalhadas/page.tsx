@@ -16,7 +16,8 @@ export default function HorasTrabalhadasPage() {
   const [projectFilter, setProjectFilter] = useState('')
   const [clientFilter, setClientFilter] = useState('')
   const [faturavelFilter, setFaturavelFilter] = useState('')
-  const [activeTab, setActiveTab] = useState<'PENDENTE' | 'REPROVADA' | 'APROVADA' | 'FATURADA'>('PENDENTE') // Aba padrão: Pendente
+  const [selectedTab, setSelectedTab] = useState<'PENDENTE' | 'REPROVADA' | 'APROVADA' | 'FATURADA'>('PENDENTE') // Card padrão: Pendente
+  const [activeTotalizer, setActiveTotalizer] = useState<string | null>('PENDENTE')
   const [projects, setProjects] = useState<any[]>([])
   const [proposals, setProposals] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
@@ -58,7 +59,30 @@ export default function HorasTrabalhadasPage() {
     setFaturavelFilter('')
     setDateFrom('')
     setDateTo('')
-    setActiveTab('PENDENTE') // Voltar ao padrão: Pendente
+    setSelectedTab('PENDENTE') // Voltar ao padrão: Pendente
+    setActiveTotalizer('PENDENTE')
+  }
+
+  const handleTotalizerClick = (type: string) => {
+    setActiveTotalizer(type)
+    setSelectedTab(type as any)
+  }
+
+  // Calcular totalizadores
+  const totalizadores = {
+    PENDENTE: timeEntries.filter((entry) => {
+      const entryStatus = entry.status || 'PENDENTE'
+      return entryStatus === 'PENDENTE' && !entry.isFaturada
+    }).length,
+    REPROVADA: timeEntries.filter((entry) => {
+      const entryStatus = entry.status || 'PENDENTE'
+      return entryStatus === 'REPROVADA' && !entry.isFaturada
+    }).length,
+    APROVADA: timeEntries.filter((entry) => {
+      const entryStatus = entry.status || 'PENDENTE'
+      return entryStatus === 'APROVADA' && !entry.isFaturada
+    }).length,
+    FATURADA: timeEntries.filter((entry) => entry.isFaturada).length,
   }
 
   useEffect(() => {
@@ -291,10 +315,12 @@ export default function HorasTrabalhadasPage() {
       }
       
       // Ordenar por data (mais recente primeiro)
+      // Usar comparação de strings para evitar problemas de timezone
       allTimeEntries.sort((a, b) => {
-        const dateA = new Date(a.data).getTime()
-        const dateB = new Date(b.data).getTime()
-        return dateB - dateA
+        const dateA = typeof a.data === 'string' ? a.data.split('T')[0] : new Date(a.data).toISOString().split('T')[0]
+        const dateB = typeof b.data === 'string' ? b.data.split('T')[0] : new Date(b.data).toISOString().split('T')[0]
+        // Comparar strings YYYY-MM-DD (ordem reversa para mais recente primeiro)
+        return dateB.localeCompare(dateA)
       })
       
       setTimeEntries(allTimeEntries)
@@ -482,23 +508,40 @@ export default function HorasTrabalhadasPage() {
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return '-'
     try {
-      let date: Date
+      // Se for string no formato YYYY-MM-DD, extrair diretamente para evitar problemas de timezone
       if (typeof dateString === 'string') {
-        // Se já tem T (datetime), usar diretamente, senão adicionar T00:00:00
-        date = dateString.includes('T') ? new Date(dateString) : new Date(dateString + 'T00:00:00')
+        // Verificar se é formato YYYY-MM-DD (com ou sem hora)
+        const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (dateMatch) {
+          const [, year, month, day] = dateMatch
+          // Formatar diretamente sem usar Date para evitar problemas de timezone
+          return `${day}/${month}/${year}`
+        }
+        // Se já tem T (datetime), extrair apenas a parte da data
+        if (dateString.includes('T')) {
+          const datePart = dateString.split('T')[0]
+          const [year, month, day] = datePart.split('-')
+          return `${day}/${month}/${year}`
+        }
+        // Tentar criar Date como fallback
+        const date = new Date(dateString)
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          return `${day}/${month}/${year}`
+        }
       } else {
-        date = new Date(dateString)
+        // Se for Date, usar métodos locais
+        const date = new Date(dateString)
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          return `${day}/${month}/${year}`
+        }
       }
-      
-      // Verificar se a data é válida
-      if (isNaN(date.getTime())) {
-        return '-'
-      }
-      
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${day}/${month}/${year}`
+      return '-'
     } catch (error) {
       console.error('Erro ao formatar data:', error, dateString)
       return '-'
@@ -506,19 +549,19 @@ export default function HorasTrabalhadasPage() {
   }
 
   const filteredTimeEntries = timeEntries.filter((entry) => {
-    // Filtro de status (baseado na aba ativa)
-    if (activeTab === 'FATURADA') {
-      // Para aba Faturadas, mostrar apenas horas que estão em invoices faturadas
+    // Filtro de status (baseado no card selecionado)
+    if (selectedTab === 'FATURADA') {
+      // Para card Faturadas, mostrar apenas horas que estão em invoices faturadas
       if (!entry.isFaturada) {
         return false
       }
     } else {
-      // Para outras abas, usar o status normal
+      // Para outros cards, usar o status normal
       const entryStatus = entry.status || 'PENDENTE' // Se não tiver status, considerar como PENDENTE
-      if (entryStatus !== activeTab) {
+      if (entryStatus !== selectedTab) {
         return false
       }
-      // Se a hora está faturada, não mostrar nas outras abas (exceto Faturadas)
+      // Se a hora está faturada, não mostrar nos outros cards (exceto Faturadas)
       if (entry.isFaturada) {
         return false
       }
@@ -556,18 +599,15 @@ export default function HorasTrabalhadasPage() {
       }
     }
 
-    // Filtro de período
+    // Filtro de período - usar comparação de strings para evitar problemas de timezone
     if (dateFrom) {
-      const entryDate = new Date(entry.data)
-      const fromDate = new Date(dateFrom)
-      if (entryDate < fromDate) return false
+      const entryDateStr = typeof entry.data === 'string' ? entry.data.split('T')[0] : new Date(entry.data).toISOString().split('T')[0]
+      if (entryDateStr < dateFrom) return false
     }
 
     if (dateTo) {
-      const entryDate = new Date(entry.data)
-      const toDate = new Date(dateTo)
-      toDate.setHours(23, 59, 59, 999)
-      if (entryDate > toDate) return false
+      const entryDateStr = typeof entry.data === 'string' ? entry.data.split('T')[0] : new Date(entry.data).toISOString().split('T')[0]
+      if (entryDateStr > dateTo) return false
     }
 
     return true
@@ -760,54 +800,6 @@ export default function HorasTrabalhadasPage() {
           </div>
         </div>
 
-        {/* Abas de Status */}
-        <div className="bg-white rounded-lg shadow-md mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px" aria-label="Tabs">
-              <button
-                onClick={() => setActiveTab('PENDENTE')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'PENDENTE'
-                    ? 'border-yellow-500 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Pendente
-              </button>
-              <button
-                onClick={() => setActiveTab('REPROVADA')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'REPROVADA'
-                    ? 'border-red-500 text-red-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Reprovada
-              </button>
-              <button
-                onClick={() => setActiveTab('APROVADA')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'APROVADA'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Aprovada
-              </button>
-              <button
-                onClick={() => setActiveTab('FATURADA')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'FATURADA'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Faturadas
-              </button>
-            </nav>
-          </div>
-        </div>
-
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end mb-4">
@@ -944,6 +936,82 @@ export default function HorasTrabalhadasPage() {
           </div>
         </div>
 
+        {/* Cards de Status com Contadores */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'PENDENTE' ? 'ring-2 ring-yellow-500 ring-offset-2 border-2 border-yellow-200' : ''
+            }`}
+            onClick={() => handleTotalizerClick('PENDENTE')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Pendentes</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {totalizadores.PENDENTE}
+                </p>
+              </div>
+              <div className="bg-yellow-100 rounded-full p-3">
+                <span className="text-yellow-600 text-2xl">⏳</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'REPROVADA' ? 'ring-2 ring-red-500 ring-offset-2 border-2 border-red-200' : ''
+            }`}
+            onClick={() => handleTotalizerClick('REPROVADA')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Reprovadas</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {totalizadores.REPROVADA}
+                </p>
+              </div>
+              <div className="bg-red-100 rounded-full p-3">
+                <span className="text-red-600 text-2xl">❌</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'APROVADA' ? 'ring-2 ring-green-500 ring-offset-2 border-2 border-green-200' : ''
+            }`}
+            onClick={() => handleTotalizerClick('APROVADA')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Aprovadas</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {totalizadores.APROVADA}
+                </p>
+              </div>
+              <div className="bg-green-100 rounded-full p-3">
+                <span className="text-green-600 text-2xl">✅</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'FATURADA' ? 'ring-2 ring-purple-500 ring-offset-2 border-2 border-purple-200' : ''
+            }`}
+            onClick={() => handleTotalizerClick('FATURADA')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Faturadas</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {totalizadores.FATURADA}
+                </p>
+              </div>
+              <div className="bg-purple-100 rounded-full p-3">
+                <span className="text-purple-600 text-2xl">💰</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Lista de Horas Trabalhadas */}
         {filteredTimeEntries.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
@@ -951,9 +1019,9 @@ export default function HorasTrabalhadasPage() {
               {(projectFilter || clientFilter || faturavelFilter || dateFrom || dateTo) 
                 ? 'Nenhuma hora encontrada com o filtro aplicado' 
                 : `Nenhuma hora trabalhada ${
-                    activeTab === 'PENDENTE' ? 'pendente' : 
-                    activeTab === 'REPROVADA' ? 'reprovada' : 
-                    activeTab === 'APROVADA' ? 'aprovada' : 
+                    selectedTab === 'PENDENTE' ? 'pendente' : 
+                    selectedTab === 'REPROVADA' ? 'reprovada' : 
+                    selectedTab === 'APROVADA' ? 'aprovada' : 
                     'faturada'
                   } registrada`}
             </p>

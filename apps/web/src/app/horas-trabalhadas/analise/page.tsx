@@ -278,8 +278,30 @@ export default function AnaliseHorasTrabalhadasPage() {
 
   const formatDate = (dateString: string): string => {
     if (!dateString) return ''
-    const date = new Date(dateString)
-    return date.toLocaleDateString('pt-BR')
+    try {
+      // Se for string no formato YYYY-MM-DD, extrair diretamente para evitar problemas de timezone
+      const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/)
+      if (dateMatch) {
+        const [, year, month, day] = dateMatch
+        // Formatar diretamente sem usar Date para evitar problemas de timezone
+        return `${day}/${month}/${year}`
+      }
+      // Se já tem T (datetime), extrair apenas a parte da data
+      if (dateString.includes('T')) {
+        const datePart = dateString.split('T')[0]
+        const [year, month, day] = datePart.split('-')
+        return `${day}/${month}/${year}`
+      }
+      // Fallback: tentar usar Date
+      const date = new Date(dateString)
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('pt-BR')
+      }
+      return ''
+    } catch (error) {
+      console.error('Erro ao formatar data:', error, dateString)
+      return ''
+    }
   }
 
   const getRelatorioTitulo = (): string => {
@@ -374,17 +396,14 @@ export default function AnaliseHorasTrabalhadasPage() {
 
   // Filtrar entries baseado nos filtros
   const filteredTimeEntries = timeEntries.filter(entry => {
-    // Filtro de data
+    // Filtro de data - usar comparação de strings para evitar problemas de timezone
     if (dateFrom) {
-      const entryDate = new Date(entry.data)
-      const fromDate = new Date(dateFrom)
-      if (entryDate < fromDate) return false
+      const entryDateStr = typeof entry.data === 'string' ? entry.data.split('T')[0] : new Date(entry.data).toISOString().split('T')[0]
+      if (entryDateStr < dateFrom) return false
     }
     if (dateTo) {
-      const entryDate = new Date(entry.data)
-      const toDate = new Date(dateTo)
-      toDate.setHours(23, 59, 59, 999)
-      if (entryDate > toDate) return false
+      const entryDateStr = typeof entry.data === 'string' ? entry.data.split('T')[0] : new Date(entry.data).toISOString().split('T')[0]
+      if (entryDateStr > dateTo) return false
     }
     
     // Filtro de projeto
@@ -706,8 +725,7 @@ export default function AnaliseHorasTrabalhadasPage() {
                     // Calcular dias únicos
                     const diasUnicos = new Set(
                       filteredTimeEntries.map(entry => {
-                        const date = new Date(entry.data)
-                        return date.toISOString().split('T')[0]
+                        return typeof entry.data === 'string' ? entry.data.split('T')[0] : new Date(entry.data).toISOString().split('T')[0]
                       })
                     )
                     const numDias = diasUnicos.size || 1
@@ -719,8 +737,7 @@ export default function AnaliseHorasTrabalhadasPage() {
                   {(() => {
                     const diasUnicos = new Set(
                       filteredTimeEntries.map(entry => {
-                        const date = new Date(entry.data)
-                        return date.toISOString().split('T')[0]
+                        return typeof entry.data === 'string' ? entry.data.split('T')[0] : new Date(entry.data).toISOString().split('T')[0]
                       })
                     )
                     return `${diasUnicos.size} dias únicos`
@@ -1116,7 +1133,7 @@ export default function AnaliseHorasTrabalhadasPage() {
                               <div className="ml-4 space-y-2">
                                 {phaseData.hours.map((hour: any) => {
                                   const userName = users.find(u => u.id === hour.userId)?.name || hour.user?.name || 'Usuário desconhecido'
-                                  const dataFormatada = new Date(hour.data).toLocaleDateString('pt-BR')
+                                  const dataFormatada = formatDate(hour.data)
                                   const horasFormatadas = formatHoursFromDecimal(parseFloat(hour.horas) || 0)
                                   const valorPorHora = parseFloat(hour.valorPorHora) || 0
                                   const valorTotal = (parseFloat(hour.horas) || 0) * valorPorHora
@@ -1163,7 +1180,7 @@ export default function AnaliseHorasTrabalhadasPage() {
                               <div className="ml-4 space-y-2">
                                 {projectData.hoursWithoutPhase.map((hour: any) => {
                                   const userName = users.find(u => u.id === hour.userId)?.name || hour.user?.name || 'Usuário desconhecido'
-                                  const dataFormatada = new Date(hour.data).toLocaleDateString('pt-BR')
+                                  const dataFormatada = formatDate(hour.data)
                                   const horasFormatadas = formatHoursFromDecimal(parseFloat(hour.horas) || 0)
                                   const valorPorHora = parseFloat(hour.valorPorHora) || 0
                                   const valorTotal = (parseFloat(hour.horas) || 0) * valorPorHora
