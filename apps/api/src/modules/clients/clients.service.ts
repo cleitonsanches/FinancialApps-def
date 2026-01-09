@@ -14,9 +14,16 @@ export class ClientsService {
     try {
       console.log('ClientsService.findAll - companyId:', companyId, 'isCliente:', isCliente, 'isFornecedor:', isFornecedor);
       
+      // Primeiro, verificar quantos registros existem SEM filtro
+      const totalCount = await this.clientRepository.count();
+      console.log('ClientsService.findAll - Total de registros na tabela (sem filtros):', totalCount);
+      
       const where: any = {};
       if (companyId) {
         where.companyId = companyId;
+        // Verificar quantos registros têm esse companyId
+        const countWithCompany = await this.clientRepository.count({ where: { companyId } });
+        console.log(`ClientsService.findAll - Registros com companyId=${companyId}:`, countWithCompany);
       }
       if (isCliente !== undefined) {
         where.isCliente = isCliente;
@@ -34,9 +41,24 @@ export class ClientsService {
         console.log('ClientsService.findAll - primeiro cliente:', {
           id: clients[0].id,
           name: clients[0].name,
+          companyId: clients[0].companyId,
           isCliente: clients[0].isCliente,
-          isFornecedor: clients[0].isFornecedor
+          isClienteType: typeof clients[0].isCliente,
+          isFornecedor: clients[0].isFornecedor,
+          isFornecedorType: typeof clients[0].isFornecedor
         });
+      } else {
+        console.warn('ClientsService.findAll - NENHUM cliente encontrado com os filtros aplicados!');
+        // Se não encontrou nada e tinha filtro de companyId, tentar sem o filtro para debug
+        if (companyId) {
+          console.log('ClientsService.findAll - Tentando buscar SEM filtro de companyId para debug...');
+          const allClients = await this.clientRepository.find({ take: 5 });
+          console.log('ClientsService.findAll - Primeiros 5 registros (sem filtro):', allClients.map(c => ({
+            id: c.id,
+            name: c.name,
+            companyId: c.companyId
+          })));
+        }
       }
       
       return clients;
