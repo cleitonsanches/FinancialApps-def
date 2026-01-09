@@ -175,7 +175,16 @@ export class Proposal {
   @Column({ name: 'data_fim_contrato', type: 'date', nullable: true })
   dataFimContrato?: Date;
 
-  @Column({ name: 'tem_manutencao_vinculada', default: false, nullable: true })
+  @Column({ 
+    name: 'tem_manutencao_vinculada', 
+    type: 'bit', 
+    default: false, 
+    nullable: true,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   temManutencaoVinculada?: boolean;
 
   @Column({ name: 'proposta_manutencao_id', nullable: true })

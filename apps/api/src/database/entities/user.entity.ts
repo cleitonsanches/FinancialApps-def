@@ -30,10 +30,26 @@ export class User {
   @JoinColumn({ name: 'contact_id' })
   contact?: Contact;
 
-  @Column({ name: 'is_admin', default: false })
+  @Column({ 
+    name: 'is_admin', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   isAdmin: boolean;
 
-  @Column({ name: 'is_active', default: true })
+  @Column({ 
+    name: 'is_active', 
+    type: 'bit', 
+    default: true,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })

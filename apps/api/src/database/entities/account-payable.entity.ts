@@ -65,7 +65,15 @@ export class AccountPayable {
   @JoinColumn({ name: 'bank_account_id' })
   bankAccount?: BankAccount;
 
-  @Column({ name: 'is_reembolsavel', default: false })
+  @Column({ 
+    name: 'is_reembolsavel', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   isReembolsavel: boolean;
 
   @Column({ name: 'valor_reembolsar', type: 'decimal', precision: 15, scale: 2, nullable: true })

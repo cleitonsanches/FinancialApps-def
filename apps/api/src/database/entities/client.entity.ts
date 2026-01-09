@@ -50,13 +50,37 @@ export class Client {
   @Column({ name: 'address_zipcode', type: 'varchar', length: 10, nullable: true })
   addressZipcode?: string;
 
-  @Column({ name: 'is_cliente', type: 'bit', default: false })
+  @Column({ 
+    name: 'is_cliente', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   isCliente: boolean;
 
-  @Column({ name: 'is_fornecedor', type: 'bit', default: false })
+  @Column({ 
+    name: 'is_fornecedor', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   isFornecedor: boolean;
 
-  @Column({ name: 'is_colaborador', type: 'bit', default: false })
+  @Column({ 
+    name: 'is_colaborador', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   isColaborador: boolean;
 
   @CreateDateColumn({ name: 'created_at' })

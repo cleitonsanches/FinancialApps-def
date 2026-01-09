@@ -67,7 +67,15 @@ export class TimeEntry {
   @Column({ name: 'motivo_aprovacao', type: 'text', nullable: true })
   motivoAprovacao?: string;
 
-  @Column({ name: 'is_faturavel', default: false })
+  @Column({ 
+    name: 'is_faturavel', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   isFaturavel?: boolean;
 
   @Column({ name: 'valor_por_hora', type: 'decimal', precision: 15, scale: 2, nullable: true })
@@ -83,7 +91,15 @@ export class TimeEntry {
   @Column({ name: 'aprovado_em', type: 'datetime', nullable: true })
   aprovadoEm?: Date;
 
-  @Column({ name: 'faturamento_desprezado', default: false })
+  @Column({ 
+    name: 'faturamento_desprezado', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   faturamentoDesprezado?: boolean;
 
   @Column({ name: 'reprovado_por', nullable: true })

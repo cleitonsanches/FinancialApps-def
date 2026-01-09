@@ -156,13 +156,37 @@ export class ProjectTask {
   @Column({ name: 'hora_fim', type: 'varchar', length: 10, nullable: true })
   horaFim?: string; // Para eventos: formato HH:MM
 
-  @Column({ name: 'sem_prazo_definido', default: false })
+  @Column({ 
+    name: 'sem_prazo_definido', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   semPrazoDefinido?: boolean; // Para atividades: se true, só precisa dataInicio
 
-  @Column({ name: 'dia_inteiro', default: false })
+  @Column({ 
+    name: 'dia_inteiro', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   diaInteiro?: boolean; // Para eventos: se true, oculta horários e trata como bloqueio de dia
 
-  @Column({ name: 'exigir_lancamento_horas', default: false })
+  @Column({ 
+    name: 'exigir_lancamento_horas', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   exigirLancamentoHoras?: boolean; // Se true, exige lançamento de horas ao concluir
 
   @CreateDateColumn({ name: 'created_at' })

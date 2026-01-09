@@ -37,7 +37,15 @@ export class BankAccount {
   @Column({ name: 'status', type: 'varchar', length: 20, default: 'ATIVA' })
   status: string; // ATIVA, INATIVA
 
-  @Column({ name: 'is_padrao', type: 'bit', default: false })
+  @Column({ 
+    name: 'is_padrao', 
+    type: 'bit', 
+    default: false,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   isPadrao: boolean;
 
   @CreateDateColumn({ name: 'created_at' })

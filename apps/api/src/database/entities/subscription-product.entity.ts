@@ -21,7 +21,15 @@ export class SubscriptionProduct {
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
-  @Column({ name: 'active', default: true })
+  @Column({ 
+    name: 'active', 
+    type: 'bit', 
+    default: true,
+    transformer: {
+      to: (value: boolean) => value ? 1 : 0,
+      from: (value: number) => value === 1
+    }
+  })
   active: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
