@@ -191,16 +191,31 @@ jobs:
             
             # Instalar/atualizar dependências na RAIZ (workspace do npm)
             echo "📦 Instalando dependências na raiz (workspace)..."
-            npm install --legacy-peer-deps || {
+            if ! npm install --legacy-peer-deps; then
               echo "❌ ERRO: Falha ao instalar dependências na raiz!"
               echo "Tentando reinstalar limpo..."
-              rm -rf node_modules package-lock.json
-              npm install --legacy-peer-deps || {
+              rm -rf node_modules package-lock.json apps/*/node_modules apps/*/package-lock.json
+              if ! npm install --legacy-peer-deps; then
                 echo "❌ ERRO CRÍTICO: Não foi possível instalar dependências!"
+                echo "Verificando logs de erro..."
+                npm install --legacy-peer-deps 2>&1 | tail -50
+                exit 1
+              fi
+            fi
+            echo "✅ Dependências instaladas com sucesso"
+            
+            # Verificar se as dependências críticas foram instaladas
+            if [ ! -d "node_modules/@nestjs" ]; then
+              echo "❌ ERRO: @nestjs não foi instalado!"
+              exit 1
+            fi
+            if [ ! -f "node_modules/.bin/nest" ] && [ ! -f "apps/api/node_modules/.bin/nest" ]; then
+              echo "⚠️ NestJS CLI não encontrado em node_modules. Tentando instalar @nestjs/cli..."
+              npm install @nestjs/cli --legacy-peer-deps || {
+                echo "❌ ERRO: Não foi possível instalar @nestjs/cli!"
                 exit 1
               }
-            }
-            echo "✅ Dependências instaladas com sucesso"
+            fi
             
             # Verificar se nest CLI está disponível (deve estar em node_modules/.bin/nest após instalação)
             if [ ! -f "node_modules/.bin/nest" ] && [ ! -f "apps/api/node_modules/.bin/nest" ]; then
