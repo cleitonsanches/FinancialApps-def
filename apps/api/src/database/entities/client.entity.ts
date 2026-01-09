@@ -56,7 +56,11 @@ export class Client {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: any) => {
+        if (value === 1 || value === true || value === 'True' || value === 'true') return true;
+        if (value === 0 || value === false || value === 'False' || value === 'false') return false;
+        return Boolean(value);
+      }
     }
   })
   isCliente: boolean;
@@ -67,7 +71,11 @@ export class Client {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: any) => {
+        if (value === 1 || value === true || value === 'True' || value === 'true') return true;
+        if (value === 0 || value === false || value === 'False' || value === 'false') return false;
+        return Boolean(value);
+      }
     }
   })
   isFornecedor: boolean;
@@ -78,7 +86,11 @@ export class Client {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: any) => {
+        if (value === 1 || value === true || value === 'True' || value === 'true') return true;
+        if (value === 0 || value === false || value === 'False' || value === 'false') return false;
+        return Boolean(value);
+      }
     }
   })
   isColaborador: boolean;
