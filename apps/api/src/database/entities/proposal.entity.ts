@@ -182,7 +182,7 @@ export class Proposal {
     nullable: true,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   temManutencaoVinculada?: boolean;

@@ -27,7 +27,7 @@ export class SubscriptionProduct {
     default: 1,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   active: boolean;

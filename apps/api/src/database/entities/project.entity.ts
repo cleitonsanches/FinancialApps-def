@@ -162,7 +162,7 @@ export class ProjectTask {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   semPrazoDefinido?: boolean; // Para atividades: se true, só precisa dataInicio
@@ -173,7 +173,7 @@ export class ProjectTask {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   diaInteiro?: boolean; // Para eventos: se true, oculta horários e trata como bloqueio de dia
@@ -184,7 +184,7 @@ export class ProjectTask {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   exigirLancamentoHoras?: boolean; // Se true, exige lançamento de horas ao concluir

@@ -36,7 +36,7 @@ export class User {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   isAdmin: boolean;
@@ -47,7 +47,7 @@ export class User {
     default: 1,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   isActive: boolean;

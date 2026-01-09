@@ -73,7 +73,7 @@ export class TimeEntry {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   isFaturavel?: boolean;
@@ -97,7 +97,7 @@ export class TimeEntry {
     default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1 || value === true
+      from: (value: number) => value === 1
     }
   })
   faturamentoDesprezado?: boolean;
