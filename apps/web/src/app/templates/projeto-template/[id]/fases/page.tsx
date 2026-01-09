@@ -28,10 +28,19 @@ export default function TemplatePhasesPage() {
   const [loading, setLoading] = useState(true)
   const [showCreatePhaseModal, setShowCreatePhaseModal] = useState(false)
   const [editingPhase, setEditingPhase] = useState<any>(null)
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+  const [selectedPhaseForTask, setSelectedPhaseForTask] = useState<string | null>(null)
   
   const [newPhase, setNewPhase] = useState({
     name: '',
     description: '',
+  })
+  
+  const [newTask, setNewTask] = useState({
+    name: '',
+    description: '',
+    duracaoPrevistaDias: 0,
+    diasAposInicioProjeto: 0,
   })
 
   useEffect(() => {
@@ -77,17 +86,62 @@ export default function TemplatePhasesPage() {
     }
 
     try {
-      await api.post(`/project-templates/${templateId}/phases`, {
+      const response = await api.post(`/project-templates/${templateId}/phases`, {
         ...newPhase,
         templateId,
       })
       
+      const createdPhaseId = response.data?.id
+      
       setNewPhase({ name: '', description: '' })
       setShowCreatePhaseModal(false)
-      loadPhases()
+      await loadPhases()
+      
+      // Abrir modal de criação de tarefas para a fase recém-criada
+      if (createdPhaseId) {
+        setSelectedPhaseForTask(createdPhaseId)
+        setShowCreateTaskModal(true)
+      }
     } catch (error: any) {
       console.error('Erro ao criar fase:', error)
       alert(error.response?.data?.message || 'Erro ao criar fase')
+    }
+  }
+  
+  const handleCreateTask = async () => {
+    if (!newTask.name.trim()) {
+      alert('Preencha o nome da tarefa')
+      return
+    }
+    
+    if (!newTask.duracaoPrevistaDias || newTask.duracaoPrevistaDias <= 0) {
+      alert('Preencha a duração prevista em dias (deve ser maior que zero)')
+      return
+    }
+
+    try {
+      await api.post(`/project-templates/${templateId}/tasks`, {
+        name: newTask.name,
+        description: newTask.description || null,
+        duracaoPrevistaDias: newTask.duracaoPrevistaDias,
+        diasAposInicioProjeto: newTask.diasAposInicioProjeto || 0,
+        phaseId: selectedPhaseForTask,
+        templateId,
+        ordem: 0,
+      })
+      
+      // Limpar formulário mas manter modal aberto
+      setNewTask({
+        name: '',
+        description: '',
+        duracaoPrevistaDias: 0,
+        diasAposInicioProjeto: 0,
+      })
+      await loadPhases() // Recarregar para atualizar contagem de tarefas
+      // Não fechar modal automaticamente - usuário pode criar mais tarefas
+    } catch (error: any) {
+      console.error('Erro ao criar tarefa:', error)
+      alert(error.response?.data?.message || 'Erro ao criar tarefa')
     }
   }
 
@@ -207,6 +261,16 @@ export default function TemplatePhasesPage() {
                     </div>
                     <div className="flex gap-2">
                       <button
+                        onClick={() => {
+                          setSelectedPhaseForTask(phase.id)
+                          setShowCreateTaskModal(true)
+                        }}
+                        className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200"
+                        title="Adicionar tarefa a esta fase"
+                      >
+                        + Tarefa
+                      </button>
+                      <button
                         onClick={() => setEditingPhase(phase)}
                         className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                       >
@@ -233,12 +297,6 @@ export default function TemplatePhasesPage() {
             className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
           >
             Finalizar Template
-          </button>
-          <button
-            onClick={handleContinueToTasks}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-          >
-            Continuar para Atividades →
           </button>
         </div>
 
@@ -335,6 +393,112 @@ export default function TemplatePhasesPage() {
                   className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
                   Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Criar Tarefa */}
+        {showCreateTaskModal && selectedPhaseForTask && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Nova Tarefa {(() => {
+                  const phase = phases.find(p => p.id === selectedPhaseForTask)
+                  return phase ? `para "${phase.name}"` : 'para a Fase'
+                })()}
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome da Tarefa *
+                  </label>
+                  <input
+                    type="text"
+                    value={newTask.name}
+                    onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ex: Reunião inicial, Desenvolvimento, Testes..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={newTask.description}
+                    onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={3}
+                    placeholder="Descreva a tarefa..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Duração Prevista (dias) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newTask.duracaoPrevistaDias || ''}
+                    onChange={(e) => setNewTask({ ...newTask, duracaoPrevistaDias: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ex: 5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Dias após início do projeto
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newTask.diasAposInicioProjeto || ''}
+                    onChange={(e) => setNewTask({ ...newTask, diasAposInicioProjeto: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ex: 0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Quantos dias após o início do projeto esta tarefa deve começar
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => {
+                    setShowCreateTaskModal(false)
+                    setSelectedPhaseForTask(null)
+                    setNewTask({
+                      name: '',
+                      description: '',
+                      duracaoPrevistaDias: 0,
+                      diasAposInicioProjeto: 0,
+                    })
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    await handleCreateTask()
+                    // Manter modal aberto para adicionar mais tarefas
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Criar e Adicionar Outra
+                </button>
+                <button
+                  onClick={async () => {
+                    await handleCreateTask()
+                    // Fechar modal após criar
+                    setShowCreateTaskModal(false)
+                    setSelectedPhaseForTask(null)
+                  }}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Criar e Fechar
                 </button>
               </div>
             </div>
