@@ -318,6 +318,13 @@ export class ProposalsService {
         case 'CANCELADA':
           cleanedUpdateData.dataCancelamento = today
           break
+        case 'CONCLUIDA':
+          // Registrar data de conclusão (usando dataFechamento como base, ou criar novo campo se necessário)
+          // Por enquanto, vamos usar dataFechamento como referência, mas podemos adicionar dataConclusao depois
+          if (!cleanedUpdateData.dataFechamento) {
+            cleanedUpdateData.dataFechamento = today
+          }
+          break
       }
 
       const linkedProjects = await this.projectRepository.find({

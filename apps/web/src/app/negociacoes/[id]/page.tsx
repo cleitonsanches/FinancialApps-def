@@ -379,6 +379,7 @@ export default function NegotiationDetailsPage() {
       RE_ENVIADA: 'bg-blue-100 text-blue-800',
       REVISADA: 'bg-yellow-100 text-yellow-800',
       FECHADA: 'bg-green-100 text-green-800',
+      CONCLUIDA: 'bg-purple-100 text-purple-800',
       CANCELADA: 'bg-red-100 text-red-800',
       DECLINADA: 'bg-orange-100 text-orange-800',
     }
@@ -392,6 +393,7 @@ export default function NegotiationDetailsPage() {
       RE_ENVIADA: 'Re-enviada',
       REVISADA: 'Revisada',
       FECHADA: 'Contratada',
+      CONCLUIDA: 'Concluída',
       CANCELADA: 'Cancelada',
       DECLINADA: 'Declinada',
     }
@@ -1466,7 +1468,7 @@ export default function NegotiationDetailsPage() {
     )
   }
 
-  const shouldShowLinkedItems = ['FECHADA', 'DECLINADA', 'CANCELADA'].includes(negotiation.status)
+  const shouldShowLinkedItems = ['FECHADA', 'CONCLUIDA', 'DECLINADA', 'CANCELADA'].includes(negotiation.status)
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
@@ -1484,7 +1486,7 @@ export default function NegotiationDetailsPage() {
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
-              <div>
+              <div className="flex-1">
                 {negotiation.numero && (
                   <p className="text-sm text-gray-500 mb-1">Número: {negotiation.numero}</p>
                 )}
@@ -1493,6 +1495,29 @@ export default function NegotiationDetailsPage() {
                 </h1>
                 {negotiation.description && (
                   <p className="text-gray-600">{negotiation.description}</p>
+                )}
+                {/* Botão Concluir - apenas para negociações Contratadas */}
+                {negotiation.status === 'FECHADA' && (
+                  <div className="mt-4">
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Tem certeza que deseja concluir esta negociação?\n\nIsso sinalizará que o projeto e as atividades foram concluídos, mesmo que ainda existam parcelas pendentes de recebimento.')) {
+                          return
+                        }
+                        try {
+                          await api.put(`/negotiations/${negotiationId}`, { status: 'CONCLUIDA' })
+                          alert('Negociação concluída com sucesso!')
+                          loadNegotiation()
+                        } catch (error: any) {
+                          console.error('Erro ao concluir negociação:', error)
+                          alert(error.response?.data?.message || 'Erro ao concluir negociação')
+                        }
+                      }}
+                      className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
+                    >
+                      🎯 Concluir Negociação
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="flex gap-2">
@@ -1538,6 +1563,7 @@ export default function NegotiationDetailsPage() {
                     <option value="RE_ENVIADA">Re-enviada</option>
                     <option value="REVISADA">Revisada</option>
                     <option value="FECHADA">Contratada</option>
+                    <option value="CONCLUIDA">Concluída</option>
                     <option value="DECLINADA">Declinada</option>
                     <option value="CANCELADA">Cancelada</option>
                   </select>

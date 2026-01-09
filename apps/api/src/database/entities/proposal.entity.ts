@@ -35,7 +35,7 @@ export class Proposal {
   title: string;
 
   @Column({ name: 'status', type: 'varchar', length: 20, default: 'RASCUNHO' })
-  status: string; // RASCUNHO, ENVIADA, RE_ENVIADA, REVISADA, FECHADA, DECLINADA, CANCELADA
+  status: string; // RASCUNHO, ENVIADA, RE_ENVIADA, REVISADA, FECHADA, CONCLUIDA, DECLINADA, CANCELADA
 
   @Column({ name: 'tipo_contratacao', type: 'varchar', length: 50, nullable: true })
   tipoContratacao?: string;

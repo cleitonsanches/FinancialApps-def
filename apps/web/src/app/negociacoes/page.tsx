@@ -12,7 +12,8 @@ export default function NegociacoesPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [serviceTypes, setServiceTypes] = useState<any[]>([])
-  const [activeTab, setActiveTab] = useState<'RASCUNHO' | 'ENVIADA' | 'CANCELADA' | 'DECLINADA' | 'FECHADA'>('RASCUNHO')
+  const [selectedTab, setSelectedTab] = useState<'RASCUNHO' | 'ENVIADA' | 'CANCELADA' | 'DECLINADA' | 'FECHADA' | 'CONCLUIDA'>('RASCUNHO')
+  const [activeTotalizer, setActiveTotalizer] = useState<string | null>('RASCUNHO')
   const loadingRef = useRef(false)
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function NegociacoesPage() {
       RASCUNHO: 'bg-gray-100 text-gray-800',
       EM_NEGOCIACAO: 'bg-blue-100 text-blue-800',
       FECHADA: 'bg-green-100 text-green-800',
+      CONCLUIDA: 'bg-purple-100 text-purple-800',
       CANCELADA: 'bg-red-100 text-red-800',
       DECLINADA: 'bg-orange-100 text-orange-800',
     }
@@ -89,6 +91,7 @@ export default function NegociacoesPage() {
       REVISADA: 'Revisada',
       EM_NEGOCIACAO: 'Em Negociação',
       FECHADA: 'Contratada',
+      CONCLUIDA: 'Concluída',
       CANCELADA: 'Cancelada',
       DECLINADA: 'Declinada',
     }
@@ -173,15 +176,36 @@ export default function NegociacoesPage() {
     setFilter('')
   }
 
+  const handleTotalizerClick = (type: string) => {
+    if (activeTotalizer === type) {
+      // Se já está ativo, desativa e volta para RASCUNHO
+      setActiveTotalizer(null)
+      setSelectedTab('RASCUNHO')
+    } else {
+      setActiveTotalizer(type)
+      setSelectedTab(type as any)
+    }
+  }
+
+  // Calcular totalizadores
+  const totalizadores = {
+    RASCUNHO: negotiations.filter((n) => n.status === 'RASCUNHO').length,
+    ENVIADA: negotiations.filter((n) => ['ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(n.status)).length,
+    CANCELADA: negotiations.filter((n) => n.status === 'CANCELADA').length,
+    DECLINADA: negotiations.filter((n) => n.status === 'DECLINADA').length,
+    FECHADA: negotiations.filter((n) => n.status === 'FECHADA').length,
+    CONCLUIDA: negotiations.filter((n) => n.status === 'CONCLUIDA').length,
+  }
+
   const filteredNegotiations = negotiations.filter((negotiation) => {
-    // Filtro por aba (status)
-    if (activeTab === 'ENVIADA') {
+    // Filtro por card (status)
+    if (selectedTab === 'ENVIADA') {
       // Agrupar ENVIADA, RE_ENVIADA e REVISADA
       if (!['ENVIADA', 'RE_ENVIADA', 'REVISADA'].includes(negotiation.status)) {
         return false
       }
     } else {
-      if (negotiation.status !== activeTab) {
+      if (negotiation.status !== selectedTab) {
         return false
       }
     }
@@ -227,63 +251,6 @@ export default function NegociacoesPage() {
           <h1 className="text-3xl font-bold text-gray-900">Negociações</h1>
         </div>
 
-        {/* Abas de Status */}
-        <div className="bg-white rounded-lg shadow-md mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px" aria-label="Tabs">
-              <button
-                onClick={() => setActiveTab('RASCUNHO')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'RASCUNHO'
-                    ? 'border-gray-500 text-gray-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Rascunho
-              </button>
-              <button
-                onClick={() => setActiveTab('ENVIADA')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'ENVIADA'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Enviada/Re-enviada/Revisada
-              </button>
-              <button
-                onClick={() => setActiveTab('CANCELADA')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'CANCELADA'
-                    ? 'border-red-500 text-red-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Cancelada
-              </button>
-              <button
-                onClick={() => setActiveTab('DECLINADA')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'DECLINADA'
-                    ? 'border-orange-500 text-orange-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Declinada
-              </button>
-              <button
-                onClick={() => setActiveTab('FECHADA')}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'FECHADA'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Contratada
-              </button>
-            </nav>
-          </div>
-        </div>
 
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
@@ -303,7 +270,11 @@ export default function NegociacoesPage() {
             </span>
             <div className="flex gap-2">
               <button
-                onClick={handleClearFilters}
+                onClick={() => {
+                  setFilter('')
+                  setSelectedTab('RASCUNHO')
+                  setActiveTotalizer('RASCUNHO')
+                }}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
               >
                 Limpar Filtros
@@ -318,6 +289,118 @@ export default function NegociacoesPage() {
           </div>
         </div>
 
+        {/* Cards de Status com Contadores */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'RASCUNHO' ? 'ring-2 ring-gray-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('RASCUNHO')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Rascunho</p>
+                <p className="text-2xl font-bold text-gray-600">
+                  {totalizadores.RASCUNHO}
+                </p>
+              </div>
+              <div className="bg-gray-100 rounded-full p-3">
+                <span className="text-gray-600 text-2xl">📝</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'ENVIADA' ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('ENVIADA')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Enviada/Re-enviada/Revisada</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {totalizadores.ENVIADA}
+                </p>
+              </div>
+              <div className="bg-blue-100 rounded-full p-3">
+                <span className="text-blue-600 text-2xl">📤</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'CANCELADA' ? 'ring-2 ring-red-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('CANCELADA')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Cancelada</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {totalizadores.CANCELADA}
+                </p>
+              </div>
+              <div className="bg-red-100 rounded-full p-3">
+                <span className="text-red-600 text-2xl">❌</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'DECLINADA' ? 'ring-2 ring-orange-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('DECLINADA')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Declinada</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {totalizadores.DECLINADA}
+                </p>
+              </div>
+              <div className="bg-orange-100 rounded-full p-3">
+                <span className="text-orange-600 text-2xl">👎</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'FECHADA' ? 'ring-2 ring-green-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('FECHADA')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Contratada</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {totalizadores.FECHADA}
+                </p>
+              </div>
+              <div className="bg-green-100 rounded-full p-3">
+                <span className="text-green-600 text-2xl">✅</span>
+              </div>
+            </div>
+          </div>
+          <div 
+            className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all hover:shadow-lg ${
+              activeTotalizer === 'CONCLUIDA' ? 'ring-2 ring-purple-500 ring-offset-2' : ''
+            }`}
+            onClick={() => handleTotalizerClick('CONCLUIDA')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Concluída</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {totalizadores.CONCLUIDA}
+                </p>
+              </div>
+              <div className="bg-purple-100 rounded-full p-3">
+                <span className="text-purple-600 text-2xl">🎯</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Lista de Negociações */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {filteredNegotiations.length === 0 ? (
@@ -325,10 +408,11 @@ export default function NegociacoesPage() {
               <p className="text-gray-600 mb-4">
                 {filter 
                   ? 'Nenhuma negociação encontrada com o filtro aplicado' 
-                  : `Nenhuma negociação ${activeTab === 'RASCUNHO' ? 'em rascunho' : 
-                      activeTab === 'ENVIADA' ? 'enviada/re-enviada/revisada' :
-                      activeTab === 'CANCELADA' ? 'cancelada' :
-                      activeTab === 'DECLINADA' ? 'declinada' : 'contratada'} cadastrada`}
+                  : `Nenhuma negociação ${selectedTab === 'RASCUNHO' ? 'em rascunho' : 
+                      selectedTab === 'ENVIADA' ? 'enviada/re-enviada/revisada' :
+                      selectedTab === 'CANCELADA' ? 'cancelada' :
+                      selectedTab === 'DECLINADA' ? 'declinada' :
+                      selectedTab === 'FECHADA' ? 'contratada' : 'concluída'} cadastrada`}
               </p>
               {!filter && (
                 <Link
@@ -405,6 +489,7 @@ export default function NegociacoesPage() {
                         <option value="RE_ENVIADA">Re-enviada</option>
                         <option value="REVISADA">Revisada</option>
                         <option value="FECHADA">Contratada</option>
+                        <option value="CONCLUIDA">Concluída</option>
                         <option value="CANCELADA">Cancelada</option>
                         <option value="DECLINADA">Declinada</option>
                       </select>
