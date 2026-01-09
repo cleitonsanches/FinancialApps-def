@@ -18,6 +18,7 @@ export default function NovaContaCorrentePage() {
     pixKey: '',
     saldoInicial: '',
     status: 'ATIVA' as AccountStatus,
+    isPadrao: false,
   })
 
   const getCompanyIdFromToken = (): string | null => {
@@ -52,6 +53,7 @@ export default function NovaContaCorrentePage() {
         pixKey: formData.pixKey || null,
         saldoInicial: formData.saldoInicial ? parseFloat(formData.saldoInicial) : 0,
         status: formData.status,
+        isPadrao: formData.isPadrao,
         companyId: companyId,
       })
 
@@ -64,6 +66,7 @@ export default function NovaContaCorrentePage() {
           pixKey: '',
           saldoInicial: '',
           status: 'ATIVA' as AccountStatus,
+          isPadrao: false,
         })
         alert('Conta salva com sucesso! Preencha os dados para adicionar outra.')
       } else {
@@ -183,6 +186,23 @@ export default function NovaContaCorrentePage() {
               <option value="ATIVA">Ativa</option>
               <option value="INATIVA">Inativa</option>
             </select>
+          </div>
+
+          {/* Conta Padrão */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="isPadrao"
+              checked={formData.isPadrao}
+              onChange={(e) => setFormData({ ...formData, isPadrao: e.target.checked })}
+              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+            />
+            <label htmlFor="isPadrao" className="ml-2 block text-sm text-gray-700">
+              Conta Padrão
+            </label>
+            <p className="ml-2 text-xs text-gray-500">
+              (Apenas uma conta pode ser padrão por empresa)
+            </p>
           </div>
 
           {/* Botões */}

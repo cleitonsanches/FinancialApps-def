@@ -208,10 +208,10 @@ export default function TemplatesPage() {
                         Tipo de Serviço
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Quantidade de Fases
+                        Fases
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Quantidade de Tarefas
+                        Atividades
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ações
@@ -237,12 +237,32 @@ export default function TemplatesPage() {
                           {template.tasks?.length || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <Link
-                            href={`/templates/projeto-template/${template.id}`}
-                            className="text-primary-600 hover:text-primary-900 mr-4"
-                          >
-                            Editar
-                          </Link>
+                          <div className="flex gap-4">
+                            <Link
+                              href={`/templates/projeto-template/${template.id}`}
+                              className="text-primary-600 hover:text-primary-900"
+                            >
+                              Editar
+                            </Link>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Tem certeza que deseja excluir o template "${template.name}"? Esta ação não pode ser desfeita.`)) {
+                                  return
+                                }
+                                try {
+                                  await api.delete(`/project-templates/${template.id}`)
+                                  alert('Template excluído com sucesso!')
+                                  loadProjectTemplates()
+                                } catch (error: any) {
+                                  console.error('Erro ao excluir template:', error)
+                                  alert(error.response?.data?.message || 'Erro ao excluir template')
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Excluir
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { BankAccount } from '../../database/entities/bank-account.entity';
 
 @Injectable()
@@ -24,6 +24,15 @@ export class BankAccountsService {
   async create(bankAccountData: Partial<BankAccount>): Promise<BankAccount> {
     // Remover pixKey temporariamente até a migração ser executada
     const { pixKey, ...dataWithoutPixKey } = bankAccountData as any;
+    
+    // Se esta conta está sendo marcada como padrão, desmarcar todas as outras da mesma empresa
+    if (dataWithoutPixKey.isPadrao && dataWithoutPixKey.companyId) {
+      await this.bankAccountRepository.update(
+        { companyId: dataWithoutPixKey.companyId },
+        { isPadrao: false }
+      );
+    }
+    
     const bankAccount = this.bankAccountRepository.create(dataWithoutPixKey as Partial<BankAccount>);
     return this.bankAccountRepository.save(bankAccount);
   }
@@ -31,6 +40,18 @@ export class BankAccountsService {
   async update(id: string, bankAccountData: Partial<BankAccount>): Promise<BankAccount> {
     // Remover pixKey temporariamente até a migração ser executada
     const { pixKey, ...dataWithoutPixKey } = bankAccountData as any;
+    
+    // Se esta conta está sendo marcada como padrão, desmarcar todas as outras da mesma empresa
+    if (dataWithoutPixKey.isPadrao) {
+      const existingAccount = await this.findOne(id);
+      if (existingAccount && existingAccount.companyId) {
+        await this.bankAccountRepository.update(
+          { companyId: existingAccount.companyId, id: Not(id) },
+          { isPadrao: false }
+        );
+      }
+    }
+    
     await this.bankAccountRepository.update(id, dataWithoutPixKey);
     return this.findOne(id);
   }

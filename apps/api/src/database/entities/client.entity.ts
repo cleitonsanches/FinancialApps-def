@@ -50,6 +50,15 @@ export class Client {
   @Column({ name: 'address_zipcode', type: 'varchar', length: 10, nullable: true })
   addressZipcode?: string;
 
+  @Column({ name: 'is_cliente', type: 'boolean', default: false })
+  isCliente: boolean;
+
+  @Column({ name: 'is_fornecedor', type: 'boolean', default: false })
+  isFornecedor: boolean;
+
+  @Column({ name: 'is_colaborador', type: 'boolean', default: false })
+  isColaborador: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

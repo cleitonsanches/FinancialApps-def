@@ -202,6 +202,7 @@ export default function ContaCorrentePage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chave PIX</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Padrão</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
@@ -235,6 +236,15 @@ export default function ContaCorrentePage() {
                       }`}>
                         {account.status === 'ATIVA' ? 'Ativa' : 'Inativa'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {account.isPadrao ? (
+                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          Padrão
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
                       <button

@@ -184,6 +184,7 @@ export default function CadastrosPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Razão Social</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CNPJ/CPF</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">E-mail</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipos</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                     </tr>
                   </thead>
@@ -216,6 +217,31 @@ export default function CadastrosPage() {
                           onClick={() => handleClientRowClick(client)}
                         >
                           {client.contactEmail || '-'}
+                        </td>
+                        <td 
+                          className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+                          onClick={() => handleClientRowClick(client)}
+                        >
+                          <div className="flex flex-wrap gap-1">
+                            {client.isCliente && (
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                Cliente
+                              </span>
+                            )}
+                            {client.isFornecedor && (
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                Fornecedor
+                              </span>
+                            )}
+                            {client.isColaborador && (
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                Colaborador
+                              </span>
+                            )}
+                            {!client.isCliente && !client.isFornecedor && !client.isColaborador && (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <button

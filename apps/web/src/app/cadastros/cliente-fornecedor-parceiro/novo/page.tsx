@@ -23,6 +23,9 @@ export default function NovoClienteFornecedorPage() {
     addressCity: '',
     addressState: '',
     addressZipcode: '',
+    isCliente: false,
+    isFornecedor: false,
+    isColaborador: false,
   })
   const [savedClientId, setSavedClientId] = useState<string | null>(null)
 
@@ -41,6 +44,13 @@ export default function NovoClienteFornecedorPage() {
 
   const handleSubmit = async (e: React.FormEvent, saveAndNew: boolean = false) => {
     e.preventDefault()
+    
+    // Validar que pelo menos um tipo foi selecionado
+    if (!formData.isCliente && !formData.isFornecedor && !formData.isColaborador) {
+      alert('Selecione pelo menos um tipo: Cliente, Fornecedor ou Colaborador/Associado')
+      return
+    }
+    
     setLoading(true)
 
     try {
@@ -64,6 +74,9 @@ export default function NovoClienteFornecedorPage() {
         addressCity: formData.addressCity || null,
         addressState: formData.addressState || null,
         addressZipcode: formData.addressZipcode || null,
+        isCliente: formData.isCliente,
+        isFornecedor: formData.isFornecedor,
+        isColaborador: formData.isColaborador,
         companyId: companyId,
       })
 
@@ -85,6 +98,9 @@ export default function NovoClienteFornecedorPage() {
           addressCity: '',
           addressState: '',
           addressZipcode: '',
+          isCliente: false,
+          isFornecedor: false,
+          isColaborador: false,
         })
         setSavedClientId(null)
         alert('Cliente/Fornecedor salvo com sucesso! Preencha os dados para adicionar outro.')
@@ -281,6 +297,50 @@ export default function NovoClienteFornecedorPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
               placeholder="Digite o telefone"
             />
+          </div>
+
+          {/* Tipos */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tipo *</h3>
+            <p className="text-sm text-gray-500 mb-4">Selecione pelo menos um tipo (pode selecionar múltiplos)</p>
+            <div className="space-y-3">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isCliente"
+                  checked={formData.isCliente}
+                  onChange={(e) => setFormData({ ...formData, isCliente: e.target.checked })}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isCliente" className="ml-2 block text-sm text-gray-700">
+                  Cliente
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isFornecedor"
+                  checked={formData.isFornecedor}
+                  onChange={(e) => setFormData({ ...formData, isFornecedor: e.target.checked })}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isFornecedor" className="ml-2 block text-sm text-gray-700">
+                  Fornecedor
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isColaborador"
+                  checked={formData.isColaborador}
+                  onChange={(e) => setFormData({ ...formData, isColaborador: e.target.checked })}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isColaborador" className="ml-2 block text-sm text-gray-700">
+                  Colaborador/Associado
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* Botão Inserir Contato */}
