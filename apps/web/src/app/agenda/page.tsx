@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import api from '@/services/api'
@@ -1612,22 +1612,102 @@ export default function AgendaPage() {
                       const projetoNome = task.project?.name || ''
                       const contexto = projetoNome ? `${clienteNome} • ${projetoNome}` : clienteNome || 'Sem contexto'
                       
-                      // Data de conclusão
-                      const dataConclusao = task.dataConclusao || task.dataFimPrevista
-                      const dataConclusaoFormatada = dataConclusao ? formatDate(dataConclusao) : null
+                      // Data de conclusão - ajustar conforme status
+                      const isConcluida = task.status === 'CONCLUIDA'
+                      const dataConclusaoEfetiva = task.dataConclusao
+                      const dataPrazo = task.dataFimPrevista
+                      
+                      let dataTexto = ''
+                      if (isConcluida && dataConclusaoEfetiva) {
+                        dataTexto = `Concluída em ${formatDate(dataConclusaoEfetiva)}`
+                      } else if (dataPrazo) {
+                        dataTexto = `Concluir até ${formatDate(dataPrazo)}`
+                      } else {
+                        dataTexto = 'Sem data'
+                      }
+                      
                       const isAtrasada = isTaskOverdue(task)
                       
                       // Comentários
                       const comentariosCount = commentsCount[task.id] || 0
                       
+                      // Funções de ação
+                      const handleEdit = (e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation()
+                        setSelectedTask(task)
+                        const formatDateForInput = (date: string | Date | null | undefined): string => {
+                          if (!date) return ''
+                          if (typeof date === 'string') {
+                            return date.split('T')[0]
+                          }
+                          const dateObj = date as Date
+                          const year = dateObj.getFullYear()
+                          const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+                          const day = String(dateObj.getDate()).padStart(2, '0')
+                          return `${year}-${month}-${day}`
+                        }
+                        setEditTaskData({
+                          name: task.name || '',
+                          description: task.description || '',
+                          status: task.status || 'PENDENTE',
+                          dataInicio: formatDateForInput(task.dataInicio),
+                          dataFimPrevista: formatDateForInput(task.dataConclusao || task.dataFimPrevista || ''),
+                          usuarioResponsavelId: task.usuarioResponsavelId || '',
+                          usuarioExecutorId: task.usuarioExecutorId || '',
+                          tipo: task.tipo || 'ATIVIDADE',
+                          horasEstimadas: task.horasEstimadas || '',
+                          horaInicio: task.horaInicio || '',
+                          horaFim: task.horaFim || '',
+                          semPrazoDefinido: task.semPrazoDefinido || false,
+                          diaInteiro: task.diaInteiro || false,
+                          exigirLancamentoHoras: task.exigirLancamentoHoras || false,
+                        })
+                        setShowEditTaskModal(true)
+                      }
+                      
+                      const handleHoras = (e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation()
+                        setSelectedTask(task)
+                        setNewTimeEntry({
+                          projectId: task.project?.id || '',
+                          proposalId: task.proposalId || '',
+                          clientId: task.clientId || '',
+                          taskId: task.id,
+                          horas: '',
+                          data: new Date().toISOString().split('T')[0],
+                          descricao: '',
+                        })
+                        setShowRegisterHoursModal(true)
+                      }
+                      
+                      const handleComentarios = (e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation()
+                        setSelectedTask(task)
+                        setShowTaskDetailsModal(true)
+                        // Focar no campo de comentários quando o modal abrir
+                        setTimeout(() => {
+                          setShowCommentInput(true)
+                        }, 100)
+                      }
+                      
+                      const handleConcluir = async (e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation()
+                        if (task.status === 'CONCLUIDA') {
+                          alert('Esta tarefa já está concluída!')
+                          return
+                        }
+                        setSelectedTask(task)
+                        setUpdateTaskData({
+                          status: 'CONCLUIDA',
+                          percentual: '100',
+                        })
+                        setShowUpdateStatusModal(true)
+                      }
+                      
                       return (
                         <div
                           key={task.id}
-                          className="group/agenda-item border border-gray-200 rounded-lg p-4 mb-2 hover:shadow-md hover:border-blue-300 transition-all bg-white cursor-pointer"
-                          onClick={() => {
-                            setSelectedTask(task)
-                            setShowTaskDetailsModal(true)
-                          }}
+                          className="group/agenda-item border border-gray-200 rounded-lg p-4 mb-2 hover:shadow-md hover:border-blue-300 transition-all bg-white"
                         >
                           {/* Linha 1: Tipo + Horário + Título + Status */}
                           <div className="flex items-start justify-between mb-1">
@@ -1678,26 +1758,67 @@ export default function AgendaPage() {
                             </p>
                           )}
 
-                          {/* Linha 4: Data conclusão + Ações (hover) */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">
-                              {dataConclusaoFormatada ? `Conclui ${dataConclusaoFormatada}` : 'Sem data'}
+                          {/* Linha 4: Data conclusão + Ações (sempre visíveis) */}
+                          <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-2">
+                            <span className="text-xs text-gray-500">
+                              {dataTexto}
                             </span>
-                            <div className="flex gap-1 opacity-0 group-hover/agenda-item:opacity-100 transition-opacity">
-                              {comentariosCount > 0 && (
-                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">
-                                  💬 {comentariosCount}
-                                </span>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={handleEdit}
+                                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                                title="Editar"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={handleHoras}
+                                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                                title="Lançar Horas"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={handleComentarios}
+                                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors relative"
+                                title={`Comentários${comentariosCount > 0 ? ` (${comentariosCount})` : ''}`}
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                {comentariosCount > 0 && (
+                                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                    {comentariosCount}
+                                  </span>
+                                )}
+                              </button>
+                              {task.status !== 'CONCLUIDA' && (
+                                <button
+                                  onClick={handleConcluir}
+                                  className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                  title="Concluir"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                </button>
                               )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  // Ações podem ser adicionadas aqui
+                                  setSelectedTask(task)
+                                  setShowTaskDetailsModal(true)
                                 }}
-                                className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
-                                title="Mais opções"
+                                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                                title="Ver Detalhes"
                               >
-                                ⋯
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                </svg>
                               </button>
                             </div>
                           </div>
