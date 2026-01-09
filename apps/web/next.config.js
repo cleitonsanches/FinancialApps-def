@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Configurações de produção
-  output: 'standalone',
+  // Removendo standalone temporariamente para evitar erro de build trace
+  // Pode ser reativado quando o problema for resolvido
+  // output: 'standalone',
   
   // Configurações de imagens
   images: {

@@ -57,7 +57,7 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
         NEXT_PUBLIC_API_URL: '/api',
-        HOSTNAME: 'localhost'
+        HOSTNAME: '0.0.0.0'  // Mudado para aceitar conexões externas
       },
       error_file: '/var/www/FinancialApps-def/logs/web-error.log',
       out_file: '/var/www/FinancialApps-def/logs/web-out.log',
