@@ -1597,275 +1597,111 @@ export default function AgendaPage() {
                     {tasksByDate[date].map((task: any) => {
                       const isEvento = task.tipo === 'EVENTO'
                       const isAtividade = task.tipo === 'ATIVIDADE' || !task.tipo
-                      const icon = isEvento ? '🕐' : '☑'
                       const tipoLabel = isEvento ? 'Evento' : 'Atividade'
                       const timeDisplay = isEvento && task.horaInicio && task.horaFim && !task.diaInteiro
-                        ? ` ${task.horaInicio} - ${task.horaFim}`
-                        : task.diaInteiro ? ' (Dia inteiro)' : ''
+                        ? `${task.horaInicio}–${task.horaFim}`
+                        : task.diaInteiro ? 'Dia inteiro' : ''
+                      
+                      // Calcular horas lançadas
+                      const horasLancadas = tasksWithHours[task.id] && tasksWithHours[task.id].length > 0
+                        ? tasksWithHours[task.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0).toFixed(2)
+                        : null
+                      
+                      // Obter cliente/projeto
+                      const clienteNome = task.client?.name || task.client?.razaoSocial || task.project?.client?.name || task.project?.client?.razaoSocial || ''
+                      const projetoNome = task.project?.name || ''
+                      const contexto = projetoNome ? `${clienteNome} • ${projetoNome}` : clienteNome || 'Sem contexto'
+                      
+                      // Data de conclusão
+                      const dataConclusao = task.dataConclusao || task.dataFimPrevista
+                      const dataConclusaoFormatada = dataConclusao ? formatDate(dataConclusao) : null
+                      const isAtrasada = isTaskOverdue(task)
+                      
+                      // Comentários
+                      const comentariosCount = commentsCount[task.id] || 0
                       
                       return (
                         <div
                           key={task.id}
-                          className={`border rounded-lg p-3 md:p-4 hover:bg-gray-50 cursor-pointer ${
-                            isEvento 
-                              ? 'border-blue-200 bg-blue-50' 
-                              : 'border-gray-200'
-                          }`}
+                          className="group/agenda-item border border-gray-200 rounded-lg p-4 mb-2 hover:shadow-md hover:border-blue-300 transition-all bg-white cursor-pointer"
                           onClick={() => {
                             setSelectedTask(task)
                             setShowTaskDetailsModal(true)
                           }}
                         >
-                          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <span className="text-lg">{icon}</span>
-                              <h3 className="text-base md:text-lg font-semibold text-gray-900 break-words">{task.name}</h3>
-                              {commentsCount[task.id] > 0 && (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                  <span>📝</span>
-                                  <span>{commentsCount[task.id]}</span>
-                                </span>
-                              )}
-                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
+                          {/* Linha 1: Tipo + Horário + Título + Status */}
+                          <div className="flex items-start justify-between mb-1">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                                isEvento ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                              }`}>
                                 {tipoLabel}
                               </span>
-                              <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getTaskStatusColor(task.status)}`}>
-                                {getTaskStatusLabel(task.status)}
-                              </span>
-                              {isTaskOverdue(task) && (
-                                <span className="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-red-100 text-red-800 border border-red-300">
-                                  Atrasada
-                                </span>
-                              )}
                               {timeDisplay && (
-                                <span className="text-xs text-gray-600 font-medium whitespace-nowrap">
+                                <span className="font-bold text-sm text-gray-700 whitespace-nowrap">
                                   {timeDisplay}
                                 </span>
                               )}
+                              <span className="font-semibold text-lg text-gray-900 truncate flex-1 min-w-0">
+                                {task.name}
+                              </span>
                             </div>
-                            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:gap-4 text-sm text-gray-500 mb-2">
-                              {task.project && (
-                                <div className="break-words">
-                                  <span className="font-semibold">Projeto:</span>{' '}
-                                  <Link
-                                    href={`/projetos/${task.project.id}`}
-                                    className="text-primary-600 hover:text-primary-700 underline break-all"
-                                  >
-                                    {task.project.name || '-'}
-                                  </Link>
-                                </div>
+                            
+                            <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                              {isAtrasada && (
+                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-300 animate-pulse whitespace-nowrap">
+                                  ATRASADA
+                                </span>
                               )}
-                              {task.proposal && (
-                                <div className="break-words">
-                                  <span className="font-semibold">Negociação:</span>{' '}
-                                  <Link
-                                    href={`/negociacoes/${task.proposal.id}`}
-                                    className="text-primary-600 hover:text-primary-700 underline break-all"
-                                  >
-                                    {task.proposal.numero ? `${task.proposal.numero} - ` : ''}{task.proposal.title || task.proposal.titulo || '-'}
-                                  </Link>
-                                </div>
-                              )}
-                              {task.client && (
-                                <div className="break-words">
-                                  <span className="font-semibold">Cliente:</span>{' '}
-                                  {task.client.name || task.client.razaoSocial || '-'}
-                                </div>
-                              )}
-                              {!task.client && task.project?.client && (
-                                <div className="break-words">
-                                  <span className="font-semibold">Cliente:</span>{' '}
-                                  {task.project.client.name || task.project.client.razaoSocial || '-'}
-                                </div>
-                              )}
-                              {task.usuarioResponsavel && (
-                                <div className="break-words">
-                                  <span className="font-semibold">Envolvidos:</span>{' '}
-                                  {task.usuarioResponsavel.name}
-                                </div>
-                              )}
-                              {task.dataFimPrevista && (
-                                <div>
-                                  <span className="font-semibold">Prazo:</span>{' '}
-                                  {formatDate(task.dataFimPrevista)}
-                                </div>
-                              )}
-                              {task.horasEstimadas && (
-                                <div>
-                                  <span className="font-semibold">Horas Estimadas:</span>{' '}
-                                  {task.horasEstimadas}h
-                                </div>
-                              )}
-                              {tasksWithHours[task.id] && tasksWithHours[task.id].length > 0 && (
-                                <div>
-                                  <span className="font-semibold">Horas Lançadas:</span>{' '}
-                                  <span className="text-blue-600 font-semibold">
-                                    {tasksWithHours[task.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0).toFixed(2)}h
-                                  </span>
-                                </div>
-                              )}
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getTaskStatusColor(task.status)}`}>
+                                {getTaskStatusLabel(task.status)}
+                              </span>
                             </div>
-                            {(task.dataInicio || task.dataFimPrevista || task.dataConclusao) && (
-                              <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:gap-4 text-sm text-gray-500 mb-2 mt-2 pt-2 border-t border-gray-200">
-                                {task.dataInicio && (
-                                  <div>
-                                    <span className="font-semibold">Data de Início:</span>{' '}
-                                    {formatDate(task.dataInicio)}
-                                  </div>
-                                )}
-                                {(task.dataFimPrevista || task.dataConclusao) && (
-                                  <div>
-                                    <span className="font-semibold">Data de Conclusão:</span>{' '}
-                                    {formatDate(task.dataConclusao || task.dataFimPrevista)}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                              <h4 className="font-semibold text-sm text-gray-900 mb-2">
-                                Descrição da tarefa
-                              </h4>
-                              <p className="text-sm text-gray-700 break-words">{task.description || 'Sem descrição'}</p>
-                            </div>
-                            {tasksWithHours[task.id] && tasksWithHours[task.id].length > 0 && (
-                              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                <h4 className="font-semibold text-sm text-blue-900 mb-2">
-                                  ⏱️ Detalhamento de Horas Lançadas
-                                </h4>
-                                <div className="space-y-1">
-                                  {tasksWithHours[task.id].map((timeEntry: any) => {
-                                    // Buscar o valorPorHora da negociação vinculada
-                                    const proposal = task.proposal || task.project?.proposal
-                                    const valorPorHora = proposal?.valorPorHora || 0
-                                    const horas = parseFloat(timeEntry.horas || 0)
-                                    const valorFaturamento = horas * valorPorHora
-                                    
-                                    return (
-                                      <div key={timeEntry.id} className="text-sm text-blue-800">
-                                        <span className="font-medium">
-                                          {formatDate(timeEntry.data)}
-                                        </span>
-                                        {' - '}
-                                        <span className="font-semibold">{timeEntry.horas}h</span>
-                                        {valorPorHora > 0 && (
-                                          <span className="text-green-700 font-semibold ml-2">
-                                            (R$ {valorFaturamento.toFixed(2).replace('.', ',')})
-                                          </span>
-                                        )}
-                                        {timeEntry.descricao && (
-                                          <span className="text-blue-600"> - {timeEntry.descricao}</span>
-                                        )}
-                                      </div>
-                                    )
-                                  })}
-                                  <div className="mt-2 pt-2 border-t border-blue-300">
-                                    <div className="flex flex-col gap-1 md:flex-row md:justify-between md:items-center">
-                                      <span className="font-semibold text-blue-900">
-                                        Total: {tasksWithHours[task.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0).toFixed(2)}h
-                                      </span>
-                                      {(() => {
-                                        const proposal = task.proposal || task.project?.proposal
-                                        const valorPorHora = proposal?.valorPorHora || 0
-                                        if (valorPorHora > 0) {
-                                          const totalHoras = tasksWithHours[task.id].reduce((sum: number, te: any) => sum + parseFloat(te.horas || 0), 0)
-                                          const totalFaturamento = totalHoras * valorPorHora
-                                          return (
-                                            <span className="font-semibold text-green-700">
-                                              Total a Faturar: R$ {totalFaturamento.toFixed(2).replace('.', ',')}
-                                            </span>
-                                          )
-                                        }
-                                        return null
-                                      })()}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                          </div>
+
+                          {/* Linha 2: Contexto + Horas */}
+                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                            <span className="truncate flex-1 min-w-0">
+                              {contexto}
+                            </span>
+                            {horasLancadas && (
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 whitespace-nowrap ml-2 flex-shrink-0">
+                                ⏱️ {horasLancadas}h
+                              </span>
                             )}
                           </div>
-                          <div className="flex flex-row md:flex-col gap-2 md:ml-4 flex-shrink-0 w-full md:w-auto">
-                            {task.status !== 'CONCLUIDA' && (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    setSelectedTask(task)
-                                    
-                                    // Converter datas para string YYYY-MM-DD sem problemas de timezone
-                                    const formatDateForInput = (date: string | Date | null | undefined): string => {
-                                      if (!date) return ''
-                                      if (typeof date === 'string') {
-                                        return date.split('T')[0]
-                                      }
-                                      // Se for Date, converter para string local
-                                      const dateObj = date as Date
-                                      const year = dateObj.getFullYear()
-                                      const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-                                      const day = String(dateObj.getDate()).padStart(2, '0')
-                                      return `${year}-${month}-${day}`
-                                    }
-                                    
-                                    setEditTaskData({
-                                      name: task.name || '',
-                                      description: task.description || '',
-                                      status: task.status || 'PENDENTE',
-                                      dataInicio: formatDateForInput(task.dataInicio),
-                                      dataFimPrevista: formatDateForInput(task.dataConclusao || task.dataFimPrevista || ''),
-                                      usuarioResponsavelId: task.usuarioResponsavelId || '',
-                                      usuarioExecutorId: task.usuarioExecutorId || '',
-                                      tipo: task.tipo || 'ATIVIDADE',
-                                      horasEstimadas: task.horasEstimadas || '',
-                                      horaInicio: task.horaInicio || '',
-                                      horaFim: task.horaFim || '',
-                                      semPrazoDefinido: task.semPrazoDefinido || false,
-                                      diaInteiro: task.diaInteiro || false,
-                                      exigirLancamentoHoras: task.exigirLancamentoHoras || false,
-                                    })
-                                    setShowEditTaskModal(true)
-                                  }}
-                                  className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap"
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedTask(task)
-                                    setUpdateTaskData({
-                                      status: task.status || '',
-                                      percentual: task.percentual?.toString() || '',
-                                    })
-                                    setShowUpdateStatusModal(true)
-                                  }}
-                                  className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm whitespace-nowrap"
-                                >
-                                  Alterar Status
-                                </button>
-                              </>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedTask(task)
-                                const timeEntryData = {
-                                  projectId: task.project?.id || '',
-                                  proposalId: task.proposalId || '',
-                                  clientId: task.clientId || '',
-                                  taskId: task.id,
-                                  horas: '',
-                                  data: new Date().toISOString().split('T')[0],
-                                  descricao: '',
-                                }
-                                setNewTimeEntry(timeEntryData)
-                                setShowRegisterHoursModal(true)
-                              }}
-                              className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm whitespace-nowrap"
-                            >
-                              ⏱️ Lançar Horas
-                            </button>
+
+                          {/* Linha 3: Descrição curta */}
+                          {task.description && (
+                            <p className="text-xs text-gray-500 mb-3 line-clamp-2">
+                              {task.description}
+                            </p>
+                          )}
+
+                          {/* Linha 4: Data conclusão + Ações (hover) */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400">
+                              {dataConclusaoFormatada ? `Conclui ${dataConclusaoFormatada}` : 'Sem data'}
+                            </span>
+                            <div className="flex gap-1 opacity-0 group-hover/agenda-item:opacity-100 transition-opacity">
+                              {comentariosCount > 0 && (
+                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">
+                                  💬 {comentariosCount}
+                                </span>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  // Ações podem ser adicionadas aqui
+                                }}
+                                className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                                title="Mais opções"
+                              >
+                                ⋯
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
                       )
                     })}
                   </div>
