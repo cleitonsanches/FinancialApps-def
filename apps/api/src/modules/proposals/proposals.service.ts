@@ -363,7 +363,7 @@ export class ProposalsService {
           
           // Registrar no histórico de cada invoice cancelada
           for (const invoice of provisionadas) {
-            await this.invoiceHistoryRepository.save({
+            const history = this.invoiceHistoryRepository.create({
               invoiceId: invoice.id,
               action: 'CANCEL',
               fieldName: 'status',
@@ -372,6 +372,8 @@ export class ProposalsService {
               description: 'Parcela cancelada devido à alteração do status da negociação de Contratada para outro status.',
               changedBy: null, // Pode ser obtido do contexto se necessário
             });
+            await this.invoiceHistoryRepository.save(history);
+            console.log(`✅ Histórico registrado para invoice ${invoice.id}`);
           }
           
           console.log(`✅ ${provisionadas.length} invoice(s) PROVISIONADA(s) cancelada(s) e histórico registrado da negociação ${id}`);

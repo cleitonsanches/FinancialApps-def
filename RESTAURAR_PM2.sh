@@ -33,7 +33,17 @@ fi
 
 if [ ! -d "apps/web/.next" ]; then
     echo "⚠️ AVISO: apps/web/.next não existe"
-    echo "O Next.js pode usar npm start mesmo sem build prévio"
+    echo "Fazendo build do Next.js..."
+    cd apps/web
+    npm install --legacy-peer-deps
+    npm run build
+    if [ $? -ne 0 ]; then
+        echo "❌ ERRO: Build do Next.js falhou!"
+        echo "⚠️ Continuando mesmo assim - pode funcionar com npm start"
+    else
+        echo "✅ Build do Next.js concluído"
+    fi
+    cd ../..
 else
     echo "✅ apps/web/.next existe"
 fi

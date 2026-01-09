@@ -266,9 +266,17 @@ export default function InvoiceDetailsPage() {
   const loadInvoiceHistory = async () => {
     try {
       const response = await api.get(`/invoices/${invoiceId}/history`)
-      setInvoiceHistory(response.data || [])
-    } catch (error) {
+      const history = response.data || []
+      setInvoiceHistory(history)
+      console.log('Histórico carregado:', history.length, 'registros')
+    } catch (error: any) {
       console.error('Erro ao carregar histórico:', error)
+      // Mesmo com erro, definir array vazio para evitar problemas
+      setInvoiceHistory([])
+      // Se for 404, pode ser que não há histórico ainda (normal)
+      if (error.response?.status !== 404) {
+        console.warn('Erro ao carregar histórico da invoice:', invoiceId)
+      }
     }
   }
 
@@ -1068,24 +1076,25 @@ export default function InvoiceDetailsPage() {
             )}
 
             {/* Histórico de Alterações */}
-            {invoiceHistory.length > 0 && (
-              <div className="mt-6">
-                <button
-                  onClick={() => setHistoryExpanded(!historyExpanded)}
-                  className="w-full flex items-center justify-between text-xl font-semibold mb-4 text-gray-900 hover:text-gray-700 transition-colors"
+            <div className="mt-6">
+              <button
+                onClick={() => setHistoryExpanded(!historyExpanded)}
+                className="w-full flex items-center justify-between text-xl font-semibold mb-4 text-gray-900 hover:text-gray-700 transition-colors"
+              >
+                <span>Histórico de Alterações {invoiceHistory.length > 0 && `(${invoiceHistory.length})`}</span>
+                <svg
+                  className={`w-5 h-5 transform transition-transform ${historyExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <span>Histórico de Alterações</span>
-                  <svg
-                    className={`w-5 h-5 transform transition-transform ${historyExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {historyExpanded && (
-                  <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {historyExpanded && (
+                <>
+                  {invoiceHistory.length > 0 ? (
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
@@ -1137,9 +1146,14 @@ export default function InvoiceDetailsPage() {
                       </tbody>
                     </table>
                   </div>
-                )}
-              </div>
-            )}
+                  ) : (
+                    <div className="bg-white rounded-lg shadow p-6 text-center">
+                      <p className="text-gray-500">Nenhum histórico de alterações registrado</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Ações */}
