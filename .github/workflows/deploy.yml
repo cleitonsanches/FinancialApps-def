@@ -293,8 +293,9 @@ jobs:
             
             echo "🔨 Fazendo build do Web (Next.js)..."
             
-            # Limpar build anterior
-            rm -rf apps/web/.next apps/web/out 2>/dev/null || true
+            # Limpar build anterior COMPLETAMENTE (incluindo cache)
+            rm -rf apps/web/.next apps/web/out apps/web/.next/cache node_modules/.cache/.next 2>/dev/null || true
+            echo "✅ Build anterior do Next.js limpo completamente"
             
             # Verificar se next está disponível (já instalado via workspace na raiz)
             if [ ! -f "node_modules/.bin/next" ] && [ ! -f "apps/web/node_modules/.bin/next" ] && ! command -v next &> /dev/null; then
