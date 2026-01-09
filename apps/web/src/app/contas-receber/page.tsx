@@ -113,7 +113,7 @@ export default function ContasReceberPage() {
 
   const loadClients = async () => {
     try {
-      const response = await api.get('/clients')
+      const response = await api.get('/clients?isCliente=true')
       setClients(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar clientes:', error)
@@ -171,11 +171,9 @@ export default function ContasReceberPage() {
     // Sugerir conta baseado no tipo de emissão
     let contaSugerida = ''
     if (invoice.tipoEmissao === 'NF') {
-      const btg = bankAccounts.find(acc => 
-        acc.bankName?.toLowerCase().includes('btg') || 
-        acc.bankName?.toLowerCase().includes('pactual')
-      )
-      if (btg) contaSugerida = btg.id
+      // Buscar conta padrão
+      const contaPadrao = bankAccounts.find(acc => acc.isPadrao === true)
+      if (contaPadrao) contaSugerida = contaPadrao.id
     } else {
       const santander = bankAccounts.find(acc => 
         acc.bankName?.toLowerCase().includes('santander')

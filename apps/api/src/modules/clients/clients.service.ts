@@ -10,16 +10,23 @@ export class ClientsService {
     private clientRepository: Repository<Client>,
   ) {}
 
-  async findAll(companyId?: string): Promise<Client[]> {
-    console.log('ClientsService.findAll - companyId:', companyId);
+  async findAll(companyId?: string, isCliente?: boolean, isFornecedor?: boolean): Promise<Client[]> {
+    console.log('ClientsService.findAll - companyId:', companyId, 'isCliente:', isCliente, 'isFornecedor:', isFornecedor);
+    
+    const where: any = {};
     if (companyId) {
-      const clients = await this.clientRepository.find({ where: { companyId } });
-      console.log('ClientsService.findAll - encontrados com companyId:', clients.length);
-      return clients;
+      where.companyId = companyId;
     }
-    const allClients = await this.clientRepository.find();
-    console.log('ClientsService.findAll - encontrados todos:', allClients.length);
-    return allClients;
+    if (isCliente !== undefined) {
+      where.isCliente = isCliente;
+    }
+    if (isFornecedor !== undefined) {
+      where.isFornecedor = isFornecedor;
+    }
+    
+    const clients = await this.clientRepository.find({ where });
+    console.log('ClientsService.findAll - encontrados:', clients.length);
+    return clients;
   }
 
   async findOne(id: string): Promise<Client> {

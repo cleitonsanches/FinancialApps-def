@@ -360,7 +360,7 @@ export default function HorasTrabalhadasPage() {
     try {
       const companyId = getCompanyIdFromToken()
       if (companyId) {
-        const response = await api.get(`/clients?companyId=${companyId}`)
+        const response = await api.get(`/clients?companyId=${companyId}&isCliente=true`)
         setClients(response.data || [])
       }
     } catch (error) {

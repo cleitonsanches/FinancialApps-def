@@ -53,6 +53,7 @@ export default function CadastrosPage() {
       setLoadingClients(true)
       const companyId = getCompanyIdFromToken()
       const url = companyId ? `/clients?companyId=${companyId}` : '/clients'
+      // Não filtrar aqui pois é a listagem geral de clientes/fornecedores
       const response = await api.get(url)
       setClients(response.data || [])
     } catch (error: any) {

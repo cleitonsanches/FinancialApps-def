@@ -17,6 +17,12 @@ export class BankAccountsController {
     return accounts;
   }
 
+  @Get('default')
+  async findDefault(@Query('companyId') companyId?: string, @Request() req?: any): Promise<BankAccount | null> {
+    const effectiveCompanyId = companyId || req?.user?.companyId;
+    return this.bankAccountsService.findDefault(effectiveCompanyId);
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<BankAccount> {
     return this.bankAccountsService.findOne(id);

@@ -59,5 +59,13 @@ export class BankAccountsService {
   async delete(id: string): Promise<void> {
     await this.bankAccountRepository.delete(id);
   }
+
+  async findDefault(companyId?: string): Promise<BankAccount | null> {
+    const where: any = { isPadrao: true };
+    if (companyId) {
+      where.companyId = companyId;
+    }
+    return this.bankAccountRepository.findOne({ where });
+  }
 }
 

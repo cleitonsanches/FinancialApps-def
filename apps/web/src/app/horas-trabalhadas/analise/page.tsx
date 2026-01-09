@@ -72,7 +72,7 @@ export default function AnaliseHorasTrabalhadasPage() {
       setProjects(allProjectsData)
       
       // Carregar clientes
-      const clientsResponse = await api.get(`/clients?companyId=${companyId}`)
+      const clientsResponse = await api.get(`/clients?companyId=${companyId}&isCliente=true`)
       setClients(clientsResponse.data || [])
       
       // Carregar usuários

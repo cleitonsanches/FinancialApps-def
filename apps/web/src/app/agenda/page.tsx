@@ -536,7 +536,7 @@ export default function AgendaPage() {
   const loadClients = async () => {
     try {
       const companyId = getCompanyIdFromToken()
-      const url = companyId ? `/clients?companyId=${companyId}` : '/clients'
+      const url = companyId ? `/clients?companyId=${companyId}&isCliente=true` : '/clients?isCliente=true'
       const response = await api.get(url)
       setClients(response.data || [])
     } catch (error) {

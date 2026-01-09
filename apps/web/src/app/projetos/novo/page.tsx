@@ -37,7 +37,7 @@ export default function NovoProjetoPage() {
 
   const loadClients = async () => {
     try {
-      const response = await api.get('/clients')
+      const response = await api.get('/clients?isCliente=true')
       setClients(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar clientes:', error)

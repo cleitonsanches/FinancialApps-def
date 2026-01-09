@@ -146,7 +146,7 @@ export default function AccountPayableDetailsPage() {
   const loadSuppliers = async () => {
     try {
       const companyId = getCompanyIdFromToken()
-      const response = await api.get(`/clients${companyId ? `?companyId=${companyId}` : ''}`)
+      const response = await api.get(`/clients${companyId ? `?companyId=${companyId}&isFornecedor=true` : '?isFornecedor=true'}`)
       setSuppliers(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar fornecedores:', error)
@@ -168,7 +168,7 @@ export default function AccountPayableDetailsPage() {
   const loadClients = async () => {
     try {
       const companyId = getCompanyIdFromToken()
-      const response = await api.get(`/clients${companyId ? `?companyId=${companyId}` : ''}`)
+      const response = await api.get(`/clients${companyId ? `?companyId=${companyId}&isCliente=true` : '?isCliente=true'}`)
       setClients(response.data || [])
     } catch (error) {
       console.error('Erro ao carregar clientes:', error)

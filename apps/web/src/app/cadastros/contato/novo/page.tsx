@@ -37,6 +37,7 @@ export default function NovoContatoPage() {
 
   const loadClients = async () => {
     try {
+      // Não filtrar aqui pois contatos podem ser de clientes, fornecedores ou colaboradores
       const response = await api.get('/clients')
       setClients(response.data || [])
     } catch (error) {

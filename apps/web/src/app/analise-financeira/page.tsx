@@ -85,35 +85,38 @@ export default function AnaliseFinanceiraPage() {
     }
   }
 
-  const getBTGAccount = (accounts: any[]): any | null => {
-    return accounts.find(acc => 
-      acc.bankName?.toLowerCase().includes('btg') || 
-      acc.bankName?.toLowerCase().includes('pactual')
-    ) || accounts.find(acc => !acc.bankAccountId) || null
+  const getDefaultAccount = (accounts: any[]): any | null => {
+    // Buscar conta padrão primeiro
+    const contaPadrao = accounts.find(acc => acc.isPadrao === true)
+    if (contaPadrao) return contaPadrao
+    // Se não houver conta padrão, retornar null
+    return null
   }
 
   const calculateAnalysis = (invoicesData: any[], payablesData: any[], bankData: any[]) => {
-    const btgAccount = getBTGAccount(bankData)
+    const contaPadrao = getDefaultAccount(bankData)
     // Tentar diferentes campos possíveis para o saldo
-    const saldoInicialBTG = btgAccount?.currentBalance || 
-                            btgAccount?.saldoInicial || 
-                            btgAccount?.balance ||
-                            parseFloat(btgAccount?.initialBalance || '0') ||
+    const saldoInicialPadrao = contaPadrao?.currentBalance || 
+                            contaPadrao?.saldoInicial || 
+                            contaPadrao?.balance ||
+                            parseFloat(contaPadrao?.initialBalance || '0') ||
                             0
 
-    // Filtrar apenas contas BTG ou sem conta definida (excluir Santander)
-    const filterBTG = (item: any) => {
+    // Filtrar apenas contas da conta padrão ou sem conta definida (excluir Santander)
+    const filterContaPadrao = (item: any) => {
       const bankName = item.bankAccount?.bankName || item.bankName || ''
       const bankNameLower = bankName.toLowerCase()
+      const itemBankId = item.bankAccountId || item.contaCorrenteId || item.bankAccount?.id
+      
       if (bankNameLower.includes('santander')) return false
-      if (bankNameLower.includes('btg') || bankNameLower.includes('pactual')) return true
+      if (contaPadrao && itemBankId === contaPadrao.id) return true
       if (!bankName || bankName.trim() === '') return true // Sem conta definida
       return false
     }
 
-    // Filtrar contas a receber (BTG ou sem conta)
-    const invoicesBTG = invoicesData.filter(filterBTG)
-    const totalReceber = invoicesBTG.reduce((sum, inv) => {
+    // Filtrar contas a receber (conta padrão ou sem conta)
+    const invoicesPadrao = invoicesData.filter(filterContaPadrao)
+    const totalReceber = invoicesPadrao.reduce((sum, inv) => {
       // Usar valorRecebido se disponível e status RECEBIDA, senão grossValue
       const valor = inv.status === 'RECEBIDA' && inv.valorRecebido 
         ? parseFloat(inv.valorRecebido?.toString() || '0')
@@ -121,9 +124,9 @@ export default function AnaliseFinanceiraPage() {
       return sum + valor
     }, 0)
 
-    // Filtrar contas a pagar (BTG ou sem conta)
-    const payablesBTG = payablesData.filter(filterBTG)
-    const totalPagar = payablesBTG.reduce((sum, pay) => {
+    // Filtrar contas a pagar (conta padrão ou sem conta)
+    const payablesPadrao = payablesData.filter(filterContaPadrao)
+    const totalPagar = payablesPadrao.reduce((sum, pay) => {
       // Usar valorPago se disponível e status PAGA, senão totalValue
       const valor = pay.status === 'PAGA' && pay.valorPago 
         ? parseFloat(pay.valorPago?.toString() || '0')
@@ -132,10 +135,10 @@ export default function AnaliseFinanceiraPage() {
     }, 0)
 
     // Calcular valor a distribuir
-    const valorDistribuir = saldoInicialBTG + totalReceber - totalPagar
+    const valorDistribuir = saldoInicialPadrao + totalReceber - totalPagar
 
     // Calcular próximo recebimento
-    const recebimentosFuturos = invoicesBTG
+    const recebimentosFuturos = invoicesPadrao
       .filter(inv => inv.dueDate && !inv.dataRecebimento && inv.status !== 'CANCELADA')
       .map(inv => new Date(inv.dueDate))
       .sort((a, b) => a.getTime() - b.getTime())
@@ -149,7 +152,7 @@ export default function AnaliseFinanceiraPage() {
     hoje.setHours(0, 0, 0, 0)
     
     // Adicionar recebimentos já realizados (com dataRecebimento preenchida e status RECEBIDA)
-    const recebimentosRealizados = invoicesBTG
+    const recebimentosRealizados = invoicesPadrao
       .filter(inv => {
         if (!inv.dataRecebimento) return false
         const dataReceb = new Date(inv.dataRecebimento)
@@ -166,7 +169,7 @@ export default function AnaliseFinanceiraPage() {
       }, 0)
     
     // Subtrair pagamentos já realizados (com paymentDate preenchida e status PAGA)
-    const pagamentosRealizados = payablesBTG
+    const pagamentosRealizados = payablesPadrao
       .filter(pay => {
         if (!pay.paymentDate) return false
         const dataPag = new Date(pay.paymentDate)
@@ -183,14 +186,14 @@ export default function AnaliseFinanceiraPage() {
       }, 0)
     
     // Saldo atual = saldo inicial + recebimentos já realizados - pagamentos já realizados
-    const saldoAtual = saldoInicialBTG + recebimentosRealizados - pagamentosRealizados
+    const saldoAtual = saldoInicialPadrao + recebimentosRealizados - pagamentosRealizados
     
     let valorDisponivel = saldoAtual
     if (proximoRecebimento) {
       const proximaData = new Date(proximoRecebimento)
       proximaData.setHours(0, 0, 0, 0)
 
-      const contasPagarAteProximo = payablesBTG
+      const contasPagarAteProximo = payablesPadrao
         .filter(pay => {
           if (!pay.dueDate) return false
           const vencimento = new Date(pay.dueDate)
@@ -232,10 +235,10 @@ export default function AnaliseFinanceiraPage() {
     
     // Agrupar por data
     const fluxoMap: Record<string, { receber: number; pagar: number }> = {}
-    let saldoAcumulado = saldoInicialBTG
+    let saldoAcumulado = saldoInicialPadrao
 
-    // Processar contas a receber (usar invoicesBTG já filtrado)
-    invoicesBTG.forEach(inv => {
+    // Processar contas a receber (usar invoicesPadrao já filtrado)
+    invoicesPadrao.forEach(inv => {
       if (!inv.dueDate) return
       const data = new Date(inv.dueDate)
       if (data < start || data > end) return
@@ -246,8 +249,8 @@ export default function AnaliseFinanceiraPage() {
       fluxoMap[dataStr].receber += parseFloat(inv.grossValue?.toString() || '0')
     })
 
-    // Processar contas a pagar (usar payablesBTG já filtrado)
-    payablesBTG.forEach(pay => {
+    // Processar contas a pagar (usar payablesPadrao já filtrado)
+    payablesPadrao.forEach(pay => {
       if (!pay.dueDate) return
       const data = new Date(pay.dueDate)
       if (data < start || data > end) return
@@ -273,11 +276,11 @@ export default function AnaliseFinanceiraPage() {
 
     // Calcular saldo atual (reutilizando variáveis já calculadas acima)
     // recebimentosRealizados e pagamentosRealizados já foram calculados nas linhas 143-162
-    const saldoAtualBTG = saldoInicialBTG + recebimentosRealizados - pagamentosRealizados
+    const saldoAtualPadrao = saldoInicialPadrao + recebimentosRealizados - pagamentosRealizados
 
     setAnalysis({
       fluxoCaixa,
-      saldoInicialBTG: saldoAtualBTG, // Atualizar para mostrar saldo atual
+      saldoInicialBTG: saldoAtualPadrao, // Atualizar para mostrar saldo atual (mantém nome da propriedade para compatibilidade)
       valorDistribuir,
       valorDisponivel,
       proximoRecebimento
@@ -472,7 +475,7 @@ export default function AnaliseFinanceiraPage() {
             <>
               <div className="space-y-3 mb-4">
                 <div className="text-sm text-gray-600">
-                  <div className="mb-2">Saldo atual BTG:</div>
+                  <div className="mb-2">Saldo atual (Conta Padrão):</div>
                   <div className="text-lg font-semibold text-gray-900">
                     {formatCurrency(analysis.saldoInicialBTG)}
                   </div>
@@ -513,22 +516,22 @@ export default function AnaliseFinanceiraPage() {
           </div>
           <div ref={extratoRef}>
           {(() => {
-            // Filtrar contas do BTG (mesma lógica do calculateAnalysis)
-            const btgAccount = getBTGAccount(bankAccounts)
-            const filterBTG = (item: any) => {
-              if (!btgAccount) return true
+            // Filtrar contas da conta padrão (mesma lógica do calculateAnalysis)
+            const contaPadrao = getDefaultAccount(bankAccounts)
+            const filterContaPadrao = (item: any) => {
+              if (!contaPadrao) return true
               const itemBankId = item.bankAccountId || item.contaCorrenteId
-              return !itemBankId || itemBankId === btgAccount.id
+              return !itemBankId || itemBankId === contaPadrao.id
             }
 
-            const invoicesBTG = invoices.filter(filterBTG)
-            const payablesBTG = accountsPayable.filter(filterBTG)
+            const invoicesPadrao = invoices.filter(filterContaPadrao)
+            const payablesPadrao = accountsPayable.filter(filterContaPadrao)
 
             // Obter saldo inicial
-            const saldoInicial = btgAccount?.currentBalance || 
-                                btgAccount?.saldoInicial || 
-                                btgAccount?.balance ||
-                                parseFloat(btgAccount?.initialBalance || '0') || 0
+            const saldoInicial = contaPadrao?.currentBalance || 
+                                contaPadrao?.saldoInicial || 
+                                contaPadrao?.balance ||
+                                parseFloat(contaPadrao?.initialBalance || '0') || 0
 
             // Criar array de movimentações
             const movimentacoes: Array<{
@@ -542,7 +545,7 @@ export default function AnaliseFinanceiraPage() {
             }> = []
 
             // Adicionar recebimentos realizados
-            invoicesBTG
+            invoicesPadrao
               .filter(inv => inv.dataRecebimento && inv.status === 'RECEBIDA')
               .forEach(inv => {
                 const valorMovimentado = inv.valorRecebido 
@@ -560,7 +563,7 @@ export default function AnaliseFinanceiraPage() {
               })
 
             // Adicionar pagamentos realizados
-            payablesBTG
+            payablesPadrao
               .filter(pay => pay.paymentDate && pay.status === 'PAGA')
               .forEach(pay => {
                 const valorMovimentado = pay.valorPago 

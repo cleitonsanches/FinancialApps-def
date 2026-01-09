@@ -255,7 +255,7 @@ export default function InvoiceDetailsPage() {
       const companyId = payload.companyId
       
       if (companyId) {
-        const response = await api.get(`/clients?companyId=${companyId}`)
+        const response = await api.get(`/clients?companyId=${companyId}&isCliente=true`)
         setClients(response.data || [])
       }
     } catch (error) {
@@ -607,12 +607,9 @@ export default function InvoiceDetailsPage() {
     // Sugerir conta baseado no tipo de emissão
     let contaSugerida = ''
     if (faturadaData.tipoEmissao === 'NF') {
-      // Buscar BTG Pactual
-      const btg = bankAccounts.find(acc => 
-        acc.bankName?.toLowerCase().includes('btg') || 
-        acc.bankName?.toLowerCase().includes('pactual')
-      )
-      if (btg) contaSugerida = btg.id
+      // Buscar conta padrão
+      const contaPadrao = bankAccounts.find(acc => acc.isPadrao === true)
+      if (contaPadrao) contaSugerida = contaPadrao.id
     } else {
       // Buscar Santander
       const santander = bankAccounts.find(acc => 

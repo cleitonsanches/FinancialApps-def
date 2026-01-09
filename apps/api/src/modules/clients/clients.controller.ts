@@ -7,10 +7,15 @@ export class ClientsController {
   constructor(private clientsService: ClientsService) {}
 
   @Get()
-  async findAll(@Query('companyId') companyId?: string, @Request() req?: any): Promise<Client[]> {
+  async findAll(
+    @Query('companyId') companyId?: string,
+    @Query('isCliente') isCliente?: string,
+    @Query('isFornecedor') isFornecedor?: string,
+    @Request() req?: any
+  ): Promise<Client[]> {
     const effectiveCompanyId = companyId || req?.user?.companyId;
     console.log('ClientsController.findAll - companyId:', companyId, 'req?.user?.companyId:', req?.user?.companyId, 'effectiveCompanyId:', effectiveCompanyId);
-    const clients = await this.clientsService.findAll(effectiveCompanyId);
+    const clients = await this.clientsService.findAll(effectiveCompanyId, isCliente === 'true', isFornecedor === 'true');
     console.log('ClientsController.findAll - encontrados:', clients.length, 'clientes');
     return clients;
   }
