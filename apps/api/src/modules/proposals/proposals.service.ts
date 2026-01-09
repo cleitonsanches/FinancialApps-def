@@ -10,6 +10,7 @@ import { Client } from '../../database/entities/client.entity';
 import { ServiceType } from '../../database/entities/service-type.entity';
 import { TimeEntry } from '../../database/entities/time-entry.entity';
 import { Invoice } from '../../database/entities/invoice.entity';
+import { InvoiceHistory } from '../../database/entities/invoice-history.entity';
 
 @Injectable()
 export class ProposalsService {
@@ -34,6 +35,8 @@ export class ProposalsService {
     private timeEntryRepository: Repository<TimeEntry>,
     @InjectRepository(Invoice)
     private invoiceRepository: Repository<Invoice>,
+    @InjectRepository(InvoiceHistory)
+    private invoiceHistoryRepository: Repository<InvoiceHistory>,
   ) {}
 
   // Função helper para limpar campos: UUID, numéricos e datas
@@ -349,7 +352,7 @@ export class ProposalsService {
         const faturadas = relatedInvoices.filter(inv => inv.status === 'FATURADA');
         const recebidas = relatedInvoices.filter(inv => inv.status === 'RECEBIDA');
         
-        // 3. Cancelar ou deletar invoices PROVISIONADAS
+        // 3. Cancelar invoices PROVISIONADAS e registrar no histórico
         if (provisionadas.length > 0) {
           const provisionadaIds = provisionadas.map(inv => inv.id);
           // Cancelar ao invés de deletar para manter histórico
@@ -357,7 +360,21 @@ export class ProposalsService {
             { id: In(provisionadaIds) },
             { status: 'CANCELADA' }
           );
-          console.log(`✅ ${provisionadas.length} invoice(s) PROVISIONADA(s) cancelada(s) da negociação ${id}`);
+          
+          // Registrar no histórico de cada invoice cancelada
+          for (const invoice of provisionadas) {
+            await this.invoiceHistoryRepository.save({
+              invoiceId: invoice.id,
+              action: 'CANCEL',
+              fieldName: 'status',
+              oldValue: 'PROVISIONADA',
+              newValue: 'CANCELADA',
+              description: 'Parcela cancelada devido à alteração do status da negociação de Contratada para outro status.',
+              changedBy: null, // Pode ser obtido do contexto se necessário
+            });
+          }
+          
+          console.log(`✅ ${provisionadas.length} invoice(s) PROVISIONADA(s) cancelada(s) e histórico registrado da negociação ${id}`);
         }
         
         // 4. Registrar aviso sobre invoices FATURADAS e RECEBIDAS (não cancelar)
