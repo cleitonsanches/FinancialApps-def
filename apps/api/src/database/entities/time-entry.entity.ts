@@ -69,11 +69,11 @@ export class TimeEntry {
 
   @Column({ 
     name: 'is_faturavel', 
-    type: 'bit', 
-    default: false,
+    type: 'tinyint', 
+    default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   isFaturavel?: boolean;
@@ -93,11 +93,11 @@ export class TimeEntry {
 
   @Column({ 
     name: 'faturamento_desprezado', 
-    type: 'bit', 
-    default: false,
+    type: 'tinyint', 
+    default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   faturamentoDesprezado?: boolean;

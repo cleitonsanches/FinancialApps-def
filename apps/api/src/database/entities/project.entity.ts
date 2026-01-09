@@ -158,33 +158,33 @@ export class ProjectTask {
 
   @Column({ 
     name: 'sem_prazo_definido', 
-    type: 'bit', 
-    default: false,
+    type: 'tinyint', 
+    default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   semPrazoDefinido?: boolean; // Para atividades: se true, só precisa dataInicio
 
   @Column({ 
     name: 'dia_inteiro', 
-    type: 'bit', 
-    default: false,
+    type: 'tinyint', 
+    default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   diaInteiro?: boolean; // Para eventos: se true, oculta horários e trata como bloqueio de dia
 
   @Column({ 
     name: 'exigir_lancamento_horas', 
-    type: 'bit', 
-    default: false,
+    type: 'tinyint', 
+    default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   exigirLancamentoHoras?: boolean; // Se true, exige lançamento de horas ao concluir

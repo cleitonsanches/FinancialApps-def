@@ -177,12 +177,12 @@ export class Proposal {
 
   @Column({ 
     name: 'tem_manutencao_vinculada', 
-    type: 'bit', 
-    default: false, 
+    type: 'tinyint', 
+    default: 0, 
     nullable: true,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   temManutencaoVinculada?: boolean;

@@ -52,33 +52,33 @@ export class Client {
 
   @Column({ 
     name: 'is_cliente', 
-    type: 'bit', 
-    default: false,
+    type: 'tinyint', 
+    default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   isCliente: boolean;
 
   @Column({ 
     name: 'is_fornecedor', 
-    type: 'bit', 
-    default: false,
+    type: 'tinyint', 
+    default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   isFornecedor: boolean;
 
   @Column({ 
     name: 'is_colaborador', 
-    type: 'bit', 
-    default: false,
+    type: 'tinyint', 
+    default: 0,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   isColaborador: boolean;

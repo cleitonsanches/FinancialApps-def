@@ -23,11 +23,11 @@ export class ServiceType {
 
   @Column({ 
     name: 'active', 
-    type: 'bit', 
-    default: true,
+    type: 'tinyint', 
+    default: 1,
     transformer: {
       to: (value: boolean) => value ? 1 : 0,
-      from: (value: number) => value === 1
+      from: (value: number) => value === 1 || value === true
     }
   })
   active: boolean;
