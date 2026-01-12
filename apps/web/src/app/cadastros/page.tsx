@@ -52,12 +52,44 @@ export default function CadastrosPage() {
     try {
       setLoadingClients(true)
       const companyId = getCompanyIdFromToken()
-      const url = companyId ? `/clients?companyId=${companyId}` : '/clients'
-      // Não filtrar aqui pois é a listagem geral de clientes/fornecedores
+      console.log('CadastrosPage.loadClients - companyId do token:', companyId)
+      
+      // Tentar primeiro sem filtro de companyId para ver todos os clientes
+      // Se não encontrar nada, tentar com companyId
+      let url = '/clients'
+      if (companyId) {
+        url = `/clients?companyId=${companyId}`
+      }
+      
+      console.log('CadastrosPage.loadClients - URL:', url)
+      console.log('CadastrosPage.loadClients - Fazendo requisição...')
+      
       const response = await api.get(url)
-      setClients(response.data || [])
+      console.log('CadastrosPage.loadClients - Resposta recebida:', {
+        status: response.status,
+        dataLength: response.data?.length || 0,
+        firstItem: response.data?.[0] || null
+      })
+      
+      const clientsData = response.data || []
+      console.log('CadastrosPage.loadClients - Clientes recebidos:', clientsData.length)
+      
+      if (clientsData.length === 0 && companyId) {
+        console.warn('CadastrosPage.loadClients - Nenhum cliente encontrado com companyId. Tentando sem filtro...')
+        // Tentar sem companyId como fallback
+        const fallbackResponse = await api.get('/clients')
+        console.log('CadastrosPage.loadClients - Fallback sem companyId:', fallbackResponse.data?.length || 0)
+        setClients(fallbackResponse.data || [])
+      } else {
+        setClients(clientsData)
+      }
     } catch (error: any) {
-      console.error('Erro ao carregar clientes:', error)
+      console.error('CadastrosPage.loadClients - ERRO:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      })
       setClients([])
     } finally {
       setLoadingClients(false)
