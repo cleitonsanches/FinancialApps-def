@@ -51,12 +51,15 @@ export default function CadastrosPage() {
   const loadClients = async () => {
     try {
       setLoadingClients(true)
+      const companyId = getCompanyIdFromToken()
       
-      // Página de Cadastros deve mostrar TODOS os clientes cadastrados
-      // Não filtrar por companyId - esta é a listagem geral
-      console.log('CadastrosPage.loadClients - Carregando TODOS os clientes (sem filtro de companyId)')
+      // Página de Cadastros deve mostrar TODOS os tipos (clientes, fornecedores, colaboradores)
+      // Manter filtro de companyId, mas NÃO filtrar por isCliente, isFornecedor, isColaborador
+      const url = companyId ? `/clients?companyId=${companyId}` : '/clients'
+      console.log('CadastrosPage.loadClients - Carregando clientes com companyId, sem filtro de tipo')
+      console.log('CadastrosPage.loadClients - URL:', url)
       
-      const response = await api.get('/clients')
+      const response = await api.get(url)
       console.log('CadastrosPage.loadClients - Resposta recebida:', {
         status: response.status,
         dataLength: response.data?.length || 0,
@@ -70,7 +73,10 @@ export default function CadastrosPage() {
         console.log('CadastrosPage.loadClients - Primeiro cliente:', {
           id: clientsData[0].id,
           name: clientsData[0].name,
-          companyId: clientsData[0].companyId
+          companyId: clientsData[0].companyId,
+          isCliente: clientsData[0].isCliente,
+          isFornecedor: clientsData[0].isFornecedor,
+          isColaborador: clientsData[0].isColaborador
         })
       }
       
