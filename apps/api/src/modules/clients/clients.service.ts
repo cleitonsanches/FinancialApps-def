@@ -20,10 +20,32 @@ export class ClientsService {
       
       const where: any = {};
       if (companyId) {
+        // Usar comparação case-insensitive para companyId (GUID pode ter variações de case)
+        // TypeORM com SQL Server pode precisar de comparação case-insensitive
         where.companyId = companyId;
-        // Verificar quantos registros têm esse companyId
+        
+        // Verificar quantos registros têm esse companyId (case-sensitive)
         const countWithCompany = await this.clientRepository.count({ where: { companyId } });
-        console.log(`ClientsService.findAll - Registros com companyId=${companyId}:`, countWithCompany);
+        console.log(`ClientsService.findAll - Registros com companyId=${companyId} (case-sensitive):`, countWithCompany);
+        
+        // Se não encontrou nada, tentar case-insensitive usando Raw
+        if (countWithCompany === 0) {
+          const countCaseInsensitive = await this.clientRepository
+            .createQueryBuilder('client')
+            .where('LOWER(client.companyId) = LOWER(:companyId)', { companyId })
+            .getCount();
+          console.log(`ClientsService.findAll - Registros com companyId (case-insensitive):`, countCaseInsensitive);
+          
+          // Se encontrou com case-insensitive, usar query case-insensitive
+          if (countCaseInsensitive > 0) {
+            const clientsCaseInsensitive = await this.clientRepository
+              .createQueryBuilder('client')
+              .where('LOWER(client.companyId) = LOWER(:companyId)', { companyId })
+              .getMany();
+            console.log(`ClientsService.findAll - Clientes encontrados (case-insensitive):`, clientsCaseInsensitive.length);
+            return clientsCaseInsensitive;
+          }
+        }
       }
       if (isCliente !== undefined) {
         where.isCliente = isCliente;
