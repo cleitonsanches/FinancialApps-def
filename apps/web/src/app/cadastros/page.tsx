@@ -51,24 +51,12 @@ export default function CadastrosPage() {
   const loadClients = async () => {
     try {
       setLoadingClients(true)
-      const companyId = getCompanyIdFromToken()
-      console.log('CadastrosPage.loadClients - companyId do token:', companyId)
-      console.log('CadastrosPage.loadClients - companyId tipo:', typeof companyId)
-      console.log('CadastrosPage.loadClients - companyId length:', companyId?.length)
       
-      // NÃO usar encodeURIComponent - GUIDs não precisam de encoding e pode causar problemas
-      // O axios já faz o encoding necessário automaticamente
-      let url = '/clients'
-      if (companyId) {
-        // Usar diretamente o companyId do token, sem encoding manual
-        url = `/clients?companyId=${companyId}`
-        console.log('CadastrosPage.loadClients - companyId usado na URL:', companyId)
-      }
+      // Página de Cadastros deve mostrar TODOS os clientes cadastrados
+      // Não filtrar por companyId - esta é a listagem geral
+      console.log('CadastrosPage.loadClients - Carregando TODOS os clientes (sem filtro de companyId)')
       
-      console.log('CadastrosPage.loadClients - URL final:', url)
-      console.log('CadastrosPage.loadClients - Fazendo requisição...')
-      
-      const response = await api.get(url)
+      const response = await api.get('/clients')
       console.log('CadastrosPage.loadClients - Resposta recebida:', {
         status: response.status,
         dataLength: response.data?.length || 0,
@@ -78,22 +66,15 @@ export default function CadastrosPage() {
       const clientsData = response.data || []
       console.log('CadastrosPage.loadClients - Clientes recebidos:', clientsData.length)
       
-      if (clientsData.length === 0 && companyId) {
-        console.warn('CadastrosPage.loadClients - Nenhum cliente encontrado com companyId. Tentando sem filtro...')
-        // Tentar sem companyId como fallback
-        const fallbackResponse = await api.get('/clients')
-        console.log('CadastrosPage.loadClients - Fallback sem companyId:', fallbackResponse.data?.length || 0)
-        if (fallbackResponse.data && fallbackResponse.data.length > 0) {
-          console.log('CadastrosPage.loadClients - Fallback encontrou clientes! Primeiro item:', {
-            id: fallbackResponse.data[0].id,
-            companyId: fallbackResponse.data[0].companyId,
-            name: fallbackResponse.data[0].name
-          })
-        }
-        setClients(fallbackResponse.data || [])
-      } else {
-        setClients(clientsData)
+      if (clientsData.length > 0) {
+        console.log('CadastrosPage.loadClients - Primeiro cliente:', {
+          id: clientsData[0].id,
+          name: clientsData[0].name,
+          companyId: clientsData[0].companyId
+        })
       }
+      
+      setClients(clientsData)
     } catch (error: any) {
       console.error('CadastrosPage.loadClients - ERRO:', {
         message: error.message,
