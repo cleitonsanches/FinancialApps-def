@@ -30,21 +30,51 @@ export class ClientsService {
       if (companyId) {
         console.log(`ClientsService.findAll - companyId recebido: "${companyId}" (tipo: ${typeof companyId}, length: ${companyId.length})`);
         
-        // Primeiro, verificar quais companyIds existem no banco
-        const allClientsSample = await this.clientRepository.find({ take: 5 });
-        const companyIdsInDb = [...new Set(allClientsSample.map(c => c.companyId))];
-        console.log(`ClientsService.findAll - CompanyIds encontrados no banco (amostra):`, companyIdsInDb);
+        // Normalizar companyId para minúsculas (banco tem em minúsculas)
+        const normalizedCompanyId = companyId.toLowerCase();
+        console.log(`ClientsService.findAll - companyId normalizado (lowercase): "${normalizedCompanyId}"`);
         
-        // Tentar busca case-insensitive diretamente (SQL Server pode ter problemas com case)
-        console.log(`ClientsService.findAll - Buscando com case-insensitive...`);
+        // Primeiro, verificar quais companyIds existem no banco (amostra)
+        const allClientsSample = await this.clientRepository.find({ take: 5 });
+        if (allClientsSample.length > 0) {
+          const companyIdsInDb = [...new Set(allClientsSample.map(c => c.companyId))];
+          console.log(`ClientsService.findAll - CompanyIds encontrados no banco (amostra):`, companyIdsInDb);
+        }
+        
+        // Buscar usando companyId normalizado (minúsculas)
+        // Primeiro tentar busca direta com o valor normalizado
+        const clientsWithNormalized = await this.clientRepository.find({ 
+          where: { companyId: normalizedCompanyId } 
+        });
+        console.log(`ClientsService.findAll - Clientes encontrados (com companyId normalizado):`, clientsWithNormalized.length);
+        
+        if (clientsWithNormalized.length > 0) {
+          console.log(`ClientsService.findAll - Primeiro cliente encontrado:`, {
+            id: clientsWithNormalized[0].id,
+            companyId: clientsWithNormalized[0].companyId,
+            name: clientsWithNormalized[0].name
+          });
+          // Aplicar outros filtros se necessário
+          let filteredClients = clientsWithNormalized;
+          if (isCliente !== undefined) {
+            filteredClients = filteredClients.filter(c => c.isCliente === isCliente);
+          }
+          if (isFornecedor !== undefined) {
+            filteredClients = filteredClients.filter(c => c.isFornecedor === isFornecedor);
+          }
+          return filteredClients;
+        }
+        
+        // Se não encontrou, tentar case-insensitive com query builder
+        console.log(`ClientsService.findAll - Tentando busca case-insensitive com QueryBuilder...`);
         const clientsCaseInsensitive = await this.clientRepository
           .createQueryBuilder('client')
-          .where('LOWER(CAST(client.companyId AS VARCHAR(MAX))) = LOWER(:companyId)', { companyId })
+          .where('LOWER(client.companyId) = LOWER(:companyId)', { companyId })
           .getMany();
         console.log(`ClientsService.findAll - Clientes encontrados (case-insensitive):`, clientsCaseInsensitive.length);
         
         if (clientsCaseInsensitive.length > 0) {
-          console.log(`ClientsService.findAll - Primeiro cliente encontrado:`, {
+          console.log(`ClientsService.findAll - Primeiro cliente encontrado (case-insensitive):`, {
             id: clientsCaseInsensitive[0].id,
             companyId: clientsCaseInsensitive[0].companyId,
             name: clientsCaseInsensitive[0].name
@@ -58,13 +88,13 @@ export class ClientsService {
             filteredClients = filteredClients.filter(c => c.isFornecedor === isFornecedor);
           }
           return filteredClients;
-        } else {
-          // Não encontrou com case-insensitive, tentar sem filtro de companyId como fallback
-          console.warn(`ClientsService.findAll - ⚠️ Nenhum cliente encontrado com companyId. Retornando TODOS os clientes como fallback.`);
-          const allClients = await this.clientRepository.find();
-          console.log(`ClientsService.findAll - Total de clientes retornados (sem filtro companyId):`, allClients.length);
-          return allClients;
         }
+        
+        // Se ainda não encontrou, retornar todos como fallback
+        console.warn(`ClientsService.findAll - ⚠️ Nenhum cliente encontrado com companyId "${companyId}" ou "${normalizedCompanyId}". Retornando TODOS os clientes como fallback.`);
+        const allClients = await this.clientRepository.find();
+        console.log(`ClientsService.findAll - Total de clientes retornados (sem filtro companyId):`, allClients.length);
+        return allClients;
       }
       if (isCliente !== undefined) {
         where.isCliente = isCliente;
