@@ -18,7 +18,14 @@ export class ClientsController {
       console.log('ClientsController.findAll - companyId:', companyId, 'req?.user?.companyId:', req?.user?.companyId, 'effectiveCompanyId:', effectiveCompanyId);
       console.log('ClientsController.findAll - isCliente:', isCliente, 'isFornecedor:', isFornecedor);
       
-      const clients = await this.clientsService.findAll(effectiveCompanyId, isCliente === 'true', isFornecedor === 'true');
+      // Converter string para boolean apenas se o parâmetro foi fornecido
+      // Se não foi fornecido, passar undefined para não aplicar filtro
+      const isClienteBool = isCliente !== undefined ? isCliente === 'true' : undefined;
+      const isFornecedorBool = isFornecedor !== undefined ? isFornecedor === 'true' : undefined;
+      
+      console.log('ClientsController.findAll - isClienteBool:', isClienteBool, 'isFornecedorBool:', isFornecedorBool);
+      
+      const clients = await this.clientsService.findAll(effectiveCompanyId, isClienteBool, isFornecedorBool);
       console.log('ClientsController.findAll - encontrados:', clients.length, 'clientes');
       return clients;
     } catch (error: any) {
