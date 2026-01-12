@@ -53,15 +53,19 @@ export default function CadastrosPage() {
       setLoadingClients(true)
       const companyId = getCompanyIdFromToken()
       console.log('CadastrosPage.loadClients - companyId do token:', companyId)
+      console.log('CadastrosPage.loadClients - companyId tipo:', typeof companyId)
+      console.log('CadastrosPage.loadClients - companyId length:', companyId?.length)
       
-      // Tentar primeiro sem filtro de companyId para ver todos os clientes
-      // Se não encontrar nada, tentar com companyId
+      // Garantir que companyId seja string e usar encodeURIComponent para evitar problemas de encoding
       let url = '/clients'
       if (companyId) {
-        url = `/clients?companyId=${companyId}`
+        const encodedCompanyId = encodeURIComponent(companyId)
+        url = `/clients?companyId=${encodedCompanyId}`
+        console.log('CadastrosPage.loadClients - companyId original:', companyId)
+        console.log('CadastrosPage.loadClients - companyId encoded:', encodedCompanyId)
       }
       
-      console.log('CadastrosPage.loadClients - URL:', url)
+      console.log('CadastrosPage.loadClients - URL final:', url)
       console.log('CadastrosPage.loadClients - Fazendo requisição...')
       
       const response = await api.get(url)
@@ -79,6 +83,13 @@ export default function CadastrosPage() {
         // Tentar sem companyId como fallback
         const fallbackResponse = await api.get('/clients')
         console.log('CadastrosPage.loadClients - Fallback sem companyId:', fallbackResponse.data?.length || 0)
+        if (fallbackResponse.data && fallbackResponse.data.length > 0) {
+          console.log('CadastrosPage.loadClients - Fallback encontrou clientes! Primeiro item:', {
+            id: fallbackResponse.data[0].id,
+            companyId: fallbackResponse.data[0].companyId,
+            name: fallbackResponse.data[0].name
+          })
+        }
         setClients(fallbackResponse.data || [])
       } else {
         setClients(clientsData)
