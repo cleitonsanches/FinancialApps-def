@@ -12,11 +12,19 @@ export class ClientsService {
 
   async findAll(companyId?: string, isCliente?: boolean, isFornecedor?: boolean): Promise<Client[]> {
     try {
-      console.log('ClientsService.findAll - companyId:', companyId, 'isCliente:', isCliente, 'isFornecedor:', isFornecedor);
+      console.log('==========================================');
+      console.log('ClientsService.findAll - INÍCIO');
+      console.log('ClientsService.findAll - Parâmetros:', { companyId, isCliente, isFornecedor });
+      console.log('==========================================');
       
       // Primeiro, verificar quantos registros existem SEM filtro
       const totalCount = await this.clientRepository.count();
       console.log('ClientsService.findAll - Total de registros na tabela (sem filtros):', totalCount);
+      
+      if (totalCount === 0) {
+        console.warn('ClientsService.findAll - ⚠️ TABELA VAZIA! Não há nenhum cliente cadastrado no banco.');
+        return [];
+      }
       
       const where: any = {};
       if (companyId) {
@@ -66,7 +74,16 @@ export class ClientsService {
       
       console.log('ClientsService.findAll - condições where:', JSON.stringify(where));
       
-      const clients = await this.clientRepository.find({ where });
+      // Se não há filtros, buscar todos
+      let clients: Client[];
+      if (Object.keys(where).length === 0) {
+        console.log('ClientsService.findAll - Sem filtros, buscando TODOS os clientes...');
+        clients = await this.clientRepository.find();
+      } else {
+        console.log('ClientsService.findAll - Com filtros, buscando com where...');
+        clients = await this.clientRepository.find({ where });
+      }
+      
       console.log('ClientsService.findAll - encontrados:', clients.length, 'clientes');
       
       if (clients.length > 0) {
@@ -80,19 +97,32 @@ export class ClientsService {
           isFornecedorType: typeof clients[0].isFornecedor
         });
       } else {
-        console.warn('ClientsService.findAll - NENHUM cliente encontrado com os filtros aplicados!');
-        // Se não encontrou nada e tinha filtro de companyId, tentar sem o filtro para debug
-        if (companyId) {
-          console.log('ClientsService.findAll - Tentando buscar SEM filtro de companyId para debug...');
-          const allClients = await this.clientRepository.find({ take: 5 });
-          console.log('ClientsService.findAll - Primeiros 5 registros (sem filtro):', allClients.map(c => ({
-            id: c.id,
-            name: c.name,
-            companyId: c.companyId
-          })));
+        console.warn('ClientsService.findAll - ⚠️ NENHUM cliente encontrado com os filtros aplicados!');
+        console.warn('ClientsService.findAll - Total na tabela:', totalCount, 'mas filtros retornaram 0');
+        
+        // Se não encontrou nada, tentar buscar TODOS para debug
+        console.log('ClientsService.findAll - Buscando TODOS os clientes para debug...');
+        const allClients = await this.clientRepository.find({ take: 10 });
+        console.log('ClientsService.findAll - Primeiros 10 registros (sem filtro):', allClients.length);
+        if (allClients.length > 0) {
+          console.log('ClientsService.findAll - Exemplo de cliente no banco:', {
+            id: allClients[0].id,
+            name: allClients[0].name,
+            companyId: allClients[0].companyId,
+            isCliente: allClients[0].isCliente,
+            isFornecedor: allClients[0].isFornecedor
+          });
+        }
+        
+        // Se não havia filtros, retornar todos
+        if (Object.keys(where).length === 0) {
+          console.log('ClientsService.findAll - Sem filtros, retornando todos os clientes encontrados');
+          return allClients;
         }
       }
       
+      console.log('ClientsService.findAll - Retornando', clients.length, 'clientes');
+      console.log('==========================================');
       return clients;
     } catch (error: any) {
       console.error('ClientsService.findAll - ERRO:', error.message);
