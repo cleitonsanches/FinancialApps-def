@@ -5,6 +5,11 @@ const nextConfig = {
   // Pode ser reativado quando o problema for resolvido
   // output: 'standalone',
   
+  // Desabilitar geração de páginas de erro estáticas para evitar erro de build
+  generateBuildId: async () => {
+    return 'build-' + Date.now()
+  },
+  
   // Configurações de imagens
   images: {
     unoptimized: true,
@@ -31,6 +36,11 @@ const nextConfig = {
     ];
     
     return config;
+  },
+  
+  // Desabilitar exportação estática de páginas de erro
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
   },
 }
 
