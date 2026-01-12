@@ -20,31 +20,41 @@ export class ClientsService {
       
       const where: any = {};
       if (companyId) {
-        // Usar comparação case-insensitive para companyId (GUID pode ter variações de case)
-        // TypeORM com SQL Server pode precisar de comparação case-insensitive
-        where.companyId = companyId;
+        console.log(`ClientsService.findAll - companyId recebido: "${companyId}" (tipo: ${typeof companyId}, length: ${companyId.length})`);
         
-        // Verificar quantos registros têm esse companyId (case-sensitive)
+        // SQL Server com collation case-insensitive deve funcionar, mas vamos garantir
+        // Primeiro tentar case-sensitive (mais rápido)
         const countWithCompany = await this.clientRepository.count({ where: { companyId } });
-        console.log(`ClientsService.findAll - Registros com companyId=${companyId} (case-sensitive):`, countWithCompany);
+        console.log(`ClientsService.findAll - Registros com companyId exato:`, countWithCompany);
         
-        // Se não encontrou nada, tentar case-insensitive usando Raw
+        // Se não encontrou nada, tentar case-insensitive
         if (countWithCompany === 0) {
-          const countCaseInsensitive = await this.clientRepository
+          console.log(`ClientsService.findAll - Tentando busca case-insensitive...`);
+          const clientsCaseInsensitive = await this.clientRepository
             .createQueryBuilder('client')
             .where('LOWER(client.companyId) = LOWER(:companyId)', { companyId })
-            .getCount();
-          console.log(`ClientsService.findAll - Registros com companyId (case-insensitive):`, countCaseInsensitive);
+            .getMany();
+          console.log(`ClientsService.findAll - Clientes encontrados (case-insensitive):`, clientsCaseInsensitive.length);
           
-          // Se encontrou com case-insensitive, usar query case-insensitive
-          if (countCaseInsensitive > 0) {
-            const clientsCaseInsensitive = await this.clientRepository
-              .createQueryBuilder('client')
-              .where('LOWER(client.companyId) = LOWER(:companyId)', { companyId })
-              .getMany();
-            console.log(`ClientsService.findAll - Clientes encontrados (case-insensitive):`, clientsCaseInsensitive.length);
-            return clientsCaseInsensitive;
+          if (clientsCaseInsensitive.length > 0) {
+            console.log(`ClientsService.findAll - Primeiro cliente encontrado (case-insensitive):`, {
+              id: clientsCaseInsensitive[0].id,
+              companyId: clientsCaseInsensitive[0].companyId,
+              name: clientsCaseInsensitive[0].name
+            });
+            // Aplicar outros filtros se necessário
+            let filteredClients = clientsCaseInsensitive;
+            if (isCliente !== undefined) {
+              filteredClients = filteredClients.filter(c => c.isCliente === isCliente);
+            }
+            if (isFornecedor !== undefined) {
+              filteredClients = filteredClients.filter(c => c.isFornecedor === isFornecedor);
+            }
+            return filteredClients;
           }
+        } else {
+          // Encontrou com case-sensitive, usar normalmente
+          where.companyId = companyId;
         }
       }
       if (isCliente !== undefined) {

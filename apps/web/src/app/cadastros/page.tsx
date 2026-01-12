@@ -56,13 +56,13 @@ export default function CadastrosPage() {
       console.log('CadastrosPage.loadClients - companyId tipo:', typeof companyId)
       console.log('CadastrosPage.loadClients - companyId length:', companyId?.length)
       
-      // Garantir que companyId seja string e usar encodeURIComponent para evitar problemas de encoding
+      // NÃO usar encodeURIComponent - GUIDs não precisam de encoding e pode causar problemas
+      // O axios já faz o encoding necessário automaticamente
       let url = '/clients'
       if (companyId) {
-        const encodedCompanyId = encodeURIComponent(companyId)
-        url = `/clients?companyId=${encodedCompanyId}`
-        console.log('CadastrosPage.loadClients - companyId original:', companyId)
-        console.log('CadastrosPage.loadClients - companyId encoded:', encodedCompanyId)
+        // Usar diretamente o companyId do token, sem encoding manual
+        url = `/clients?companyId=${companyId}`
+        console.log('CadastrosPage.loadClients - companyId usado na URL:', companyId)
       }
       
       console.log('CadastrosPage.loadClients - URL final:', url)
