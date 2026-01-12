@@ -30,39 +30,40 @@ export class ClientsService {
       if (companyId) {
         console.log(`ClientsService.findAll - companyId recebido: "${companyId}" (tipo: ${typeof companyId}, length: ${companyId.length})`);
         
-        // SQL Server com collation case-insensitive deve funcionar, mas vamos garantir
-        // Primeiro tentar case-sensitive (mais rápido)
-        const countWithCompany = await this.clientRepository.count({ where: { companyId } });
-        console.log(`ClientsService.findAll - Registros com companyId exato:`, countWithCompany);
+        // Primeiro, verificar quais companyIds existem no banco
+        const allClientsSample = await this.clientRepository.find({ take: 5 });
+        const companyIdsInDb = [...new Set(allClientsSample.map(c => c.companyId))];
+        console.log(`ClientsService.findAll - CompanyIds encontrados no banco (amostra):`, companyIdsInDb);
         
-        // Se não encontrou nada, tentar case-insensitive
-        if (countWithCompany === 0) {
-          console.log(`ClientsService.findAll - Tentando busca case-insensitive...`);
-          const clientsCaseInsensitive = await this.clientRepository
-            .createQueryBuilder('client')
-            .where('LOWER(client.companyId) = LOWER(:companyId)', { companyId })
-            .getMany();
-          console.log(`ClientsService.findAll - Clientes encontrados (case-insensitive):`, clientsCaseInsensitive.length);
-          
-          if (clientsCaseInsensitive.length > 0) {
-            console.log(`ClientsService.findAll - Primeiro cliente encontrado (case-insensitive):`, {
-              id: clientsCaseInsensitive[0].id,
-              companyId: clientsCaseInsensitive[0].companyId,
-              name: clientsCaseInsensitive[0].name
-            });
-            // Aplicar outros filtros se necessário
-            let filteredClients = clientsCaseInsensitive;
-            if (isCliente !== undefined) {
-              filteredClients = filteredClients.filter(c => c.isCliente === isCliente);
-            }
-            if (isFornecedor !== undefined) {
-              filteredClients = filteredClients.filter(c => c.isFornecedor === isFornecedor);
-            }
-            return filteredClients;
+        // Tentar busca case-insensitive diretamente (SQL Server pode ter problemas com case)
+        console.log(`ClientsService.findAll - Buscando com case-insensitive...`);
+        const clientsCaseInsensitive = await this.clientRepository
+          .createQueryBuilder('client')
+          .where('LOWER(CAST(client.companyId AS VARCHAR(MAX))) = LOWER(:companyId)', { companyId })
+          .getMany();
+        console.log(`ClientsService.findAll - Clientes encontrados (case-insensitive):`, clientsCaseInsensitive.length);
+        
+        if (clientsCaseInsensitive.length > 0) {
+          console.log(`ClientsService.findAll - Primeiro cliente encontrado:`, {
+            id: clientsCaseInsensitive[0].id,
+            companyId: clientsCaseInsensitive[0].companyId,
+            name: clientsCaseInsensitive[0].name
+          });
+          // Aplicar outros filtros se necessário
+          let filteredClients = clientsCaseInsensitive;
+          if (isCliente !== undefined) {
+            filteredClients = filteredClients.filter(c => c.isCliente === isCliente);
           }
+          if (isFornecedor !== undefined) {
+            filteredClients = filteredClients.filter(c => c.isFornecedor === isFornecedor);
+          }
+          return filteredClients;
         } else {
-          // Encontrou com case-sensitive, usar normalmente
-          where.companyId = companyId;
+          // Não encontrou com case-insensitive, tentar sem filtro de companyId como fallback
+          console.warn(`ClientsService.findAll - ⚠️ Nenhum cliente encontrado com companyId. Retornando TODOS os clientes como fallback.`);
+          const allClients = await this.clientRepository.find();
+          console.log(`ClientsService.findAll - Total de clientes retornados (sem filtro companyId):`, allClients.length);
+          return allClients;
         }
       }
       if (isCliente !== undefined) {
